@@ -1,147 +1,432 @@
+"use client";
+
 /**
- * /dashboard — Phase 1 placeholder with hardcoded data.
- * Real data wired in Phase 2 (Supabase + API integration).
+ * /dashboard — Phase 2: live data from GET /daily_status, glassmorphism design.
+ * Auto-refreshes every 60 seconds.
  */
 
-import { formatUSD, formatPct } from "@/lib/utils";
+import { useCallback, useEffect, useState } from "react";
+import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip } from "recharts";
+import { api } from "@/lib/api";
+import type { DailyStatusResponse, SleeveWeight, VaultBalance } from "@/lib/types";
 
-// ── Placeholder data ──────────────────────────────────────────────────────────
-
-const PLACEHOLDER = {
-  netWorth: 287_430.12,
-  dailyChange: 1_842.55,
-  dailyChangePct: 0.00644,
-  regime: "normal" as const,
-  sleeves: [
-    { name: "US Equity",    target: 0.45, actual: 0.463, color: "#3b82f6" },
-    { name: "Bonds",        target: 0.20, actual: 0.187, color: "#22c55e" },
-    { name: "Intl Equity",  target: 0.15, actual: 0.142, color: "#f59e0b" },
-    { name: "Brazil Eq.",   target: 0.10, actual: 0.094, color: "#ef4444" },
-    { name: "Crypto",       target: 0.07, actual: 0.082, color: "#a855f7" },
-    { name: "Cash",         target: 0.03, actual: 0.032, color: "#6b7280" },
-  ],
-  vaults: [
-    { name: "Future Investments", balance: 4_200,  min: 500,   color: "#3b82f6" },
-    { name: "Opportunity",        balance: 8_750,  min: 1_000, color: "#f59e0b" },
-    { name: "Emergency",          balance: 18_000, min: null,  color: "#22c55e" },
-  ],
+// ── Design tokens (DESIGN.md) ─────────────────────────────────────────────────
+const SLEEVE_COLORS: Record<string, string> = {
+  us_equity:     "#10b981", // emerald
+  intl_equity:   "#06b6d4", // cyan
+  bonds:         "#3b82f6", // blue
+  brazil_equity: "#22c55e", // green
+  crypto:        "#8b5cf6", // violet
+  cash:          "#64748b", // slate
 };
 
-const REGIME_BADGE: Record<string, { label: string; classes: string }> = {
-  normal:      { label: "NORMAL",      classes: "bg-green-900/40 text-green-400 border-green-700" },
-  high_vol:    { label: "HIGH VOL",    classes: "bg-red-900/40 text-red-400 border-red-700" },
-  opportunity: { label: "OPPORTUNITY", classes: "bg-amber-900/40 text-amber-400 border-amber-700" },
+const SLEEVE_LABELS: Record<string, string> = {
+  us_equity:     "US Equity",
+  intl_equity:   "Intl Equity",
+  bonds:         "Bonds",
+  brazil_equity: "Brazil Eq.",
+  crypto:        "Crypto",
+  cash:          "Cash",
 };
 
-// ── Component ─────────────────────────────────────────────────────────────────
+const REGIME_CONFIG = {
+  normal:      { label: "NORMAL REGIME",      color: "#10b981", bg: "rgba(16,185,129,0.08)", border: "rgba(16,185,129,0.25)" },
+  high_vol:    { label: "HIGH VOLATILITY",    color: "#f59e0b", bg: "rgba(245,158,11,0.08)", border: "rgba(245,158,11,0.25)" },
+  opportunity: { label: "OPPORTUNITY MODE",   color: "#8b5cf6", bg: "rgba(139,92,246,0.08)", border: "rgba(139,92,246,0.25)" },
+  paused:      { label: "AUTOMATION PAUSED",  color: "#ef4444", bg: "rgba(239,68,68,0.08)", border: "rgba(239,68,68,0.25)" },
+};
 
+const VAULT_CONFIG = {
+  future_investments: { label: "Future Investments", color: "#10b981", icon: "💰" },
+  opportunity:        { label: "Opportunity",         color: "#f59e0b", icon: "🎯" },
+  emergency:          { label: "Emergency",           color: "#64748b", icon: "🔒" },
+};
+
+// ── Glass card base style ─────────────────────────────────────────────────────
+const glass = "rounded-2xl border border-white/[0.08] bg-white/[0.03] backdrop-blur-sm";
+const glassInner = `${glass} p-5`;
+
+// ── Formatters ────────────────────────────────────────────────────────────────
+function fmtUSD(n: number) {
+  return new Intl.NumberFormat("en-US", { style: "currency", currency: "USD", maximumFractionDigits: 0 }).format(n);
+}
+function fmtBRL(n: number) {
+  return "R$ " + new Intl.NumberFormat("pt-BR", { maximumFractionDigits: 0 }).format(n);
+}
+function fmtPct(n: number, signed = true) {
+  const s = (n * 100).toFixed(1) + "%";
+  return signed && n > 0 ? "+" + s : s;
+}
+
+// ── Skeleton ──────────────────────────────────────────────────────────────────
+function Skeleton({ className = "" }: { className?: string }) {
+  return <div className={`animate-pulse rounded bg-white/[0.06] ${className}`} />;
+}
+
+// ── Custom donut tooltip ──────────────────────────────────────────────────────
+function DonutTooltip({ active, payload }: { active?: boolean; payload?: { name: string; value: number }[] }) {
+  if (!active || !payload?.length) return null;
+  return (
+    <div className={`${glass} p-3 text-xs`}>
+      <div className="font-medium text-white/90">{payload[0].name}</div>
+      <div style={{ color: "#10b981" }} className="font-mono">{fmtPct(payload[0].value, false)}</div>
+    </div>
+  );
+}
+
+// ── Main component ────────────────────────────────────────────────────────────
 export default function DashboardPage() {
-  const regime = REGIME_BADGE[PLACEHOLDER.regime];
-  const isPositive = PLACEHOLDER.dailyChange >= 0;
+  const [status, setStatus] = useState<DailyStatusResponse | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [lastRefresh, setLastRefresh] = useState<Date>(new Date());
+
+  const fetchStatus = useCallback(async () => {
+    try {
+      const data = await api.dailyStatus();
+      setStatus(data);
+      setError(null);
+      setLastRefresh(new Date());
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to load data");
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchStatus();
+    const interval = setInterval(fetchStatus, 60_000);
+    return () => clearInterval(interval);
+  }, [fetchStatus]);
+
+  const regime = status ? (REGIME_CONFIG[status.regime_state] ?? REGIME_CONFIG.normal) : REGIME_CONFIG.normal;
+
+  const donutData = (status?.sleeve_weights ?? []).map((sw) => ({
+    name: SLEEVE_LABELS[sw.sleeve] ?? sw.sleeve,
+    value: sw.current_weight,
+    sleeve: sw.sleeve,
+    color: SLEEVE_COLORS[sw.sleeve] ?? "#64748b",
+  }));
 
   return (
-    <div className="p-6 space-y-6">
-      {/* Header */}
+    <div className="min-h-screen p-6 space-y-5" style={{ background: "#050508" }}>
+      {/* ── Header ── */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-base font-semibold text-[hsl(210,40%,98%)]">Dashboard</h1>
-          <p className="text-xs text-[hsl(215,20.2%,65.1%)] mt-0.5">
-            Placeholder data — Phase 1 · {new Date().toLocaleDateString("en-US", { dateStyle: "medium" })}
+          <h1 className="text-xl font-semibold text-white/95 tracking-tight">Dashboard</h1>
+          <p className="text-xs text-white/40 mt-0.5">
+            {new Date().toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric" })}
+            {" · "}
+            {loading ? "Loading..." : error ? "⚠ Error" : `Updated ${lastRefresh.toLocaleTimeString()}`}
           </p>
         </div>
-        <span className={`text-xs font-medium px-2.5 py-1 rounded border ${regime.classes}`}>
+        <div
+          className="flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-medium border"
+          style={{ color: regime.color, background: regime.bg, borderColor: regime.border }}
+        >
+          <span className="w-1.5 h-1.5 rounded-full animate-pulse" style={{ background: regime.color }} />
           {regime.label}
-        </span>
+        </div>
       </div>
 
-      {/* Top row: Net Worth + Vaults */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-        {/* Net Worth card */}
-        <div className="md:col-span-1 border border-[hsl(217.2,32.6%,17.5%)] rounded-lg p-4 bg-[hsl(222.2,84%,6%)]">
-          <p className="text-xs text-[hsl(215,20.2%,65.1%)] uppercase tracking-wider">Net Worth</p>
-          <p className="text-2xl font-bold text-[hsl(210,40%,98%)] mt-1">
-            {formatUSD(PLACEHOLDER.netWorth)}
-          </p>
-          <p className={`text-xs mt-1 font-medium ${isPositive ? "text-green-400" : "text-red-400"}`}>
-            {isPositive ? "+" : ""}
-            {formatUSD(PLACEHOLDER.dailyChange)}{" "}
-            ({isPositive ? "+" : ""}
-            {formatPct(PLACEHOLDER.dailyChangePct)}) today
-          </p>
+      {/* ── Top metrics row ── */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+        {/* Net Worth */}
+        <div className={glassInner} style={{ borderColor: "rgba(16,185,129,0.2)", boxShadow: "0 0 20px rgba(16,185,129,0.05)" }}>
+          <p className="text-xs text-white/40 uppercase tracking-widest mb-2">Net Worth</p>
+          {loading ? (
+            <Skeleton className="h-9 w-36 mb-2" />
+          ) : (
+            <p className="text-3xl font-bold text-white font-mono tracking-tight">
+              {fmtUSD(status?.total_value_usd ?? 0)}
+            </p>
+          )}
+          {loading ? (
+            <Skeleton className="h-4 w-24 mt-1" />
+          ) : (
+            <>
+              {status?.today_pnl_usd != null ? (
+                <p className={`text-xs mt-1 font-mono ${status.today_pnl_usd >= 0 ? "text-emerald-400" : "text-rose-400"}`}>
+                  {status.today_pnl_usd >= 0 ? "↑ " : "↓ "}
+                  {fmtUSD(Math.abs(status.today_pnl_usd))} ({fmtPct(status.today_pnl_pct ?? 0)}) today
+                </p>
+              ) : (
+                <p className="text-xs mt-1 text-white/30 font-mono">P&L: run allocation to compute</p>
+              )}
+              <p className="text-xs mt-0.5 text-white/30 font-mono">{fmtBRL(status?.total_value_brl ?? 0)}</p>
+            </>
+          )}
+        </div>
+
+        {/* YTD Return */}
+        <div className={glassInner}>
+          <p className="text-xs text-white/40 uppercase tracking-widest mb-2">YTD Return (TWR)</p>
+          {loading ? (
+            <Skeleton className="h-9 w-24 mb-2" />
+          ) : status?.ytd_return_twr != null ? (
+            <p className={`text-3xl font-bold font-mono ${status.ytd_return_twr >= 0 ? "text-emerald-400" : "text-rose-400"}`}>
+              {fmtPct(status.ytd_return_twr)}
+            </p>
+          ) : (
+            <p className="text-3xl font-bold text-white/20 font-mono">—</p>
+          )}
+          <p className="text-xs text-white/30 mt-1">Time-weighted return</p>
+        </div>
+
+        {/* Max Drawdown */}
+        <div className={glassInner}>
+          <p className="text-xs text-white/40 uppercase tracking-widest mb-2">Max Drawdown</p>
+          {loading ? (
+            <Skeleton className="h-9 w-24 mb-2" />
+          ) : status?.max_drawdown_pct != null ? (
+            <p className={`text-3xl font-bold font-mono ${Math.abs(status.max_drawdown_pct) > 0.25 ? "text-rose-400" : "text-amber-400"}`}>
+              {fmtPct(status.max_drawdown_pct)}
+            </p>
+          ) : (
+            <p className="text-3xl font-bold text-white/20 font-mono">—</p>
+          )}
+          <p className="text-xs text-white/30 mt-1">From peak</p>
+        </div>
+
+        {/* Pending Approvals */}
+        <div className={glassInner} style={
+          (status?.pending_approvals ?? 0) > 0
+            ? { borderColor: "rgba(245,158,11,0.3)", boxShadow: "0 0 20px rgba(245,158,11,0.06)" }
+            : {}
+        }>
+          <p className="text-xs text-white/40 uppercase tracking-widest mb-2">Pending Approvals</p>
+          {loading ? (
+            <Skeleton className="h-9 w-16 mb-2" />
+          ) : (
+            <p className={`text-3xl font-bold font-mono ${(status?.pending_approvals ?? 0) > 0 ? "text-amber-400" : "text-white/30"}`}>
+              {status?.pending_approvals ?? 0}
+            </p>
+          )}
+          {(status?.pending_approvals ?? 0) > 0 ? (
+            <a href="/signals" className="text-xs text-amber-400/70 hover:text-amber-400 mt-1 block transition-colors">
+              Review in Signals →
+            </a>
+          ) : (
+            <p className="text-xs text-white/30 mt-1">All clear</p>
+          )}
+        </div>
+      </div>
+
+      {/* ── Middle row: Donut + Vaults ── */}
+      <div className="grid grid-cols-1 lg:grid-cols-5 gap-4">
+        {/* Allocation donut */}
+        <div className={`${glassInner} lg:col-span-3`}>
+          <p className="text-xs text-white/40 uppercase tracking-widest mb-4">Asset Allocation</p>
+          {loading ? (
+            <div className="flex gap-6">
+              <Skeleton className="h-48 w-48 rounded-full" />
+              <div className="flex-1 space-y-3 pt-4">
+                {Array.from({ length: 6 }).map((_, i) => <Skeleton key={i} className="h-6" />)}
+              </div>
+            </div>
+          ) : (
+            <div className="flex flex-col sm:flex-row gap-6 items-start">
+              <div className="w-48 h-48 shrink-0">
+                <ResponsiveContainer width="100%" height="100%">
+                  <PieChart>
+                    <Pie
+                      data={donutData}
+                      cx="50%"
+                      cy="50%"
+                      innerRadius={55}
+                      outerRadius={88}
+                      paddingAngle={2}
+                      dataKey="value"
+                      strokeWidth={0}
+                    >
+                      {donutData.map((entry) => (
+                        <Cell key={entry.sleeve} fill={entry.color} opacity={0.85} />
+                      ))}
+                    </Pie>
+                    <Tooltip content={<DonutTooltip />} />
+                  </PieChart>
+                </ResponsiveContainer>
+              </div>
+
+              {/* Sleeve bars */}
+              <div className="flex-1 space-y-2.5 w-full">
+                {status?.sleeve_weights?.map((sw) => (
+                  <SleeveBar key={sw.sleeve} sw={sw} />
+                ))}
+              </div>
+            </div>
+          )}
         </div>
 
         {/* Vault cards */}
-        {PLACEHOLDER.vaults.map((vault) => (
-          <div
-            key={vault.name}
-            className="border border-[hsl(217.2,32.6%,17.5%)] rounded-lg p-4 bg-[hsl(222.2,84%,6%)]"
-          >
-            <p className="text-xs text-[hsl(215,20.2%,65.1%)] uppercase tracking-wider truncate">
-              {vault.name}
-            </p>
-            <p className="text-xl font-bold mt-1" style={{ color: vault.color }}>
-              {formatUSD(vault.balance)}
-            </p>
-            {vault.min !== null && (
-              <p className="text-xs text-[hsl(215,20.2%,65.1%)] mt-1">
-                Min: {formatUSD(vault.min)}
-              </p>
-            )}
-            {vault.name === "Emergency" && (
-              <p className="text-xs text-[hsl(215,20.2%,65.1%)] mt-1">Non-investable</p>
-            )}
-          </div>
-        ))}
-      </div>
-
-      {/* Sleeve allocation */}
-      <div className="border border-[hsl(217.2,32.6%,17.5%)] rounded-lg p-4 bg-[hsl(222.2,84%,6%)]">
-        <p className="text-xs text-[hsl(215,20.2%,65.1%)] uppercase tracking-wider mb-4">
-          Sleeve Allocation vs. Targets
-        </p>
-        <div className="space-y-3">
-          {PLACEHOLDER.sleeves.map((sleeve) => {
-            const diff = sleeve.actual - sleeve.target;
-            const absDiff = Math.abs(diff);
-            const drifted = absDiff >= 0.05;
-
-            return (
-              <div key={sleeve.name} className="grid grid-cols-12 items-center gap-3 text-xs">
-                <span className="col-span-2 text-[hsl(215,20.2%,65.1%)] truncate">{sleeve.name}</span>
-
-                {/* Bar track */}
-                <div className="col-span-7 h-2 rounded-full bg-[hsl(217.2,32.6%,17.5%)] relative">
-                  {/* Target marker */}
-                  <div
-                    className="absolute top-0 h-full w-0.5 bg-white/30 rounded"
-                    style={{ left: `${sleeve.target * 100}%` }}
-                  />
-                  {/* Actual fill */}
-                  <div
-                    className="h-full rounded-full transition-all"
-                    style={{
-                      width: `${Math.min(sleeve.actual * 100, 100)}%`,
-                      backgroundColor: sleeve.color,
-                      opacity: drifted ? 1 : 0.7,
-                    }}
-                  />
-                </div>
-
-                <span className="col-span-1 text-right text-[hsl(210,40%,98%)] font-medium">
-                  {formatPct(sleeve.actual)}
-                </span>
-                <span className={`col-span-2 text-right font-medium ${drifted ? "text-amber-400" : "text-[hsl(215,20.2%,65.1%)]"}`}>
-                  {diff >= 0 ? "+" : ""}
-                  {formatPct(diff)} {drifted ? "⚠" : ""}
-                </span>
-              </div>
-            );
-          })}
+        <div className="lg:col-span-2 flex flex-col gap-3">
+          {loading
+            ? Array.from({ length: 3 }).map((_, i) => <Skeleton key={i} className="h-24 rounded-2xl" />)
+            : (status?.vault_balances ?? []).map((v) => <VaultCard key={v.vault_type} vault={v} />)}
         </div>
-        <p className="text-xs text-[hsl(215,20.2%,65.1%)] mt-4">
-          White markers = target · Drift threshold: ±5%
-        </p>
       </div>
+
+      {/* ── Bottom row: Regime + FX ── */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+        {/* Economic Season */}
+        <div className={glassInner}>
+          <p className="text-xs text-white/40 uppercase tracking-widest mb-3">Economic Season</p>
+          {loading ? (
+            <Skeleton className="h-8 w-48" />
+          ) : (
+            <div className="flex items-center gap-3">
+              <span className="text-lg">{seasonIcon(status?.economic_season ?? "normal")}</span>
+              <div>
+                <p className="text-sm font-medium text-white/90">{seasonLabel(status?.economic_season ?? "normal")}</p>
+                <p className="text-xs text-white/30 mt-0.5">Dalio 4-season classifier</p>
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* FX Rate */}
+        <div className={glassInner}>
+          <p className="text-xs text-white/40 uppercase tracking-widest mb-3">USD/BRL Rate</p>
+          {loading ? (
+            <Skeleton className="h-8 w-32" />
+          ) : (
+            <div className="flex items-center gap-3">
+              <span className="text-lg">🇧🇷</span>
+              <div>
+                <p className="text-2xl font-bold text-white/90 font-mono">
+                  {status?.usd_brl_rate?.toFixed(4) ?? "—"}
+                </p>
+                <p className="text-xs text-white/30 mt-0.5">BRL per 1 USD · live via yfinance</p>
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* ── Error banner ── */}
+      {error && (
+        <div className={`${glass} p-4 border-rose-500/30 bg-rose-500/5`}>
+          <p className="text-sm text-rose-400">
+            ⚠ API unavailable — {error}. Start the backend: <code className="text-rose-300">uv run uvicorn app.main:app --reload</code>
+          </p>
+        </div>
+      )}
     </div>
   );
+}
+
+// ── Sub-components ────────────────────────────────────────────────────────────
+
+function SleeveBar({ sw }: { sw: SleeveWeight }) {
+  const color = SLEEVE_COLORS[sw.sleeve] ?? "#64748b";
+  const label = SLEEVE_LABELS[sw.sleeve] ?? sw.sleeve;
+  const isBreached = sw.is_breached;
+
+  return (
+    <div className="grid grid-cols-12 items-center gap-2 text-xs">
+      <span className="col-span-3 text-white/50 truncate">{label}</span>
+
+      {/* Bar track */}
+      <div className="col-span-6 h-1.5 rounded-full bg-white/[0.06] relative">
+        {/* Target ghost bar */}
+        <div
+          className="absolute top-0 h-full rounded-full opacity-20"
+          style={{ width: `${sw.target_weight * 100}%`, background: color }}
+        />
+        {/* Actual fill */}
+        <div
+          className="absolute top-0 h-full rounded-full transition-all duration-500"
+          style={{
+            width: `${Math.min(sw.current_weight * 100, 100)}%`,
+            background: color,
+            boxShadow: isBreached ? `0 0 6px ${color}` : undefined,
+          }}
+        />
+        {/* Target marker */}
+        <div
+          className="absolute top-0 w-px h-full bg-white/40"
+          style={{ left: `${sw.target_weight * 100}%` }}
+        />
+      </div>
+
+      <span className="col-span-1 text-right text-white/70 font-mono">
+        {(sw.current_weight * 100).toFixed(0)}%
+      </span>
+      <span
+        className={`col-span-2 text-right font-mono ${isBreached ? "text-amber-400" : "text-white/30"}`}
+      >
+        {sw.drift_pct > 0 ? "+" : ""}{sw.drift_pct.toFixed(1)}%
+        {isBreached ? " ⚠" : ""}
+      </span>
+    </div>
+  );
+}
+
+function VaultCard({ vault }: { vault: VaultBalance }) {
+  const cfg = VAULT_CONFIG[vault.vault_type as keyof typeof VAULT_CONFIG] ?? {
+    label: vault.vault_type,
+    color: "#64748b",
+    icon: "💼",
+  };
+  const progress = vault.progress_pct ?? 0;
+
+  return (
+    <div
+      className={`${glass} p-4`}
+      style={{ borderColor: vault.is_investable ? `${cfg.color}30` : "rgba(255,255,255,0.05)" }}
+    >
+      <div className="flex items-center justify-between mb-2">
+        <span className="text-xs text-white/50 flex items-center gap-1.5">
+          {cfg.icon} {cfg.label}
+        </span>
+        {!vault.is_investable && (
+          <span className="text-[10px] text-white/30 border border-white/10 rounded px-1.5 py-0.5">NON-INVESTABLE</span>
+        )}
+        {vault.approval_required && vault.is_investable && (
+          <span className="text-[10px] text-amber-400/70 border border-amber-400/20 rounded px-1.5 py-0.5">APPROVAL REQ.</span>
+        )}
+      </div>
+
+      <p className="text-xl font-bold font-mono" style={{ color: cfg.color }}>
+        {fmtUSD(vault.balance_usd)}
+      </p>
+
+      {vault.min_balance != null && (
+        <div className="mt-2">
+          <div className="h-1 rounded-full bg-white/[0.06] overflow-hidden">
+            <div
+              className="h-full rounded-full transition-all duration-700"
+              style={{ width: `${Math.min(progress * 100, 100)}%`, background: cfg.color, opacity: 0.7 }}
+            />
+          </div>
+          <p className="text-[10px] text-white/25 mt-1 font-mono">
+            {(progress * 100).toFixed(0)}% of min {fmtUSD(vault.min_balance)}
+          </p>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function seasonLabel(s: string) {
+  const labels: Record<string, string> = {
+    rising_growth_low_inflation:      "Rising Growth / Low Inflation",
+    falling_growth_low_inflation:     "Falling Growth / Low Inflation",
+    rising_inflation:                 "Rising Inflation",
+    falling_inflation_growth_recovery:"Recovery / Falling Inflation",
+    normal:                           "Normal / Unclear Regime",
+  };
+  return labels[s] ?? s;
+}
+
+function seasonIcon(s: string) {
+  const icons: Record<string, string> = {
+    rising_growth_low_inflation:      "📈",
+    falling_growth_low_inflation:     "📉",
+    rising_inflation:                 "🔥",
+    falling_inflation_growth_recovery:"🌱",
+    normal:                           "⚖️",
+  };
+  return icons[s] ?? "📊";
 }

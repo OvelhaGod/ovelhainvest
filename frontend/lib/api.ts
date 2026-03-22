@@ -3,6 +3,12 @@
  * All backend calls go through here — never inline fetch in components.
  */
 
+import type {
+  AllocationRunResponse,
+  DailyStatusResponse,
+  SignalsRun,
+} from "@/lib/types";
+
 const API_URL =
   process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
 
@@ -18,12 +24,23 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
 }
 
 export const api = {
-  health: () => request<{ status: string; supabase: string; version: string }>("/health"),
-  // Phase 2+
-  dailyStatus: () => request<unknown>("/api/v1/daily_status"),
-  runAllocation: (body: unknown) =>
-    request<unknown>("/api/v1/run_allocation", {
+  health: () =>
+    request<{ status: string; supabase: string; version: string }>("/health"),
+
+  dailyStatus: (userId?: string) =>
+    request<DailyStatusResponse>(
+      `/daily_status${userId ? `?user_id=${userId}` : ""}`
+    ),
+
+  runAllocation: (body: { user_id?: string; event_type?: string; notes?: string }) =>
+    request<AllocationRunResponse>("/run_allocation", {
       method: "POST",
-      body: JSON.stringify(body),
+      body: JSON.stringify({ event_type: "daily_check", ...body }),
+    }),
+
+  updateSignalStatus: (runId: string, status: string) =>
+    request<{ id: string; status: string }>(`/signals/${runId}/status`, {
+      method: "PATCH",
+      body: JSON.stringify({ status }),
     }),
 };

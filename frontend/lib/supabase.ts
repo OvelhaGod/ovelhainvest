@@ -1,12 +1,13 @@
 import { createClient } from "@supabase/supabase-js";
 
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL ?? "";
+const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ?? "";
 
-if (!supabaseUrl || !supabaseAnonKey) {
-  throw new Error(
-    "Missing NEXT_PUBLIC_SUPABASE_URL or NEXT_PUBLIC_SUPABASE_ANON_KEY"
-  );
+// Allow app to build without env vars set (shows error state at runtime)
+export const supabase = supabaseUrl && supabaseAnonKey
+  ? createClient(supabaseUrl, supabaseAnonKey)
+  : null;
+
+export function isSupabaseConfigured(): boolean {
+  return Boolean(supabaseUrl && supabaseAnonKey);
 }
-
-export const supabase = createClient(supabaseUrl, supabaseAnonKey);
