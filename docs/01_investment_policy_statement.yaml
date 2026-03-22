@@ -1,0 +1,40 @@
+# OvelhaInvest — Investment Policy Statement (IPS)
+# Thiago Wealth OS v1.0
+
+investor: Thiago
+profile:
+  risk_tolerance: moderate_aggressive
+  time_horizon: long_term  # 15+ years
+  max_comfortable_drawdown: 0.35   # 35%
+  pause_automation_drawdown: 0.40  # 40%
+  alert_drawdown: 0.25             # 25%
+
+target_allocations:
+  us_equity:     { target: 0.45, min: 0.40, max: 0.50 }
+  intl_equity:   { target: 0.15, min: 0.10, max: 0.20 }
+  bonds:         { target: 0.20, min: 0.10, max: 0.30 }
+  brazil_equity: { target: 0.10, min: 0.05, max: 0.15 }
+  crypto:        { target: 0.07, min: 0.05, max: 0.10 }
+  cash:          { target: 0.03, min: 0.02, max: 0.10 }
+
+crypto_targets:
+  btc_fraction_of_crypto: { target: 0.65, min: 0.50, max: 0.80 }
+  eth_fraction_of_crypto: { target: 0.25, min: 0.15, max: 0.40 }
+  satellites_max_fraction: 0.20
+  max_single_satellite: 0.10
+
+rebalancing_rules:
+  drift_threshold: 0.05
+  hard_rebalance_max_frequency_days: 30
+  execution_max_frequency_days: 7
+  min_reinvest_cadence_days: 14
+  prefer_soft_rebalance: true
+  min_trade_usd: 50
+  max_single_trade_pct_portfolio: 0.05
+  max_daily_trades_pct_portfolio: 0.10
+
+concentration_limits:
+  max_single_stock_pct: 0.07
+  max_single_sector_pct_equity: 0.25
+  crypto_max_pct: 0.10
+  crypto_min_pct: 0.03
