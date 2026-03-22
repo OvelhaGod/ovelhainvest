@@ -1,0 +1,26 @@
+# Secrets — never commit
+.env
+.env.*
+*.pem
+*.key
+service_account.json
+gcloud_credentials.json
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+dist/
+*.egg-info/
+
+# Node
+node_modules/
+.next/
+out/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Tools
+.claude/cache/
