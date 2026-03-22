@@ -1,5 +1,5 @@
 # OvelhaInvest — Claude Code Project Brief
-> Version 2.0 | Single-user personal wealth OS for Thiago
+> Version 3.0 | Single-user personal wealth OS for Thiago
 > Read this file COMPLETELY before writing any code. Every section matters.
 
 ---
@@ -15,7 +15,7 @@
 
 **Core principle:** Deterministic Python engine is the source of truth. AI is validator + explainer only. Never the decision-maker.
 
-**Design aesthetic:** Data-dense decision-support terminal. Bloomberg terminal meets personal finance. Dark mode default. Dense, professional, never gamified.
+**Design aesthetic:** Modern glassmorphism with depth. Think Linear.app meets Vercel dashboard meets a premium trading terminal. Dark mode always. Frosted glass cards with subtle backdrop blur, soft purple/blue/green gradient accents on key metrics, smooth micro-animations on state changes, variable rounded corners (never fully squared). Data-dense but breathable — tight spacing where it matters, generous padding on hero metrics. Typography: Inter for UI copy, Geist Mono for all numbers and tickers. Color language: emerald green (#10b981) for gains/positive, rose red (#f43f5e) for losses/negative, amber (#f59e0b) for warnings, violet (#8b5cf6) as brand accent. Every screen should feel like a premium 2026 AI product — NOT boxy default shadcn, NOT plain tables, NOT generic fintech.
 
 ---
 
@@ -1575,80 +1575,223 @@ The DESIGN.md for OvelhaInvest must specify:
 - Component patterns: dense tables, compact cards, minimal whitespace
 - Chart palette: green/red for P&L, blue spectrum for multi-series
 
-### 27.4 Stitch Prompts for Each OvelhaInvest Page
+### 27.4 Design System — OvelhaInvest Visual Language
 
-Use these exact prompts at stitch.withgoogle.com before writing frontend code:
+Before generating Stitch screens, internalize this design system. Every screen must follow it exactly.
 
-**Dashboard:**
-```
-Professional financial portfolio dashboard. Dark theme #0a0a0a background.
-Bloomberg terminal aesthetic — data-dense, zero decoration.
-Top row: 4 metric cards (Net Worth in USD, Today P&L with % change, YTD TWR vs benchmark delta, Max Drawdown).
-Center: Asset allocation donut chart (6 slices: US Equity, Intl, Bonds, Brazil, Crypto, Cash) with target vs actual rings.
-Right: 3 vault balance cards (Future Investments, Opportunity, Emergency) with progress bars.
-Bottom: Regime status banner (Normal/High-Vol/Opportunity) + recent signals table (5 rows).
-Font: Inter. Numbers: JetBrains Mono. Green for positive values, red for negative. shadcn/ui components.
-```
+**Design Inspiration:** Linear.app + Vercel Dashboard + Raycast + Stripe Dashboard — 2026 premium AI product aesthetic. NOT Bloomberg boxy. NOT default shadcn. NOT squared-off corporate.
 
-**Signals:**
-```
-Financial signals and activity log page. Dark theme. 
-Full-width table: timestamp, event type badge, proposed trades summary, AI status badge (OK/Warning/Block), execution status.
-Expandable row reveals: full trade list with amounts, AI investment framework check (5 green/amber/red indicators for Swensen/Dalio/Marks/Graham/Bogle), approval button if pending.
-Filter bar: status dropdown, event type, date range picker.
-Dense, professional, no whitespace waste. shadcn/ui Table component.
-```
+**Core Visual Principles:**
+- Glassmorphism cards: `backdrop-blur-xl bg-white/5 border border-white/10 rounded-2xl`
+- Subtle gradient backgrounds: deep space dark `#050508` with faint radial glow behind hero elements
+- Gradient accents: emerald-to-cyan for positive `(#10b981 → #06b6d4)`, rose-to-red for negative `(#f43f5e → #ef4444)`, violet-to-purple for AI/intelligence features
+- Floating sidebar: glassmorphic, blurred, not solid black
+- Cards have soft inner glow on hover: `shadow-[0_0_30px_rgba(16,185,129,0.15)]`
+- Numbers use Geist Mono or JetBrains Mono — large, confident, with color-coded signs
+- Typography: Geist Sans (headings) + Inter (body) + JetBrains Mono (all financial numbers)
+- Smooth transitions: 200ms ease on all interactive elements
+- Charts: glowing line strokes with area fill gradient, NOT flat bars
+- Status badges: pill-shaped with colored glow, NOT squared chips
+- Empty states: subtle animated gradient placeholder, NOT blank white boxes
+- Spacing: generous padding inside cards (p-6), tight between data rows
 
-**Assets & Valuations:**
+**Color Tokens:**
 ```
-Investment asset screener and valuation table. Dark theme, Bloomberg style.
-Sticky header with filter bar: asset class, region, tier, min margin of safety slider.
-Sortable table columns: Symbol, Class, Price, Margin of Safety % (color-coded: green >20%, amber 10-20%, red <10%), Value Score, Momentum Score, Quality Score, Moat (wide/narrow/none badge), Fair Value, Buy Target, Rank.
-Row click opens right drawer with: DCF assumptions accordion, score breakdown bar charts, linked news feed.
-Compact row height, monospace numbers.
-```
-
-**Performance:**
-```
-Portfolio performance analytics page. Dark theme. Institutional-grade.
-Top tabs: Summary | Attribution | Rolling | Risk.
-Summary tab: return cards row (1mo/3mo/6mo/YTD/1yr/All) showing TWR vs benchmark delta. Below: Sharpe/Sortino/Calmar ratio cards with interpretation badge.
-Attribution tab: stacked horizontal bar chart by sleeve (allocation effect + selection effect). Table: top 5 contributors, bottom 5 detractors.
-Risk tab: Beta, R2, Max Drawdown timeline chart, VaR gauge.
-Color: green for outperformance, red for underperformance.
+Background:     #050508  (deep space)
+Surface:        rgba(255,255,255,0.04)  (glass card)
+Surface-hover:  rgba(255,255,255,0.07)
+Border:         rgba(255,255,255,0.08)
+Border-accent:  rgba(16,185,129,0.3)   (green glow border)
+Text-primary:   #f8fafc
+Text-secondary: #94a3b8
+Text-muted:     #475569
+Positive:       #10b981  (emerald)
+Positive-glow:  rgba(16,185,129,0.2)
+Negative:       #f43f5e  (rose)
+Negative-glow:  rgba(244,63,94,0.2)
+Warning:        #f59e0b  (amber)
+AI-accent:      #8b5cf6  (violet — for AI features)
+Brazil:         #22c55e  (green flag accent)
 ```
 
-**Projections:**
+### 27.5 Stitch Prompts for Each OvelhaInvest Page
+
+**IMPORTANT:** Paste the GLOBAL STYLE BLOCK first in Stitch as a new project, then generate each screen within that project so Stitch maintains consistency.
+
+**GLOBAL STYLE BLOCK — paste this first, before any screen prompt:**
 ```
-Portfolio projection and scenario analysis page. Dark theme.
-4 horizontal tabs: Monte Carlo | Contribution Sim | Stress Test | Retirement.
-Monte Carlo tab: input row (monthly contribution, years, model selector). Below: fan chart with 5 shaded percentile bands (5th/25th/50th/75th/95th) from today to horizon. Key stats: median ending value, probability of reaching $X, 4% SWR survival %.
-Stress test tab: scenario cards (2008 GFC, 2020 COVID, 2022 Rate Shock, Stagflation, Brazil Crisis) — select one to see waterfall chart of sleeve-level impact.
+Design system for OvelhaInvest — a premium AI-powered wealth management app.
+
+Visual style: 2026 glassmorphism. Inspired by Linear.app, Vercel dashboard, and Raycast. 
+Dark mode only. Deep space background #050508. 
+Cards are frosted glass: semi-transparent with backdrop blur, subtle white border at 8% opacity, rounded-2xl corners.
+Gradient accents: emerald (#10b981) for gains/positive, rose (#f43f5e) for losses/negative, violet (#8b5cf6) for AI features.
+Typography: Geist Sans for headings, Inter for body text, JetBrains Mono for all numbers and tickers.
+Charts have glowing colored strokes with translucent gradient fills beneath them — no flat bars.
+Buttons: gradient fills with subtle glow shadows. Not flat. Not squared.
+Status badges: pill-shaped, colored background at 15% opacity, matching text color and left-border glow.
+Sidebar: fixed left, glassmorphic, blurred background, icon + label navigation items with active state showing emerald left-border accent and subtle background highlight.
+All interactive elements: smooth 200ms hover transitions with glow intensification.
+No pure white or pure black anywhere. Everything lives in the dark glass world.
 ```
 
-**Tax:**
+---
+
+**Screen 1 — Dashboard:**
 ```
-Tax lot tracker and optimization page. Dark theme.
-Top: Brazil DARF progress bar (monthly gross sales vs R$20,000 exemption, with projected month-end estimate).
-Main: Tax lots table — Symbol, Account, Acquisition Date, Quantity, Cost Basis, Current Value, Unrealized Gain/Loss (green/red), Holding Period (ST/LT badge), Est. Tax if Sold.
-Method selector: FIFO / HIFO / Spec ID toggle per account.
-Loss harvesting panel: flagged lots with suggested harvest action and wash-sale warning.
+OvelhaInvest Dashboard screen. Apply the project design system.
+
+Layout: fixed glassmorphic left sidebar (240px) + main content area.
+Sidebar: OvelhaInvest logo with sheep emoji at top, nav items (Dashboard, Signals, Assets, Performance, Projections, Tax, Journal, Config) with icons, Dashboard item active with emerald left-border glow.
+
+Main content — top row (4 metric cards in a glass card grid):
+- "Net Worth" card: large number $284,420 in white Geist Mono, subtitle "↑ $1,240 today" in emerald, secondary line "R$ 1.42M" in muted text. Card has faint emerald glow border.
+- "Today's P&L" card: "+$1,240" large in emerald with glow, "+0.44%" badge pill, sparkline chart below in emerald.
+- "YTD Return" card: "+18.4%" large, "vs benchmark +14.2%" in muted, "+4.2% alpha" emerald badge.
+- "Max Drawdown" card: "-8.3%" in amber, "from peak Mar 2024" muted subtitle.
+
+Middle row — two columns:
+Left (60%): Allocation donut chart — 6 glowing arc segments (emerald US Equity, cyan Intl, blue Bonds, green Brazil, violet Crypto, slate Cash). Center shows "45% US Equity". Outer ring shows target vs actual in lighter stroke. Chart title "Asset Allocation" with "vs targets" toggle.
+Right (40%): Three vault cards stacked — "Future Investments" glass card with emerald progress bar at 68%, balance $8,400. "Opportunity" card with amber bar at 22%, $2,800. "Emergency" card with slate bar at 100%, $15,000 with lock icon.
+
+Bottom row: "Market Regime" banner — pill badge "NORMAL" in emerald glow. Recent signals mini-table (3 rows): timestamp, event type colored badge, summary text, status badge. "View all signals →" link in muted.
 ```
 
-**Journal:**
+---
+
+**Screen 2 — Signals & Activity:**
 ```
-Investment decision journal page. Dark theme.
-Top: Override accuracy scorecard — 2 big numbers: "When you followed the system: +X% avg 90d outcome" vs "When you overrode: +Y% avg 90d outcome".
-Main table: Date, Action (Followed/Overrode/Deferred badge), Asset, System Recommendation summary, Your Reasoning (truncated), 30d Outcome, 90d Outcome.
-Bottom: Pattern analysis card — AI-generated text block on behavioral tendencies.
+OvelhaInvest Signals page. Apply the project design system.
+
+Header: "Signals & Activity" title + filter bar row — status dropdown (glass select), event type dropdown, date range picker, all with glass styling and subtle borders.
+
+Main: Full-width table in a large glass card.
+Table header row: Timestamp | Event Type | Proposed Trades | AI Status | Execution | Actions — all in muted uppercase small caps.
+3 visible rows with subtle hover glow:
+Row 1: "Today 09:14" | "DAILY CHECK" emerald pill badge | "Buy VTI $600, Buy BTC $300" | "✓ OK" emerald glow badge | "Pending Approval" amber badge | "Approve / Reject" gradient buttons.
+Row 2: "Yesterday 09:15" | "DAILY CHECK" | "Buy VXUS $400" | "⚠ Warning" amber badge | "Executed" slate badge | "View" link.
+Row 3: "Mar 18" | "OPPORTUNITY" violet pill badge | "Buy BTC $1,500 (Tier 1)" | "✓ OK" | "Approved" emerald badge | "View" link.
+
+Expanded row detail (show Row 1 expanded): inner glass panel showing — 5 framework check indicators in a row (Swensen ✓, Dalio ✓, Marks ⚠, Graham ✓, Bogle ✓) as colored icon+label pills. Below: proposed trades list with amounts. Bottom: gradient "Approve All" button and ghost "Reject" button.
 ```
 
-**Config:**
+---
+
+**Screen 3 — Assets & Valuations:**
 ```
-Strategy configuration viewer. Dark theme. Technical, developer-facing.
-Left: version history list (active version highlighted).
-Right: JSON viewer with syntax highlighting showing active strategy_config. Allocation targets donut chart rendered from config values. Comparison toggle: "vs Swensen" / "vs All-Weather" overlaid on same donut.
-Read-only in v1 with prominent "v2: editable" label.
+OvelhaInvest Assets page. Apply the project design system.
+
+Header: "Assets & Valuations" + filter bar — asset class multi-select, region dropdown, "Min Margin of Safety" range slider showing 15%, tier filter.
+
+Main: large glass card containing sortable table.
+Columns: Symbol | Class | Price | MoS% | Value | Momentum | Quality | Moat | Fair Value | Buy Target | Rank
+Column headers in muted small caps with sort arrows.
+4 visible rows:
+- VTI: ETF badge (blue pill), $218.40, MoS +12% amber pill, three score bars (value 0.62, momentum 0.71, quality 0.83) as small colored progress bars, moat "—", Fair $247, Buy $197, Rank #3
+- NVDA: Stock badge (violet), $124.80, MoS +28% emerald pill, scores (0.58, 0.89, 0.76), moat "Narrow" orange pill, Fair $173, Buy $147, Rank #1
+- BTC: Crypto badge (amber), $82,400, MoS +31% emerald pill, scores (0.71, 0.83, "N/A"), moat "—", Fair $115k, Buy $92k, Rank #2
+- PLTR: Stock badge (violet), $24.10, MoS -8% rose pill, scores (0.31, 0.77, 0.54), moat "Narrow", Fair $22, Buy $18, Rank #8
+
+Right side drawer (visible for NVDA row): glass panel sliding in from right — "NVDA Detail" header, DCF assumptions accordion (FCF $28B, growth 22%, rate 10%), three score breakdown bar charts with labels, recent news feed (3 items with source favicon).
+```
+
+---
+
+**Screen 4 — Performance Analytics:**
+```
+OvelhaInvest Performance page. Apply the project design system.
+
+Horizontal tab bar: Summary | Attribution | Rolling | Risk — glass pill tabs, active tab has emerald underline glow.
+
+Summary tab content:
+Top row — 6 period cards in glass: 1mo, 3mo, 6mo, YTD, 1yr, All-Time. Each shows TWR % large, benchmark delta small below ("vs +14.2% bench" in muted), colored by positive/negative.
+
+Middle row — 3 ratio cards:
+- Sharpe 1.42 — large number, "Good" emerald badge, subtitle "Risk-adjusted return"
+- Sortino 1.89 — large number, "Excellent" emerald glow badge
+- Calmar 0.87 — large number, "Fair" amber badge
+
+Bottom: Portfolio vs Benchmark line chart — two glowing lines (emerald portfolio, slate benchmark) on dark chart canvas with gradient area fill. X-axis: 12 months. Hover tooltip with glass styling.
+
+Attribution tab (visible in background): stacked horizontal bar chart by sleeve showing allocation vs selection effects in emerald/violet. Top contributors table below (5 rows, NVDA +2.1%, BTC +1.8%, VTI +0.9%...).
+```
+
+---
+
+**Screen 5 — Projections:**
+```
+OvelhaInvest Projections page. Apply the project design system.
+
+Horizontal pill tabs: Monte Carlo | Contribution Sim | Stress Test | Retirement — Monte Carlo active.
+
+Input row (glass card): "Monthly Contribution" input $2,000, "Projection Years" slider 20yr, "Model" dropdown "Current Allocation", "Run Simulation" emerald gradient button.
+
+Main chart — Monte Carlo fan chart: 5 translucent shaded bands spreading outward from today's value $284k. Bands colored from darkest (5th percentile, near-flat line, rose-tinted) to lightest (95th, steep rise, emerald-tinted). Median line (50th) is bright emerald stroke. X-axis: years 0-20. Y-axis: $0-2M. Chart canvas is dark with very subtle grid lines.
+
+Stats row below chart — 3 glass cards:
+- "Median at 20yr" — "$892,000" large emerald
+- "Reach $1M probability" — "61%" large  
+- "4% SWR survival" — "94%" large emerald with "Safe" badge
+```
+
+---
+
+**Screen 6 — Tax Optimization:**
+```
+OvelhaInvest Tax page. Apply the project design system.
+
+Top section — Brazil DARF tracker glass card:
+"Brazil Monthly Exemption" label. Large progress bar (amber gradient fill) at 34% — "R$6,800 of R$20,000 used this month". Right side: "Projected month-end: R$11,200 — Safe" emerald badge. "Days remaining: 9" muted.
+
+Method selector row: three pill toggle buttons "FIFO | HIFO ✓ | Spec ID" — HIFO active with emerald glow border.
+
+Main table — glass card:
+Columns: Symbol | Account | Acquired | Qty | Cost Basis | Current Value | Unrealized G/L | Holding | Est. Tax
+4 rows:
+- NVDA: M1 Taxable, Jun 2022, 50 shares, $4,200, $6,240, +$2,040 emerald, LT green badge, $306
+- BTC: Binance, Jan 2023, 0.12, $3,600, $9,888, +$6,288 emerald, LT green badge, $943
+- PLTR: M1 Taxable, Nov 2024, 100, $2,100, $2,410, +$310 emerald, ST amber badge, $99
+- VTI: M1 Roth, multiple lots — "Tax-free" slate badge spanning columns
+
+Loss harvesting panel (bottom, glass card with amber left border glow):
+"2 Harvest Candidates" amber heading. List: "BNDX: -$420 unrealized — harvest before Dec 31, pair with BND to avoid wash sale" with "Review" button.
+```
+
+---
+
+**Screen 7 — Decision Journal:**
+```
+OvelhaInvest Journal page. Apply the project design system.
+
+Top — Override Accuracy scorecard (two glass cards side by side with colored glow):
+Left card (emerald glow): "When You Followed the System" — "+12.4% avg 90-day outcome" large emerald number, "47 decisions tracked" muted subtitle, emerald checkmark icon.
+Right card (amber glow): "When You Overrode the System" — "+7.1% avg 90-day outcome" large amber number, "12 overrides" muted subtitle, amber warning icon. Subtle label: "System outperformed your overrides by 5.3%"
+
+Main table — glass card:
+Columns: Date | Action | Asset | System Said | Your Reasoning | 30d | 90d
+3 rows:
+- Mar 15: "Followed" emerald pill | BTC | "Buy $300 Tier-1" | "Agreed with drawdown signal" | +8.2% emerald | +22.1% emerald
+- Mar 10: "Overrode" rose pill | NVDA | "Hold — no buy signal" | "Felt momentum was strong" | +4.1% | +11.2%
+- Feb 28: "Deferred" amber pill | VTI | "Buy $600 DCA" | "Waited for lower price" | -1.2% rose | +3.8%
+
+Bottom — AI Pattern Analysis glass card with violet left glow:
+Violet sparkle icon. "AI Behavioral Analysis" heading. Text: "You override the system most during high-volatility periods (VIX > 25). Your 90-day outcomes when overriding during high-vol are +4.2% vs system's +14.8%. Consider trusting the engine more during volatile markets." Glass card, violet accent.
+```
+
+---
+
+**Screen 8 — Config:**
+```
+OvelhaInvest Config page. Apply the project design system.
+
+Two-column layout:
+Left column (35%) — Version history glass card:
+Title "Strategy Configs". List of versions — "v1.0.0 (Active)" row highlighted with emerald left glow, emerald "Active" badge, timestamp. Below: "v0.9.1" muted row, "v0.9.0" muted row. "Create new version" ghost button at bottom.
+
+Right column (65%) — two stacked glass cards:
+Top card: Allocation targets donut chart — same 6-slice glowing arc design as dashboard. Below donut: three toggle buttons "Current | Swensen | All-Weather". When Swensen active, a second ghost ring overlays showing Swensen targets for comparison.
+
+Bottom card: JSON config viewer with syntax highlighting. Dark code area with colored tokens: keys in violet, numbers in emerald, booleans in amber. Monospace font. "v1.0.0 — Read Only" label in top-right with slate badge. Scrollable, 12 visible lines showing targets, constraints, volatility_rules keys.
 ```
 
 ---
@@ -1658,12 +1801,12 @@ Read-only in v1 with prominent "v2: editable" label.
 ### 28.1 Repository Setup
 ```bash
 # Two remotes: Gitea (primary/private) + GitHub (mirror/backup)
-git remote add origin https://gitea.ovelha.us/thiago/ovelhainvest.git
-git remote add github https://github.com/[YOUR_GITHUB_USERNAME]/ovelhainvest.git
+git remote add origin https://git.ovelha.us/thiago/ovelhainvest.git
+git remote add github https://github.com/OvelhaGod/ovelhainvest.git
 
 # Push to both simultaneously via push config
-git config --local remote.origin.pushurl https://gitea.ovelha.us/thiago/ovelhainvest.git
-git remote set-url --add --push origin https://github.com/[YOUR_GITHUB_USERNAME]/ovelhainvest.git
+git config --local remote.origin.pushurl https://git.ovelha.us/thiago/ovelhainvest.git
+git remote set-url --add --push origin https://github.com/OvelhaGod/ovelhainvest.git
 
 # Verify
 git remote -v
@@ -1701,8 +1844,8 @@ fix/name      ← hotfix branches
 
 ### 28.4 Claude Code Git Rules (ALWAYS FOLLOW)
 - After completing any task unit (file, function, endpoint, page): `git add -A && git commit -m "feat(...): ..."` 
-- After completing a full phase: `git push origin dev && git push github dev`
-- After merging phase branch to main: `git push origin main && git push github main`
+- After completing a full phase: `git push origin dev && git push origin dev`
+- After merging phase branch to main: `git push origin main && git push origin main`
 - Never leave uncommitted work at end of a session
 - `.env` files are NEVER committed — `.gitignore` must cover all secrets
 - `CLAUDE.md`, `DESIGN.md`, `STITCH_PROMPT.md` ARE committed — they are project docs
@@ -1750,7 +1893,7 @@ Manually complete these prerequisites:
 3. Get Anthropic API key (already have)
 4. Get Finnhub API key (free at finnhub.io)
 5. Create Telegram bot via @BotFather → get token + chat ID
-6. Create Gitea repo: `https://gitea.ovelha.us/thiago/ovelhainvest`
+6. Create Gitea repo: `https://git.ovelha.us/thiago/ovelhainvest`
 7. Create GitHub repo: `github.com/[username]/ovelhainvest` (private)
 8. Create Google Cloud project → enable Stitch API (for later)
 
@@ -1759,8 +1902,11 @@ Manually complete these prerequisites:
 mkdir ovelhainvest && cd ovelhainvest
 # Place CLAUDE.md here (this file)
 git init
-git remote add origin https://gitea.ovelha.us/thiago/ovelhainvest.git
-git remote set-url --add --push origin https://github.com/[username]/ovelhainvest.git
+git checkout -b main
+git remote add origin https://git.ovelha.us/thiago/ovelhainvest.git
+git remote set-url --add --push origin https://git.ovelha.us/thiago/ovelhainvest.git
+git remote set-url --add --push origin https://github.com/OvelhaGod/ovelhainvest.git
+git config core.autocrlf input
 ```
 
 ### Step 2 — First Claude Code Session (Phase 1 + Stitch Prep)
@@ -1794,12 +1940,12 @@ PART B — STITCH DESIGN PREP:
 
 PART C — GIT SETUP:
 20. Create initial commit: `git add -A && git commit -m "chore(infra): initial project scaffold — all stubs, migrations, frontend shell"`
-21. Push to both remotes: `git push -u origin main && git push github main`
+21. Push to both remotes: `git push -u origin main && git push origin main`
 
 PART D — VERIFY:
 22. Run `cd backend && uvicorn app.main:app --reload` — confirm /health returns 200
 23. Run `cd frontend && pnpm dev` — confirm dashboard renders without errors
-24. Commit verification: `git add -A && git commit -m "chore(infra): verified Phase 1 scaffold running" && git push origin main && git push github main`
+24. Commit verification: `git add -A && git commit -m "chore(infra): verified Phase 1 scaffold running" && git push origin main && git push origin main`
 
 Report back what's done and what needs my input before proceeding to Phase 2.
 ```
@@ -1811,7 +1957,7 @@ Report back what's done and what needs my input before proceeding to Phase 2.
 4. Export DESIGN.md from Stitch
 5. Replace the placeholder DESIGN.md in repo root
 6. Install Stitch skill: `npx skills add google-labs-code/stitch-skills --skill stitch-design --global`
-7. Commit: `git add DESIGN.md && git commit -m "docs(design): add Stitch DESIGN.md — design system contract" && git push origin main && git push github main`
+7. Commit: `git add DESIGN.md && git commit -m "docs(design): add Stitch DESIGN.md — design system contract" && git push origin main && git push origin main`
 
 ### Step 4 — Phase 2 (Portfolio Engine) — After DESIGN.md Is Committed
 ```
@@ -1871,10 +2017,10 @@ Implement in this exact order. Commit after each item.
    Commit: "feat(frontend): dashboard — live data from /daily_status"
 
 After all 8 commits: push to both remotes.
-`git push origin dev && git push github dev`
+`git push origin dev && git push origin dev`
 
 Then open a PR: dev → main, merge, push main.
-`git checkout main && git merge dev && git push origin main && git push github main`
+`git checkout main && git merge dev && git push origin main && git push origin main`
 ```
 
 ---
@@ -1892,3 +2038,819 @@ Claude Code must follow these git rules in every session, without being reminded
 7. **After every session ends:** `git status` → commit anything uncommitted → push.
 8. **The .env file is NEVER committed.** If it shows in `git status`, add to .gitignore immediately.
 9. **CLAUDE.md and DESIGN.md are project artifacts** — commit any updates to them immediately.
+---
+
+## 31. PERSONAL FINANCE OS — MONARCH REPLACEMENT (Phase 11+)
+
+> **HARD GATE:** Do not touch anything in this section until Phase 10 (PWA/Polish) is fully complete and merged to main. The investment engine must be fully operational before adding budgeting features.
+
+### 31.1 Vision
+
+OvelhaInvest Phase 11 becomes a complete personal finance OS — the only app where spending decisions, savings behavior, and investment strategy share the same data model and inform each other in real time.
+
+**What no other app does:**
+- Budget cuts reflected in Monte Carlo retirement projections
+- Payday cashflow automatically routed to investment vaults
+- Net worth breakdown: market gains vs new savings vs debt paydown
+- Savings rate shown alongside portfolio performance on the same dashboard
+- "If I cut dining by $300/month, how does my 20-year projection change?"
+
+**What we are NOT building (keep scope tight):**
+- Bill pay or payment initiation
+- Credit score monitoring
+- Shared/household budgets
+- Tax filing
+- Subscription cancellation flows
+- Anything requiring OAuth to banks beyond read-only Plaid/Teller aggregation
+
+### 31.2 New Database Tables (Migration 005)
+
+```sql
+-- Migration 005: Personal Finance OS tables
+
+-- Liabilities (completes the net worth picture)
+CREATE TABLE liabilities (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id uuid NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  name text NOT NULL,
+  liability_type text NOT NULL,       -- "mortgage", "auto", "credit_card", "student", "personal", "other"
+  current_balance numeric(18,2) NOT NULL,
+  original_balance numeric(18,2),
+  interest_rate numeric(9,6),
+  minimum_payment numeric(18,2),
+  due_day integer,                     -- day of month (1-31)
+  payoff_date date,
+  account_linked_id uuid REFERENCES accounts(id) ON DELETE SET NULL,
+  is_active boolean NOT NULL DEFAULT true,
+  created_at timestamptz NOT NULL DEFAULT now(),
+  updated_at timestamptz NOT NULL DEFAULT now()
+);
+
+-- Spending transactions (separate from investment transactions)
+CREATE TABLE spending_transactions (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id uuid NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  account_id uuid REFERENCES accounts(id) ON DELETE SET NULL,
+  amount numeric(18,2) NOT NULL,
+  direction text NOT NULL,             -- "debit" (expense), "credit" (income)
+  merchant_name text,
+  merchant_name_clean text,            -- normalized for categorization
+  category text,                       -- top-level: "Housing", "Food", "Transport", etc.
+  subcategory text,                    -- "Groceries", "Restaurants", "Gas", etc.
+  date date NOT NULL,
+  is_recurring boolean NOT NULL DEFAULT false,
+  recurring_item_id uuid,
+  notes text,
+  source text NOT NULL DEFAULT 'manual', -- "plaid", "teller", "manual", "csv_import"
+  external_id text,                    -- dedup key from Plaid/Teller
+  is_hidden boolean NOT NULL DEFAULT false,
+  is_reviewed boolean NOT NULL DEFAULT false,
+  currency text NOT NULL DEFAULT 'USD',
+  created_at timestamptz NOT NULL DEFAULT now()
+);
+CREATE INDEX spending_txn_user_date_idx ON spending_transactions(user_id, date DESC);
+CREATE UNIQUE INDEX spending_txn_external_id_idx ON spending_transactions(user_id, external_id)
+  WHERE external_id IS NOT NULL;
+
+-- Category rules (rule-based categorization engine)
+CREATE TABLE category_rules (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id uuid NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  priority integer NOT NULL DEFAULT 100,  -- lower = higher priority
+  match_field text NOT NULL,              -- "merchant_name", "amount", "description"
+  match_type text NOT NULL,               -- "contains", "equals", "starts_with", "regex", "amount_range"
+  match_value text NOT NULL,
+  category text NOT NULL,
+  subcategory text,
+  is_active boolean NOT NULL DEFAULT true,
+  created_at timestamptz NOT NULL DEFAULT now()
+);
+
+-- Budget envelopes (monthly targets per category)
+CREATE TABLE budgets (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id uuid NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  category text NOT NULL,
+  monthly_target numeric(18,2) NOT NULL,
+  rollover boolean NOT NULL DEFAULT false,  -- unused budget carries to next month
+  alert_at_pct numeric(5,2) DEFAULT 0.80,   -- alert when 80% spent
+  color text,                               -- hex color for UI
+  emoji text,                               -- display emoji
+  is_active boolean NOT NULL DEFAULT true,
+  created_at timestamptz NOT NULL DEFAULT now(),
+  UNIQUE (user_id, category)
+);
+
+-- Recurring items (bills + income schedule)
+CREATE TABLE recurring_items (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id uuid NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  name text NOT NULL,
+  amount numeric(18,2) NOT NULL,
+  direction text NOT NULL,              -- "income", "expense"
+  frequency text NOT NULL,             -- "monthly", "biweekly", "weekly", "annual", "quarterly"
+  anchor_date date NOT NULL,           -- reference date for frequency calculation
+  next_date date NOT NULL,
+  category text,
+  account_id uuid REFERENCES accounts(id) ON DELETE SET NULL,
+  notes text,
+  is_active boolean NOT NULL DEFAULT true,
+  created_at timestamptz NOT NULL DEFAULT now()
+);
+
+-- Cashflow snapshots (daily/monthly aggregates)
+CREATE TABLE cashflow_snapshots (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id uuid NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  snapshot_date date NOT NULL,
+  period_type text NOT NULL DEFAULT 'monthly',  -- "daily", "monthly"
+  total_income numeric(18,2) NOT NULL DEFAULT 0,
+  total_expenses numeric(18,2) NOT NULL DEFAULT 0,
+  net_cashflow numeric(18,2) GENERATED ALWAYS AS (total_income - total_expenses) STORED,
+  savings_amount numeric(18,2) NOT NULL DEFAULT 0,  -- amount actually invested/saved
+  savings_rate numeric(9,6),                         -- savings / income
+  amount_available_for_investing numeric(18,2),      -- feeds contribution optimizer
+  projected_period_end_balance numeric(18,2),
+  income_by_category jsonb,            -- { "Salary": 8500, "Freelance": 500 }
+  expenses_by_category jsonb,          -- { "Housing": 2200, "Food": 800, ... }
+  created_at timestamptz NOT NULL DEFAULT now(),
+  UNIQUE (user_id, snapshot_date, period_type)
+);
+
+-- Net worth snapshots (investment assets + bank + liabilities)
+CREATE TABLE net_worth_snapshots (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id uuid NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  snapshot_date date NOT NULL,
+  total_assets_usd numeric(18,2) NOT NULL,
+  investment_assets_usd numeric(18,2) NOT NULL,   -- from portfolio_snapshots
+  bank_assets_usd numeric(18,2) NOT NULL,          -- checking + savings + vaults
+  other_assets_usd numeric(18,2) DEFAULT 0,        -- real estate, vehicles (manual)
+  total_liabilities_usd numeric(18,2) NOT NULL DEFAULT 0,
+  net_worth_usd numeric(18,2) GENERATED ALWAYS AS
+    (total_assets_usd - total_liabilities_usd) STORED,
+  change_from_market numeric(18,2),    -- portfolio gain/loss contribution
+  change_from_savings numeric(18,2),   -- new money invested
+  change_from_debt_paydown numeric(18,2),
+  created_at timestamptz NOT NULL DEFAULT now(),
+  UNIQUE (user_id, snapshot_date)
+);
+
+-- Spending categories master list (reference)
+-- Populated by seed data, not user-created
+CREATE TABLE spending_categories (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  name text NOT NULL UNIQUE,
+  parent_category text,
+  emoji text,
+  color text,
+  is_income boolean NOT NULL DEFAULT false,
+  display_order integer
+);
+```
+
+### 31.3 Spending Category Taxonomy (Seed Data)
+
+```python
+SPENDING_CATEGORIES = [
+    # Income
+    {"name": "Salary",           "parent": "Income",      "emoji": "💼", "is_income": True},
+    {"name": "Freelance",        "parent": "Income",      "emoji": "💻", "is_income": True},
+    {"name": "Investment Income","parent": "Income",      "emoji": "📈", "is_income": True},
+    {"name": "Other Income",     "parent": "Income",      "emoji": "💰", "is_income": True},
+
+    # Fixed Expenses
+    {"name": "Rent/Mortgage",    "parent": "Housing",     "emoji": "🏠"},
+    {"name": "Insurance",        "parent": "Housing",     "emoji": "🛡️"},
+    {"name": "HOA/Condo",        "parent": "Housing",     "emoji": "🏢"},
+    {"name": "Utilities",        "parent": "Housing",     "emoji": "⚡"},
+    {"name": "Internet/Phone",   "parent": "Housing",     "emoji": "📡"},
+
+    # Variable Expenses
+    {"name": "Groceries",        "parent": "Food",        "emoji": "🛒"},
+    {"name": "Restaurants",      "parent": "Food",        "emoji": "🍽️"},
+    {"name": "Coffee",           "parent": "Food",        "emoji": "☕"},
+
+    {"name": "Gas",              "parent": "Transport",   "emoji": "⛽"},
+    {"name": "Car Payment",      "parent": "Transport",   "emoji": "🚗"},
+    {"name": "Car Insurance",    "parent": "Transport",   "emoji": "🚗"},
+    {"name": "Uber/Lyft",        "parent": "Transport",   "emoji": "🚕"},
+    {"name": "Parking",          "parent": "Transport",   "emoji": "🅿️"},
+
+    {"name": "Streaming",        "parent": "Subscriptions","emoji": "📺"},
+    {"name": "Software",         "parent": "Subscriptions","emoji": "💿"},
+    {"name": "Gym",              "parent": "Subscriptions","emoji": "🏋️"},
+
+    {"name": "Doctor/Medical",   "parent": "Health",      "emoji": "🏥"},
+    {"name": "Pharmacy",         "parent": "Health",      "emoji": "💊"},
+
+    {"name": "Shopping",         "parent": "Personal",    "emoji": "🛍️"},
+    {"name": "Personal Care",    "parent": "Personal",    "emoji": "💇"},
+    {"name": "Clothing",         "parent": "Personal",    "emoji": "👕"},
+
+    {"name": "Travel",           "parent": "Lifestyle",   "emoji": "✈️"},
+    {"name": "Entertainment",    "parent": "Lifestyle",   "emoji": "🎭"},
+    {"name": "Gifts",            "parent": "Lifestyle",   "emoji": "🎁"},
+
+    {"name": "Tuition",          "parent": "Education",   "emoji": "🎓"},
+    {"name": "Books/Courses",    "parent": "Education",   "emoji": "📚"},
+
+    {"name": "Federal Tax",      "parent": "Taxes",       "emoji": "🏛️"},
+    {"name": "State Tax",        "parent": "Taxes",       "emoji": "🏛️"},
+    {"name": "Brazil Tax/DARF",  "parent": "Taxes",       "emoji": "🇧🇷"},
+
+    {"name": "Investment",       "parent": "Savings",     "emoji": "📈"},
+    {"name": "Emergency Fund",   "parent": "Savings",     "emoji": "🛡️"},
+
+    {"name": "Uncategorized",    "parent": None,          "emoji": "❓"},
+]
+```
+
+### 31.4 New Service Files
+
+Add to `backend/app/services/`:
+
+```
+budget_engine.py          ← monthly actuals vs targets, rollover logic, alerts
+cashflow_engine.py        ← income/expense aggregation, savings rate, forecasting
+categorization_engine.py  ← rule-based + Claude AI fallback categorization
+net_worth_engine.py       ← assets + liabilities → net worth + change attribution
+recurring_engine.py       ← upcoming bills/income, next-date computation
+transaction_sync.py       ← Plaid/Teller pull, CSV import, dedup logic
+```
+
+### 31.5 New API Endpoints
+
+```python
+# Budget
+GET  /budget/summary          # current month: category actuals vs targets
+GET  /budget/history          # month-by-month budget performance
+POST /budget/categories       # create/update budget envelope
+
+# Transactions
+GET  /transactions            # paginated, filterable spending transaction feed
+POST /transactions            # manual transaction entry
+PATCH /transactions/{id}      # update category, notes, hidden flag
+POST /transactions/import/csv # bulk CSV import
+
+# Cashflow
+GET  /cashflow/summary        # current month income, expenses, savings rate
+GET  /cashflow/forecast       # projected cashflow for next 30/60/90 days
+GET  /cashflow/history        # month-by-month cashflow history
+
+# Net Worth
+GET  /networth/summary        # current net worth + change attribution
+GET  /networth/history        # net worth timeline
+POST /networth/liabilities    # add/update liability
+GET  /networth/liabilities    # list liabilities
+
+# Recurring
+GET  /recurring               # all active recurring items
+POST /recurring               # add recurring item
+GET  /recurring/upcoming      # next 30 days bill/income calendar
+```
+
+### 31.6 Categorization Engine
+
+```python
+def categorize_transaction(
+    merchant_name: str,
+    amount: float,
+    direction: str,
+    user_rules: list[CategoryRule],
+) -> tuple[str, str]:
+    """
+    Three-pass categorization:
+
+    Pass 1 — User rules (highest priority, exact match)
+      Apply user-defined category_rules in priority order.
+      If match found: return immediately.
+
+    Pass 2 — Global rules (built-in merchant name patterns)
+      GLOBAL_RULES = {
+        r"(?i)amazon|amzn":           ("Shopping", "Online"),
+        r"(?i)uber eats|doordash|grubhub": ("Food", "Delivery"),
+        r"(?i)netflix|spotify|hulu":  ("Subscriptions", "Streaming"),
+        r"(?i)shell|chevron|exxon|bp|sunoco": ("Transport", "Gas"),
+        r"(?i)publix|kroger|whole foods|trader joe": ("Food", "Groceries"),
+        r"(?i)walmart|target|costco": ("Shopping", "General"),
+        r"(?i)uber|lyft":             ("Transport", "Rideshare"),
+        # ... 100+ patterns
+      }
+
+    Pass 3 — Claude AI fallback (only if passes 1+2 fail)
+      Send merchant_name + amount + direction to Claude API.
+      Prompt: "Categorize this transaction for personal budgeting.
+               Merchant: {merchant_name}, Amount: ${amount}, Type: {direction}.
+               Return JSON: {category: string, subcategory: string}
+               from this list: {SPENDING_CATEGORIES}"
+      Cache result in Redis (merchant_name → category, 30-day TTL).
+      Store as new user rule so same merchant is never sent to AI again.
+
+    Returns: (category, subcategory)
+    """
+```
+
+### 31.7 Cashflow → Investment Engine Integration
+
+This is the critical integration point that makes OvelhaInvest unique:
+
+```python
+# In cashflow_engine.py
+def compute_available_for_investing(
+    monthly_income: float,
+    fixed_expenses: float,
+    variable_expenses_actual: float,
+    emergency_fund_target: float,
+    current_emergency_balance: float,
+) -> float:
+    """
+    Available = Income - Fixed - Variable - Emergency_top_up
+    This value flows into:
+    1. contribution_optimizer.py (which account + asset to buy)
+    2. vault_funding_suggestion (how much to route to Future Investments vault)
+    3. Monte Carlo projections (realistic monthly contribution input)
+    """
+
+# In n8n payday workflow — ENHANCED:
+# Step 1: detect deposit in SoFi
+# Step 2: compute cashflow_engine.compute_available_for_investing()
+# Step 3: subtract fixed recurring bills due this pay period
+# Step 4: remainder → suggest vault funding split
+# Step 5: call /simulation/contribution_optimizer with real available amount
+# Step 6: send Telegram digest: "Paycheck received. After bills: $X available.
+#          Suggested: $Y → Future Investments vault, $Z → keep as buffer."
+```
+
+### 31.8 Budget Impact on Monte Carlo
+
+```python
+# In simulation_engine.py — ENHANCED for Phase 11
+def run_monte_carlo_with_budget(
+    current_value: float,
+    monthly_contribution: float,        # from cashflow snapshot
+    budget_scenario: dict | None = None, # optional: {"dining": -300, "subscriptions": -50}
+) -> MonteCarloResult:
+    """
+    If budget_scenario provided:
+      adjusted_contribution = monthly_contribution + sum(budget_scenario.values())
+      # Negative values = spending cuts = more available to invest
+      # e.g. {"dining": -300} means $300 less dining = $300 more invested
+
+    Run both base and scenario side-by-side.
+    Return comparison: base_median_20yr vs scenario_median_20yr.
+    UI shows: "Cutting dining by $300/month adds $X to your projected net worth in 20 years."
+    """
+```
+
+### 31.9 Net Worth Attribution Engine
+
+```python
+def compute_net_worth_change_attribution(
+    prev_snapshot: NetWorthSnapshot,
+    curr_snapshot: NetWorthSnapshot,
+    cashflow_snapshot: CashflowSnapshot,
+    portfolio_return: float,
+) -> dict:
+    """
+    Decompose net worth change into 3 buckets:
+
+    change_from_market = portfolio_value * portfolio_return
+      → "Markets moved your wealth by $X"
+
+    change_from_savings = new_money_invested + bank_balance_increase
+      → "You added $X in new savings"
+
+    change_from_debt_paydown = prev_liabilities - curr_liabilities - interest_paid
+      → "Debt paydown increased your net worth by $X"
+
+    residual = total_change - sum(above)  # should be near zero
+    """
+```
+
+---
+
+## 32. PERSONAL FINANCE PAGES — UI SPEC
+
+### /networth
+**The single most important page in the whole app.**
+
+Top: Big number — Net Worth today in USD (and BRL equivalent). Change from last month with attribution breakdown: "↑ $4,200 this month — Markets: +$2,800 | New Savings: +$1,100 | Debt Paydown: +$300"
+
+Assets section: Investment assets (from portfolio_snapshots) + Bank accounts + Other assets (manual)
+Liabilities section: Each liability with balance, rate, minimum payment, payoff timeline bar
+
+Net worth timeline chart: all-time line chart, toggle: 1mo / 3mo / 1yr / all-time
+
+---
+
+### /budget
+**Monthly budget envelopes — Monarch-style but connected to investment engine.**
+
+Top: Month selector. Key metrics: Income this month | Spent | Remaining | Savings Rate %
+
+Budget grid: cards per category. Each card: emoji + name + progress bar (actual/target) + $ remaining. Color: green < 70%, amber 70-90%, red > 90%.
+
+Bottom: "Budget Surplus → Investment Impact" card: "You're $320 under budget this month. If invested, that adds $X to your 20-year projection." Button: "Route to Future Investments Vault"
+
+---
+
+### /cashflow
+**Income vs expenses timeline. Where the money actually goes.**
+
+Top row: This month — Income, Expenses, Net Cashflow, Savings Rate (all with MoM delta)
+
+Main chart: Stacked area chart — income (green) vs expenses (red) by week, current month + last 3 months
+
+Cashflow calendar: Next 30 days. Each day shows: upcoming bills (red badges), expected income (green badges), projected daily balance
+
+Savings rate trend: 12-month line chart. Benchmark line at 20% (target savings rate)
+
+---
+
+### /transactions
+**Spending transaction feed. Full control.**
+
+Filter bar: date range, account, category, direction (income/expense), search by merchant
+
+Table: Date | Merchant | Category (editable inline dropdown) | Amount | Account | Reviewed checkbox
+
+Bulk actions: select multiple → recategorize, hide, mark reviewed
+
+Category spending breakdown: right panel or bottom — pie chart of current month by category
+
+CSV import button: drag-drop, auto-parse, preview before import
+
+---
+
+### /recurring
+**Bills and income schedule. Never miss a payment.**
+
+"Upcoming 30 days" timeline: calendar-style list of upcoming bills and income
+
+Two sections: Fixed Income (salary, freelance) | Fixed Expenses (rent, subscriptions, car)
+
+Each item: name, amount, next date, frequency, account, days-until countdown badge
+
+Monthly fixed cost total vs monthly fixed income total → "Fixed coverage ratio: X%"
+
+Alert: items without a matched transaction in last period (possible missed payment)
+
+---
+
+## 33. UPDATED PHASE BUILD PLAN (Complete)
+
+| Phase | Scope | Gate |
+|---|---|---|
+| 1 | Foundation — scaffold, migrations, health check | ✅ Done |
+| 2 | Portfolio Engine — allocation, rebalancing, volatility, signals | Phase 1 complete |
+| 3 | Valuation Engine — factor scoring, DCF, margin of safety | Phase 2 complete |
+| 4 | Performance Analytics — TWR/MWR, Sharpe/Sortino/Calmar, attribution | Phase 3 complete |
+| 5 | AI Advisor Layer — Claude API, philosophy prompt, commentary | Phase 4 complete |
+| 6 | Alerts + Automation — Telegram, n8n workflows, opportunity scan | Phase 5 complete |
+| 7 | Simulation + Projections — Monte Carlo, stress tests, contribution optimizer | Phase 6 complete |
+| 8 | Tax Engine — lot tracking, HIFO/FIFO, Brazil DARF | Phase 7 complete |
+| 9 | Decision Journal + Reports — override tracking, PDF export | Phase 8 complete |
+| 10 | PWA + Polish — offline, push, FX attribution, risk parity view | Phase 9 complete |
+| **11** | **Personal Finance OS — transactions, budget, cashflow, net worth, recurring** | **Phase 10 complete** |
+| 12 | Integration Layer — budget feeds Monte Carlo, cashflow feeds vault optimizer | Phase 11 complete |
+| 13 | Advanced Analytics — spending pattern ML, savings optimization suggestions | Phase 12 complete |
+
+### Phase 11 Sub-Phases (Internal Sequence)
+
+```
+11a — Data model: migration 005, seed spending_categories
+11b — Transaction engine: spending_transactions table, CSV import, manual entry
+11c — Categorization engine: rule-based + Claude AI fallback
+11d — Budget engine: monthly actuals vs targets, rollover, alerts
+11e — Recurring engine: bill/income schedule, next-date computation
+11f — Cashflow engine: aggregation, savings rate, 30-day forecast
+11g — Net worth engine: assets + liabilities + attribution
+11h — API endpoints: all 15 new endpoints
+11i — Frontend: /transactions page
+11j — Frontend: /budget page
+11k — Frontend: /cashflow page
+11l — Frontend: /recurring page
+11m — Frontend: /networth page + update /dashboard with new cards
+11n — Integration: cashflow → contribution_optimizer
+11o — Integration: budget scenarios → Monte Carlo
+11p — n8n: enhanced payday workflow using real cashflow data
+```
+
+---
+
+## 34. COMPLETE FEATURE COMPARISON
+
+| Feature | Monarch | Empower | Betterment | OvelhaInvest (Complete) |
+|---|---|---|---|---|
+| Transaction categorization | ✅ | ✅ | ❌ | ✅ Phase 11 |
+| Budget envelopes | ✅ | ✅ | ❌ | ✅ Phase 11 |
+| Net worth tracking | ✅ | ✅ | ✅ | ✅ Phase 11 |
+| Cashflow forecasting | ✅ | ✅ | ❌ | ✅ Phase 11 |
+| Recurring bills | ✅ | ✅ | ❌ | ✅ Phase 11 |
+| Investment portfolio | Limited | Limited | ✅ | ✅ Phase 2-3 |
+| Factor scoring (Value/Mom/Quality) | ❌ | ❌ | ❌ | ✅ Phase 3 |
+| DCF + margin of safety | ❌ | ❌ | ❌ | ✅ Phase 3 |
+| Risk parity analysis | ❌ | ❌ | ❌ | ✅ Phase 4 |
+| Monte Carlo projections | ❌ | ✅ Basic | ✅ Basic | ✅ Phase 7 |
+| Stress testing | ❌ | ❌ | ❌ | ✅ Phase 7 |
+| Performance attribution | ❌ | ❌ | Limited | ✅ Phase 4 |
+| Tax lot tracking (HIFO) | ❌ | ❌ | ✅ | ✅ Phase 8 |
+| Brazil DARF tracking | ❌ | ❌ | ❌ | ✅ Phase 8 |
+| AI investment advisor | ❌ | ❌ | ❌ | ✅ Phase 5 |
+| Decision journal + override tracking | ❌ | ❌ | ❌ | ✅ Phase 9 |
+| Real-time Telegram alerts | ❌ | ❌ | ❌ | ✅ Phase 6 |
+| Budget → retirement projection link | ❌ | ❌ | ❌ | ✅ Phase 12 |
+| Cashflow → vault routing | ❌ | ❌ | ❌ | ✅ Phase 12 |
+| Multi-currency (USD + BRL) | ❌ | ❌ | ❌ | ✅ Phase 2 |
+| Swensen/Dalio/Marks/Graham engine | ❌ | ❌ | ❌ | ✅ Phase 2-3 |
+| PWA (offline access) | ✅ | ✅ | ✅ | ✅ Phase 10 |
+| Self-hosted / private | ❌ | ❌ | ❌ | ✅ All phases |
+| Cost | $99/yr | Free | 0.25%/yr | $0 (self-hosted) |
+
+---
+
+## 35. DESIGN SYSTEM — GLASSMORPHISM + PREMIUM DARK THEME
+
+> This section is the single source of truth for all visual decisions.
+> Claude Code reads this alongside DESIGN.md (Stitch export) when building any component.
+> DESIGN.md takes precedence for layout structure. This section governs all styling tokens.
+
+### 35.1 Design Language
+
+**Aesthetic:** Premium glassmorphism — the visual language of modern AI tools (Linear, Vercel, Raycast, Perplexity). Frosted glass cards floating on dark gradient backgrounds. Subtle depth, motion, and light effects. NOT Bloomberg terminal anymore — that was the data philosophy. The visual is modern AI-native.
+
+**Keywords:** Glass panels, gradient accents, soft glows, smooth curves, premium typography, subtle animations, depth through blur and shadow — not through borders and flat color blocks.
+
+### 35.2 Color Tokens
+
+```css
+:root {
+  /* Backgrounds — layered depth */
+  --bg-base:        #050508;   /* deepest — page background */
+  --bg-surface:     #0d0d14;   /* cards, panels */
+  --bg-elevated:    #13131f;   /* hover states, dropdowns */
+  --bg-overlay:     #1a1a2e;   /* modals, tooltips */
+
+  /* Glass effect */
+  --glass-bg:       rgba(255, 255, 255, 0.04);
+  --glass-border:   rgba(255, 255, 255, 0.08);
+  --glass-hover:    rgba(255, 255, 255, 0.07);
+  --glass-blur:     12px;
+
+  /* Brand gradients */
+  --gradient-primary:   linear-gradient(135deg, #6366f1 0%, #8b5cf6 50%, #a78bfa 100%);
+  --gradient-green:     linear-gradient(135deg, #10b981 0%, #34d399 100%);
+  --gradient-amber:     linear-gradient(135deg, #f59e0b 0%, #fbbf24 100%);
+  --gradient-red:       linear-gradient(135deg, #ef4444 0%, #f87171 100%);
+  --gradient-blue:      linear-gradient(135deg, #3b82f6 0%, #60a5fa 100%);
+  --gradient-surface:   linear-gradient(135deg, rgba(99,102,241,0.08) 0%, rgba(139,92,246,0.04) 100%);
+
+  /* Glow effects */
+  --glow-purple:    0 0 40px rgba(139, 92, 246, 0.15);
+  --glow-green:     0 0 40px rgba(16, 185, 129, 0.15);
+  --glow-blue:      0 0 40px rgba(59, 130, 246, 0.12);
+
+  /* Semantic colors */
+  --color-positive:     #10b981;   /* gains, above target */
+  --color-negative:     #ef4444;   /* losses, below target */
+  --color-warning:      #f59e0b;   /* drift, approaching limit */
+  --color-neutral:      #6b7280;
+
+  /* Text */
+  --text-primary:   #f1f5f9;
+  --text-secondary: #94a3b8;
+  --text-muted:     #475569;
+  --text-disabled:  #334155;
+
+  /* Borders */
+  --border-subtle:  rgba(255, 255, 255, 0.06);
+  --border-default: rgba(255, 255, 255, 0.10);
+  --border-strong:  rgba(255, 255, 255, 0.16);
+
+  /* Radius */
+  --radius-sm:  8px;
+  --radius-md:  12px;
+  --radius-lg:  16px;
+  --radius-xl:  24px;
+  --radius-full: 9999px;
+
+  /* Shadows */
+  --shadow-sm:  0 1px 3px rgba(0,0,0,0.4), 0 1px 2px rgba(0,0,0,0.3);
+  --shadow-md:  0 4px 16px rgba(0,0,0,0.5), 0 2px 8px rgba(0,0,0,0.3);
+  --shadow-lg:  0 20px 60px rgba(0,0,0,0.6), 0 8px 24px rgba(0,0,0,0.4);
+  --shadow-glow: 0 0 0 1px rgba(139,92,246,0.2), 0 8px 32px rgba(139,92,246,0.12);
+}
+```
+
+### 35.3 Typography
+
+```css
+/* Font stack */
+--font-sans:  'Inter var', 'Inter', system-ui, sans-serif;
+--font-mono:  'JetBrains Mono', 'Fira Code', 'Cascadia Code', monospace;
+--font-display: 'Cal Sans', 'Inter var', sans-serif; /* headings */
+
+/* Scale */
+--text-xs:   0.75rem;   /* 12px — table labels, badges */
+--text-sm:   0.875rem;  /* 14px — body, table cells */
+--text-base: 1rem;      /* 16px — default */
+--text-lg:   1.125rem;  /* 18px — card titles */
+--text-xl:   1.25rem;   /* 20px — section headers */
+--text-2xl:  1.5rem;    /* 24px — page titles */
+--text-3xl:  1.875rem;  /* 30px — big numbers */
+--text-4xl:  2.25rem;   /* 36px — hero numbers (net worth) */
+--text-5xl:  3rem;      /* 48px — dashboard headline number */
+
+/* Weights */
+--font-normal:   400;
+--font-medium:   500;
+--font-semibold: 600;
+--font-bold:     700;
+
+/* Numbers always use mono font */
+.number { font-family: var(--font-mono); font-variant-numeric: tabular-nums; }
+```
+
+### 35.4 Component Patterns
+
+**Glass Card (primary surface)**
+```css
+.glass-card {
+  background: var(--glass-bg);
+  backdrop-filter: blur(var(--glass-blur));
+  -webkit-backdrop-filter: blur(var(--glass-blur));
+  border: 1px solid var(--glass-border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-md);
+  transition: all 0.2s ease;
+}
+.glass-card:hover {
+  background: var(--glass-hover);
+  border-color: rgba(255,255,255,0.12);
+  box-shadow: var(--shadow-glow);
+  transform: translateY(-1px);
+}
+```
+
+**Metric Card (dashboard KPI)**
+```css
+.metric-card {
+  /* glass base */
+  background: linear-gradient(135deg, var(--glass-bg), rgba(99,102,241,0.03));
+  border: 1px solid var(--glass-border);
+  border-radius: var(--radius-lg);
+  padding: 20px 24px;
+  position: relative;
+  overflow: hidden;
+}
+.metric-card::before {
+  /* subtle top accent line */
+  content: '';
+  position: absolute;
+  top: 0; left: 0; right: 0;
+  height: 1px;
+  background: var(--gradient-primary);
+  opacity: 0.6;
+}
+.metric-card .label  { font-size: var(--text-xs); color: var(--text-muted); letter-spacing: 0.08em; text-transform: uppercase; }
+.metric-card .value  { font-size: var(--text-4xl); font-family: var(--font-mono); font-weight: var(--font-bold); color: var(--text-primary); line-height: 1.1; margin: 8px 0 4px; }
+.metric-card .change { font-size: var(--text-sm); font-family: var(--font-mono); }
+.metric-card .change.positive { color: var(--color-positive); }
+.metric-card .change.negative { color: var(--color-negative); }
+```
+
+**Glow Badge (regime status)**
+```css
+.badge-normal      { background: rgba(16,185,129,0.12); color: #34d399; border: 1px solid rgba(16,185,129,0.25); }
+.badge-high-vol    { background: rgba(245,158,11,0.12); color: #fbbf24; border: 1px solid rgba(245,158,11,0.25); }
+.badge-opportunity { background: rgba(99,102,241,0.12); color: #a78bfa; border: 1px solid rgba(99,102,241,0.25); }
+/* All badges: border-radius: var(--radius-full); padding: 4px 12px; font-size: var(--text-xs); font-weight: 600; */
+```
+
+**Data Table**
+```css
+.data-table { border-collapse: separate; border-spacing: 0; width: 100%; }
+.data-table th { font-size: var(--text-xs); color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.08em; font-weight: 500; padding: 10px 16px; border-bottom: 1px solid var(--border-subtle); }
+.data-table td { font-size: var(--text-sm); color: var(--text-secondary); padding: 12px 16px; border-bottom: 1px solid var(--border-subtle); }
+.data-table tr:hover td { background: rgba(255,255,255,0.02); color: var(--text-primary); }
+.data-table td.number { font-family: var(--font-mono); }
+```
+
+**Sidebar Navigation**
+```css
+.sidebar {
+  background: linear-gradient(180deg, rgba(13,13,20,0.95) 0%, rgba(5,5,8,0.98) 100%);
+  backdrop-filter: blur(20px);
+  border-right: 1px solid var(--border-subtle);
+  width: 240px;
+}
+.nav-item { display: flex; align-items: center; gap: 10px; padding: 10px 16px; border-radius: var(--radius-md); color: var(--text-muted); font-size: var(--text-sm); font-weight: 500; transition: all 0.15s ease; }
+.nav-item:hover { background: var(--glass-bg); color: var(--text-secondary); }
+.nav-item.active { background: linear-gradient(135deg, rgba(99,102,241,0.15), rgba(139,92,246,0.08)); color: #a78bfa; border: 1px solid rgba(99,102,241,0.2); }
+```
+
+**Chart Colors (Recharts palette)**
+```javascript
+export const CHART_COLORS = {
+  primary:    '#6366f1',  // indigo — primary series
+  secondary:  '#8b5cf6',  // purple — secondary series
+  positive:   '#10b981',  // emerald — gains
+  negative:   '#ef4444',  // red — losses
+  warning:    '#f59e0b',  // amber — alerts
+  neutral:    '#475569',  // slate — muted
+  us_equity:  '#6366f1',
+  intl_equity:'#8b5cf6',
+  bonds:      '#3b82f6',
+  brazil:     '#10b981',
+  crypto:     '#f59e0b',
+  cash:       '#475569',
+  // Monte Carlo bands
+  p5:   'rgba(239,68,68,0.15)',
+  p25:  'rgba(245,158,11,0.15)',
+  p50:  'rgba(99,102,241,0.5)',   // median line, solid
+  p75:  'rgba(16,185,129,0.15)',
+  p95:  'rgba(16,185,129,0.25)',
+}
+```
+
+**Page Background (each page)**
+```css
+.page-bg {
+  min-height: 100vh;
+  background:
+    radial-gradient(ellipse 80% 50% at 50% -20%, rgba(99,102,241,0.12) 0%, transparent 60%),
+    radial-gradient(ellipse 60% 40% at 80% 80%, rgba(139,92,246,0.06) 0%, transparent 50%),
+    var(--bg-base);
+}
+```
+
+### 35.5 Animation Standards
+
+```css
+/* Micro-interactions */
+--transition-fast:   0.1s ease;
+--transition-base:   0.2s ease;
+--transition-slow:   0.3s cubic-bezier(0.4, 0, 0.2, 1);
+
+/* Number counter animation on load — all metric cards */
+@keyframes countUp {
+  from { opacity: 0; transform: translateY(8px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+.metric-value { animation: countUp 0.4s ease forwards; }
+
+/* Skeleton loader */
+@keyframes shimmer {
+  0%   { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
+.skeleton {
+  background: linear-gradient(90deg, var(--bg-surface) 25%, var(--bg-elevated) 50%, var(--bg-surface) 75%);
+  background-size: 200% 100%;
+  animation: shimmer 1.5s infinite;
+  border-radius: var(--radius-sm);
+}
+```
+
+### 35.6 Next.js / Tailwind Implementation Notes
+
+```javascript
+// tailwind.config.js additions needed
+module.exports = {
+  darkMode: 'class',
+  theme: {
+    extend: {
+      colors: {
+        bg: { base: '#050508', surface: '#0d0d14', elevated: '#13131f' },
+        brand: { purple: '#6366f1', violet: '#8b5cf6', lavender: '#a78bfa' },
+        positive: '#10b981',
+        negative: '#ef4444',
+        warning: '#f59e0b',
+      },
+      fontFamily: {
+        sans: ['Inter var', 'Inter', 'system-ui', 'sans-serif'],
+        mono: ['JetBrains Mono', 'Fira Code', 'monospace'],
+      },
+      backgroundImage: {
+        'gradient-radial': 'radial-gradient(var(--tw-gradient-stops))',
+        'glass': 'linear-gradient(135deg, rgba(255,255,255,0.04), rgba(255,255,255,0.02))',
+      },
+      boxShadow: {
+        'glow-purple': '0 0 40px rgba(139, 92, 246, 0.15)',
+        'glow-green':  '0 0 40px rgba(16, 185, 129, 0.15)',
+        'glass': '0 4px 16px rgba(0,0,0,0.5), inset 0 1px 0 rgba(255,255,255,0.08)',
+      },
+      backdropBlur: { glass: '12px' },
+    }
+  }
+}
+```
+
+```html
+<!-- Add to frontend/app/layout.tsx <head> — Google Fonts -->
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="" />
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet" />
+```
+
