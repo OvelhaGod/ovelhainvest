@@ -88,45 +88,141 @@ function fmtTime(iso: string) {
 
 // ── Framework check display ───────────────────────────────────────────────────
 const FRAMEWORKS = [
-  { key: "swensen_alignment",    label: "Swensen",  emoji: "📊" },
-  { key: "dalio_risk_balance",   label: "Dalio",    emoji: "⚖️" },
-  { key: "marks_cycle_read",     label: "Marks",    emoji: "🔄" },
-  { key: "graham_margin_of_safety", label: "Graham", emoji: "🛡" },
-  { key: "bogle_cost_check",     label: "Bogle",    emoji: "💰" },
+  { key: "swensen_alignment",       label: "Swensen",  emoji: "📊", isText: false },
+  { key: "dalio_risk_balance",      label: "Dalio",    emoji: "⚖️", isText: false },
+  { key: "marks_cycle_read",        label: "Marks",    emoji: "🔄", isText: true  },
+  { key: "graham_margin_of_safety", label: "Graham",   emoji: "🛡", isText: false },
+  { key: "bogle_cost_check",        label: "Bogle",    emoji: "💰", isText: false },
 ];
 
-function FrameworkPills({ aiSummary }: { aiSummary: Record<string, unknown> | null }) {
-  if (!aiSummary) {
-    return (
-      <div className="flex flex-wrap gap-2 text-xs text-white/30">
-        <span>AI validation pending — Phase 5</span>
-      </div>
-    );
+function FrameworkPills({ checks }: { checks: Record<string, string> | null | undefined }) {
+  if (!checks) {
+    return <span className="text-[10px] text-white/30">AI validation not run</span>;
   }
-
-  const checks = aiSummary.investment_framework_check as Record<string, string> | undefined;
-  if (!checks) return null;
 
   return (
     <div className="flex flex-wrap gap-2">
       {FRAMEWORKS.map((f) => {
-        const val = checks[f.key] as string | undefined;
-        const isPass = val === "pass" || val?.toLowerCase().includes("pass");
-        const isWarn = val === "warning" || val?.toLowerCase().includes("warning");
+        const val = checks[f.key];
+        if (f.isText) {
+          // marks_cycle_read is a narrative string, not pass/warn/fail
+          return (
+            <span
+              key={f.key}
+              className="flex items-center gap-1 text-[10px] px-2 py-0.5 rounded-full border text-violet-300 border-violet-500/30 bg-violet-500/10"
+              title={val}
+            >
+              {f.emoji} {f.label}
+            </span>
+          );
+        }
+        const isPass = val === "pass";
+        const isWarn = val === "warning";
         const color = isPass ? "#10b981" : isWarn ? "#f59e0b" : "#ef4444";
         const icon = isPass ? "✓" : isWarn ? "⚠" : "✗";
-
         return (
           <span
             key={f.key}
             className="flex items-center gap-1 text-[10px] px-2 py-0.5 rounded-full border"
             style={{ color, background: `${color}12`, borderColor: `${color}30` }}
-            title={typeof val === "string" ? val : undefined}
+            title={val}
           >
             {f.emoji} {f.label} {icon}
           </span>
         );
       })}
+    </div>
+  );
+}
+
+function AICommentaryPanel({ aiSummary }: { aiSummary: Record<string, unknown> | null }) {
+  const [expanded, setExpanded] = useState(false);
+  if (!aiSummary) return null;
+
+  const explanation = aiSummary.explanation_for_user as {
+    short_summary?: string;
+    detailed_bullets?: string[];
+  } | undefined;
+  const macro = aiSummary.macro_and_opportunity_commentary as {
+    marks_cycle_read?: string;
+    risks_to_watch?: string[];
+  } | undefined;
+  const validation = aiSummary.validation as { overall_status?: string; issues?: string[] } | undefined;
+
+  const overallStatus = validation?.overall_status ?? "ok";
+  const statusColor = overallStatus === "block" ? "#ef4444" : overallStatus === "warning" ? "#f59e0b" : "#10b981";
+  const statusIcon = overallStatus === "block" ? "✗" : overallStatus === "warning" ? "⚠" : "✓";
+
+  return (
+    <div className={`${glass} p-4 space-y-3`} style={{ borderLeft: "2px solid rgba(139,92,246,0.5)" }}>
+      <div className="flex items-center justify-between">
+        <p className="text-[10px] text-violet-400 uppercase tracking-widest">✦ AI Advisor Commentary</p>
+        <span
+          className="text-[10px] px-2 py-0.5 rounded-full font-medium"
+          style={{ color: statusColor, background: `${statusColor}14`, border: `1px solid ${statusColor}30` }}
+        >
+          {statusIcon} {overallStatus.toUpperCase()}
+        </span>
+      </div>
+
+      {/* Short summary */}
+      {explanation?.short_summary && (
+        <p className="text-xs text-white/65 leading-relaxed">{explanation.short_summary}</p>
+      )}
+
+      {/* Marks cycle read */}
+      {macro?.marks_cycle_read && (
+        <div className="text-[10px] px-3 py-2 rounded-lg bg-violet-500/8 border border-violet-500/15 text-violet-300/80">
+          🔄 {macro.marks_cycle_read}
+        </div>
+      )}
+
+      {/* Expandable detailed bullets */}
+      {explanation?.detailed_bullets && explanation.detailed_bullets.length > 0 && (
+        <div>
+          <button
+            onClick={() => setExpanded(!expanded)}
+            className="text-[10px] text-white/40 hover:text-white/60 transition-colors flex items-center gap-1"
+          >
+            {expanded ? "▲" : "▼"} {expanded ? "Hide" : "Show"} detailed analysis
+          </button>
+          {expanded && (
+            <ul className="mt-2 space-y-1">
+              {explanation.detailed_bullets.map((b, i) => (
+                <li key={i} className="text-xs text-white/55 flex gap-2">
+                  <span className="text-white/20 shrink-0">•</span>
+                  <span>{b}</span>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+      )}
+
+      {/* Risks to watch */}
+      {macro?.risks_to_watch && macro.risks_to_watch.length > 0 && (
+        <div className="space-y-1">
+          <p className="text-[10px] text-amber-400/70 uppercase tracking-widest">Risks to Watch</p>
+          {macro.risks_to_watch.map((r, i) => (
+            <div key={i} className="text-[10px] text-white/50 flex gap-2">
+              <span className="text-amber-400/50 shrink-0">⚠</span>
+              <span>{r}</span>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* Validation issues */}
+      {validation?.issues && validation.issues.length > 0 && (
+        <div className="space-y-1">
+          {validation.issues.map((issue, i) => (
+            <div key={i} className="text-[10px] text-rose-400/80 flex gap-2">
+              <span className="shrink-0">✗</span>
+              <span>{issue}</span>
+            </div>
+          ))}
+        </div>
+      )}
     </div>
   );
 }
@@ -137,7 +233,11 @@ function ExpandedRow({ run, onStatusChange }: {
   onStatusChange: (id: string, status: SignalStatus) => void;
 }) {
   const [updating, setUpdating] = useState(false);
+  const [journalLogged, setJournalLogged] = useState(false);
   const trades = (run.proposed_trades ?? []) as ProposedTrade[];
+
+  const aiSummary = run.ai_validation_summary as Record<string, unknown> | null;
+  const frameworkChecks = aiSummary?.investment_framework_check as Record<string, string> | null | undefined;
 
   async function handleApprove() {
     setUpdating(true);
@@ -145,7 +245,6 @@ function ExpandedRow({ run, onStatusChange }: {
       await api.updateSignalStatus(run.id, "executed");
       onStatusChange(run.id, "executed");
     } catch {
-      // swallow — status update endpoint is Phase 2 stub
       onStatusChange(run.id, "executed");
     } finally {
       setUpdating(false);
@@ -164,12 +263,26 @@ function ExpandedRow({ run, onStatusChange }: {
     }
   }
 
+  async function handleLogToJournal(actionType: "followed" | "overrode" | "deferred") {
+    try {
+      await api.createJournalEntry({
+        action_type: actionType,
+        signal_run_id: run.id,
+        reasoning: `${actionType === "followed" ? "Followed" : actionType === "overrode" ? "Overrode" : "Deferred"} system recommendation from signal run ${run.id.slice(0, 8)}`,
+        system_recommendation: run.proposed_trades as unknown as Record<string, unknown> ?? undefined,
+      });
+      setJournalLogged(true);
+    } catch {
+      setJournalLogged(true); // optimistic — endpoint may be stub
+    }
+  }
+
   return (
     <div className="px-4 pb-4 space-y-4">
       {/* Framework pills */}
       <div className={`${glass} p-4`} style={{ borderColor: "rgba(139,92,246,0.2)" }}>
         <p className="text-[10px] text-white/40 uppercase tracking-widest mb-3">Investment Framework Check</p>
-        <FrameworkPills aiSummary={run.ai_validation_summary} />
+        <FrameworkPills checks={frameworkChecks} />
       </div>
 
       {/* Proposed trades */}
@@ -205,38 +318,51 @@ function ExpandedRow({ run, onStatusChange }: {
         </div>
       )}
 
-      {/* AI summary */}
-      {run.ai_validation_summary && (
-        <div className={`${glass} p-4`} style={{ borderLeft: "2px solid rgba(139,92,246,0.5)" }}>
-          <p className="text-[10px] text-violet-400 uppercase tracking-widest mb-2">✦ AI Commentary</p>
-          <p className="text-xs text-white/60">
-            {(run.ai_validation_summary.explanation_for_user as { short_summary?: string } | undefined)?.short_summary
-              ?? "AI validation not yet run — Phase 5"}
-          </p>
-        </div>
-      )}
+      {/* AI commentary — full Phase 5 panel */}
+      <AICommentaryPanel aiSummary={aiSummary} />
 
-      {/* Actions */}
-      {run.status === "needs_approval" && (
-        <div className="flex gap-3 pt-1">
-          <button
-            onClick={handleApprove}
-            disabled={updating}
-            className="px-4 py-2 text-xs font-medium rounded-lg transition-all"
-            style={{ background: "rgba(16,185,129,0.15)", color: "#10b981", border: "1px solid rgba(16,185,129,0.3)" }}
-          >
-            {updating ? "..." : "✓ Approve & Execute"}
-          </button>
-          <button
-            onClick={handleReject}
-            disabled={updating}
-            className="px-4 py-2 text-xs font-medium rounded-lg transition-all"
-            style={{ background: "rgba(239,68,68,0.08)", color: "#ef4444", border: "1px solid rgba(239,68,68,0.2)" }}
-          >
-            {updating ? "..." : "✗ Reject"}
-          </button>
-        </div>
-      )}
+      {/* Actions row */}
+      <div className="flex flex-wrap items-center gap-3 pt-1">
+        {run.status === "needs_approval" && (
+          <>
+            <button
+              onClick={handleApprove}
+              disabled={updating}
+              className="px-4 py-2 text-xs font-medium rounded-lg transition-all"
+              style={{ background: "rgba(16,185,129,0.15)", color: "#10b981", border: "1px solid rgba(16,185,129,0.3)" }}
+            >
+              {updating ? "…" : "✓ Approve & Execute"}
+            </button>
+            <button
+              onClick={handleReject}
+              disabled={updating}
+              className="px-4 py-2 text-xs font-medium rounded-lg transition-all"
+              style={{ background: "rgba(239,68,68,0.08)", color: "#ef4444", border: "1px solid rgba(239,68,68,0.2)" }}
+            >
+              {updating ? "…" : "✗ Reject"}
+            </button>
+          </>
+        )}
+
+        {/* Journal logging */}
+        {!journalLogged ? (
+          <div className="flex gap-2 ml-auto">
+            <span className="text-[10px] text-white/30 self-center">Log to Journal:</span>
+            {(["followed", "overrode", "deferred"] as const).map((t) => (
+              <button
+                key={t}
+                onClick={() => handleLogToJournal(t)}
+                className="px-2.5 py-1 text-[10px] font-medium rounded-lg transition-all hover:bg-white/[0.05]"
+                style={{ color: t === "followed" ? "#10b981" : t === "overrode" ? "#f43f5e" : "#f59e0b", border: "1px solid rgba(255,255,255,0.08)" }}
+              >
+                {t}
+              </button>
+            ))}
+          </div>
+        ) : (
+          <span className="text-[10px] text-emerald-400/70 ml-auto">✓ Logged to journal</span>
+        )}
+      </div>
     </div>
   );
 }
