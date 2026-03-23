@@ -10,6 +10,29 @@ import { useEffect, useState } from "react";
 import { api } from "@/lib/api";
 import type { AlertRule } from "@/lib/types";
 
+// ── Types ─────────────────────────────────────────────────────────────────────
+interface RebalanceTrade {
+  sleeve: string;
+  action: "buy" | "sell";
+  amount_usd: number;
+  from_weight: number;
+  to_weight: number;
+  asset_suggestion: string;
+}
+interface RebalancePreview {
+  total_value_usd: number;
+  current_weights: Record<string, number>;
+  target_weights: Record<string, number>;
+  drifts: Record<string, number>;
+  proposed_trades: RebalanceTrade[];
+  estimated_tax_usd: number;
+  tax_warning: boolean;
+  tax_warning_message: string | null;
+  total_trades: number;
+  total_buy_usd: number;
+  total_sell_usd: number;
+}
+
 // ── Design tokens ─────────────────────────────────────────────────────────────
 const glass     = "rounded-2xl border border-white/[0.08] bg-white/[0.03] backdrop-blur-sm";
 const glassInner = `${glass} p-5`;
@@ -110,13 +133,16 @@ type AllocModel = keyof typeof ALLOCATION_MODELS;
 
 // ── Main ──────────────────────────────────────────────────────────────────────
 export default function ConfigPage() {
-  const [tab, setTab]                     = useState<"strategy" | "alerts">("strategy");
+  const [tab, setTab]                     = useState<"strategy" | "alerts" | "rebalance">("strategy");
   const [allocModel, setAllocModel]       = useState<AllocModel>("current");
   const [alertRules, setAlertRules]       = useState<AlertRule[]>([]);
   const [loadingRules, setLoadingRules]   = useState(false);
   const [testingId, setTestingId]         = useState<string | null>(null);
   const [expandedId, setExpandedId]       = useState<string | null>(null);
   const [toastMsg, setToastMsg]           = useState<string | null>(null);
+  const [rebalPreview, setRebalPreview]   = useState<RebalancePreview | null>(null);
+  const [rebalLoading, setRebalLoading]   = useState(false);
+  const [rebalError, setRebalError]       = useState<string | null>(null);
 
   useEffect(() => {
     if (tab === "alerts" && alertRules.length === 0) {
@@ -157,6 +183,24 @@ export default function ConfigPage() {
     }
   }
 
+  async function fetchRebalancePreview() {
+    setRebalLoading(true);
+    setRebalError(null);
+    try {
+      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000"}/simulation/rebalance_preview`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({}),
+      });
+      if (!res.ok) throw new Error(`API ${res.status}`);
+      setRebalPreview(await res.json() as RebalancePreview);
+    } catch (e) {
+      setRebalError(e instanceof Error ? e.message : "Error");
+    } finally {
+      setRebalLoading(false);
+    }
+  }
+
   const model = ALLOCATION_MODELS[allocModel];
 
   return (
@@ -176,17 +220,21 @@ export default function ConfigPage() {
 
       {/* Tab bar */}
       <div className="flex gap-2">
-        {(["strategy", "alerts"] as const).map((t) => (
+        {([
+          { id: "strategy",  label: "⚙️ Strategy Config" },
+          { id: "alerts",    label: "🔔 Alert Rules" },
+          { id: "rebalance", label: "⚖️ Rebalance Preview" },
+        ] as const).map(({ id, label }) => (
           <button
-            key={t}
-            onClick={() => setTab(t)}
+            key={id}
+            onClick={() => setTab(id)}
             className={`px-4 py-1.5 rounded-full text-xs font-medium border transition-all ${
-              tab === t
+              tab === id
                 ? "border-violet-500/40 bg-violet-500/10 text-violet-300"
                 : "border-white/[0.08] bg-white/[0.02] text-white/40 hover:text-white/60"
             }`}
           >
-            {t === "strategy" ? "⚙️ Strategy Config" : "🔔 Alert Rules"}
+            {label}
           </button>
         ))}
       </div>
@@ -279,6 +327,133 @@ export default function ConfigPage() {
               </div>
             </div>
           </div>
+        </div>
+      )}
+
+      {/* ── Rebalance Preview tab ── */}
+      {tab === "rebalance" && (
+        <div className="space-y-4">
+          <div className="flex justify-between items-center">
+            <p className="text-xs text-white/40">Simulates a hard rebalance without executing any trades.</p>
+            <button
+              onClick={fetchRebalancePreview}
+              disabled={rebalLoading}
+              className="px-5 py-1.5 rounded-xl text-xs font-semibold transition-all"
+              style={{ background: rebalLoading ? "rgba(99,102,241,0.2)" : "linear-gradient(135deg, #6366f1, #8b5cf6)", color: "#fff" }}
+            >
+              {rebalLoading ? "Loading…" : "Preview Hard Rebalance"}
+            </button>
+          </div>
+
+          {rebalError && (
+            <div className="rounded-xl px-4 py-3 text-xs" style={{ background: "rgba(239,68,68,0.1)", border: "1px solid rgba(239,68,68,0.2)", color: "#f87171" }}>
+              {rebalError}
+            </div>
+          )}
+
+          {rebalPreview && (
+            <>
+              {/* Tax warning */}
+              {rebalPreview.tax_warning && (
+                <div className="rounded-xl px-4 py-3 flex items-start gap-3" style={{ background: "rgba(245,158,11,0.08)", border: "1px solid rgba(245,158,11,0.25)" }}>
+                  <span>⚠️</span>
+                  <div>
+                    <p className="text-xs font-medium" style={{ color: "#fbbf24" }}>Tax Impact Warning</p>
+                    <p className="text-xs mt-0.5" style={{ color: "#94a3b8" }}>{rebalPreview.tax_warning_message}</p>
+                    <p className="text-xs mt-0.5 font-mono" style={{ color: "#f59e0b" }}>Estimated tax: ${rebalPreview.estimated_tax_usd.toFixed(0)}</p>
+                  </div>
+                </div>
+              )}
+
+              {/* Summary row */}
+              <div className="grid grid-cols-4 gap-3">
+                {[
+                  { label: "Portfolio Value", value: `$${(rebalPreview.total_value_usd / 1000).toFixed(0)}K` },
+                  { label: "Total Trades",    value: String(rebalPreview.total_trades) },
+                  { label: "Total Buys",      value: `$${rebalPreview.total_buy_usd.toFixed(0)}`,  color: "#10b981" },
+                  { label: "Total Sells",     value: `$${rebalPreview.total_sell_usd.toFixed(0)}`, color: "#ef4444" },
+                ].map(({ label, value, color }) => (
+                  <div key={label} className={`${glassInner} text-center`}>
+                    <p className="text-[10px] text-white/30 uppercase tracking-wider">{label}</p>
+                    <p className="text-lg font-bold font-mono mt-1" style={{ color: color ?? "#f1f5f9" }}>{value}</p>
+                  </div>
+                ))}
+              </div>
+
+              {/* Before/after weights */}
+              <div className={glassInner}>
+                <p className="text-xs text-white/40 uppercase tracking-widest mb-4">Sleeve Weights — Current vs Target</p>
+                <div className="space-y-3">
+                  {Object.entries(SLEEVE_TARGETS).map(([sleeve, targets]) => {
+                    const current = rebalPreview.current_weights[sleeve] ?? 0;
+                    const target  = targets.target;
+                    const drift   = rebalPreview.drifts[sleeve] ?? 0;
+                    const color   = targets.color;
+                    return (
+                      <div key={sleeve} className="grid grid-cols-12 items-center gap-2 text-xs">
+                        <span className="col-span-2 text-white/50 truncate capitalize">{SLEEVE_LABELS[sleeve] ?? sleeve}</span>
+                        <div className="col-span-7 relative h-3 rounded-full" style={{ background: "rgba(255,255,255,0.06)" }}>
+                          {/* target ghost */}
+                          <div className="absolute top-0 h-full rounded-full opacity-20" style={{ width: `${target * 100}%`, background: color }} />
+                          {/* current */}
+                          <div className="absolute top-0 h-full rounded-full transition-all" style={{ width: `${Math.min(current * 100, 100)}%`, background: color }} />
+                          {/* target marker */}
+                          <div className="absolute top-0 w-px h-full bg-white/40" style={{ left: `${target * 100}%` }} />
+                        </div>
+                        <span className="col-span-1 text-right font-mono text-white/60">{(current * 100).toFixed(0)}%</span>
+                        <span className={`col-span-2 text-right font-mono text-xs ${Math.abs(drift) > 0.05 ? "text-amber-400" : "text-white/30"}`}>
+                          {drift > 0 ? "+" : ""}{(drift * 100).toFixed(1)}%
+                        </span>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* Proposed trades */}
+              {rebalPreview.proposed_trades.length > 0 && (
+                <div className={glassInner}>
+                  <p className="text-xs text-white/40 uppercase tracking-widest mb-4">Proposed Trades</p>
+                  <div className="space-y-2">
+                    {rebalPreview.proposed_trades.map((t, i) => (
+                      <div key={i} className="flex items-center justify-between py-2 px-3 rounded-xl" style={{ background: "rgba(255,255,255,0.02)", border: "1px solid rgba(255,255,255,0.05)" }}>
+                        <div className="flex items-center gap-3">
+                          <span
+                            className="px-2 py-0.5 rounded-full text-xs font-semibold uppercase"
+                            style={{
+                              background: t.action === "buy" ? "rgba(16,185,129,0.12)" : "rgba(239,68,68,0.12)",
+                              color: t.action === "buy" ? "#34d399" : "#f87171",
+                              border: `1px solid ${t.action === "buy" ? "rgba(16,185,129,0.25)" : "rgba(239,68,68,0.25)"}`,
+                            }}
+                          >
+                            {t.action}
+                          </span>
+                          <div>
+                            <p className="text-xs font-medium text-white/80">{t.asset_suggestion}</p>
+                            <p className="text-[10px] text-white/30 capitalize">{(t.sleeve ?? "").replace("_", " ")} sleeve · {(t.from_weight * 100).toFixed(1)}% → {(t.to_weight * 100).toFixed(1)}%</p>
+                          </div>
+                        </div>
+                        <p className="font-mono text-sm font-bold" style={{ color: t.action === "buy" ? "#10b981" : "#ef4444" }}>
+                          ${t.amount_usd.toLocaleString(undefined, { maximumFractionDigits: 0 })}
+                        </p>
+                      </div>
+                    ))}
+                  </div>
+                  <p className="text-[10px] text-white/20 mt-3 italic">
+                    ⚠ Preview only — no trades have been executed. Approve via Telegram or Signals page.
+                  </p>
+                </div>
+              )}
+            </>
+          )}
+
+          {!rebalPreview && !rebalLoading && !rebalError && (
+            <div className={`${glassInner} flex flex-col items-center justify-center py-12 gap-3`}>
+              <span className="text-3xl opacity-40">⚖️</span>
+              <p className="text-sm text-white/30">Click "Preview Hard Rebalance" to see what a full rebalance would look like.</p>
+              <p className="text-xs text-white/20">No trades will be executed — simulation only.</p>
+            </div>
+          )}
         </div>
       )}
 

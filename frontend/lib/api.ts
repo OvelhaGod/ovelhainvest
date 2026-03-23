@@ -198,4 +198,20 @@ export const api = {
       `/admin/pause?authorization=${secret}`,
       { method: "POST", body: JSON.stringify({ reason }) }
     ),
+
+  // ── Simulation (Phase 7) ──────────────────────────────────────────────────
+
+  simulationDashboardPreview: (body?: { monthly_contribution?: number }) =>
+    request<{
+      median_10yr: number;
+      median_20yr: number;
+      swr_probability: number;
+      current_value: number;
+      monthly_contribution: number;
+      years_simulated: number;
+      n_simulations: number;
+    }>("/simulation/dashboard_preview", {
+      method: "POST",
+      body: JSON.stringify(body ?? {}),
+    }),
 };

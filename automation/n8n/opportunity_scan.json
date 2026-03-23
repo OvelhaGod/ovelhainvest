@@ -1,6 +1,6 @@
 {
   "name": "OvelhaInvest — Opportunity Scan",
-  "description": "Runs daily at 8AM ET (13:00 UTC) on weekdays. Scans for Tier 1/2 drawdown triggers with margin of safety. Fires run_allocation in opportunity mode if triggered.",
+  "description": "Runs daily at 8AM ET (13:00 UTC) on weekdays. Scans for Tier 1/2 drawdown triggers with margin of safety. Fires run_allocation in opportunity mode if triggered; runs stress test to show downside scenario.",
   "active": false,
   "nodes": [
     {
@@ -64,6 +64,22 @@
       }
     },
     {
+      "id": "c3d4e5f6-0008-0008-0008-000000000008",
+      "name": "POST /simulation/stress_test (2020_covid)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [840, 300],
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $vars.OVELHAINVEST_API_URL }}/simulation/stress_test",
+        "authentication": "none",
+        "sendBody": true,
+        "contentType": "json",
+        "body": "={\"scenario_key\": \"2020_covid\", \"user_id\": \"{{ $vars.OVELHAINVEST_USER_ID }}\"}",
+        "options": { "timeout": 30000 }
+      }
+    },
+    {
       "id": "c3d4e5f6-0005-0005-0005-000000000005",
       "name": "Telegram — Opportunity Alert",
       "type": "n8n-nodes-base.telegram",
@@ -72,12 +88,13 @@
       "parameters": {
         "operation": "sendMessage",
         "chatId": "={{ $vars.TELEGRAM_CHAT_ID }}",
-        "text": "={{ '🚨 *OPPORTUNITY ALERT*\\n\\nTier 1: ' + ($json.tier_1_count || 0) + ' asset\\(s\\)\\nTier 2: ' + ($json.tier_2_count || 0) + ' asset\\(s\\)\\n\\n' + ($json.approval_required_count || 0) + ' trade\\(s\\) proposed — *approval required*\\.\\n\\n_Marks principle: Buy when fear is highest\\._ \\n\\nNet Worth: \\\\$' + ($json.total_value_usd || 0).toFixed(0).replace(/\\\\B(?=(\\\\d{3})+(?!\\\\d))/g, ',') }}",
+        "text": "={{ '🚨 *OPPORTUNITY ALERT*\\n\\nTier 1: ' + ($('GET /valuation_summary').item.json.tier_1_count || 0) + ' asset\\(s\\)\\nTier 2: ' + ($('GET /valuation_summary').item.json.tier_2_count || 0) + ' asset\\(s\\)\\n\\n' + ($json.approval_required_count || 0) + ' trade\\(s\\) proposed — *approval required*\\.\\n\\n*Stress check \\(COVID analog\\):*\\n  Downside: \\-\\\\$' + (($('POST /simulation/stress_test (2020_covid)').item.json.total_loss_usd || 0).toFixed(0)) + ' \\(' + (($('POST /simulation/stress_test (2020_covid)').item.json.total_loss_pct || 0) * 100).toFixed(1) + '%\\)\\n  Recovery: ~' + ($('POST /simulation/stress_test (2020_covid)').item.json.estimated_recovery_months || '?') + 'mo\\n\\n_Marks principle: Buy when fear is highest\\._ ' }}",
         "additionalFields": {
           "parse_mode": "MarkdownV2",
           "reply_markup": {
             "inline_keyboard": [[
-              { "text": "✅ Review Signals", "url": "={{ $vars.APP_URL + '/signals' }}" }
+              { "text": "✅ Review Signals",  "url": "={{ $vars.APP_URL + '/signals' }}" },
+              { "text": "📊 Stress Test",     "url": "={{ $vars.APP_URL + '/projections' }}" }
             ]]
           }
         }
@@ -107,6 +124,9 @@
       ]
     },
     "POST /run_allocation (opportunity)": {
+      "main": [[{ "node": "POST /simulation/stress_test (2020_covid)", "type": "main", "index": 0 }]]
+    },
+    "POST /simulation/stress_test (2020_covid)": {
       "main": [[{ "node": "Telegram — Opportunity Alert", "type": "main", "index": 0 }]]
     }
   },
@@ -117,6 +137,6 @@
     "executionOrder": "v1"
   },
   "staticData": null,
-  "tags": ["ovelhainvest", "opportunity"],
+  "tags": ["ovelhainvest", "opportunity", "simulation"],
   "pinData": {}
 }

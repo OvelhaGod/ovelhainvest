@@ -1,6 +1,6 @@
 {
   "name": "OvelhaInvest — Valuation Pipeline",
-  "description": "Runs every Sunday at 6AM ET (11:00 UTC). Triggers full valuation update; sends Telegram digest with notable changes and top opportunities.",
+  "description": "Runs every Sunday at 6AM ET (11:00 UTC). Triggers full valuation update + simulation preview refresh; sends Telegram digest with notable changes, top opportunities, and 20yr projection.",
   "active": false,
   "nodes": [
     {
@@ -32,17 +32,33 @@
       }
     },
     {
+      "id": "b2c3d4e5-0007-0007-0007-000000000007",
+      "name": "POST /simulation/dashboard_preview",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [640, 300],
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $vars.OVELHAINVEST_API_URL }}/simulation/dashboard_preview",
+        "authentication": "none",
+        "sendBody": true,
+        "contentType": "json",
+        "body": "={\"user_id\": \"{{ $vars.OVELHAINVEST_USER_ID }}\"}",
+        "options": { "timeout": 60000 }
+      }
+    },
+    {
       "id": "b2c3d4e5-0003-0003-0003-000000000003",
       "name": "Check: Notable Changes?",
       "type": "n8n-nodes-base.if",
       "typeVersion": 2,
-      "position": [640, 300],
+      "position": [840, 300],
       "parameters": {
         "conditions": {
           "options": { "caseSensitive": true, "leftValue": "", "typeValidation": "strict" },
           "conditions": [{
             "id": "cond-1",
-            "leftValue": "={{ $json.notable_changes }}",
+            "leftValue": "={{ $('POST /valuation_update').item.json.notable_changes }}",
             "rightValue": 0,
             "operator": { "type": "number", "operation": "larger" }
           }]
@@ -55,16 +71,17 @@
       "name": "Telegram — Opportunities Found",
       "type": "n8n-nodes-base.telegram",
       "typeVersion": 1.2,
-      "position": [840, 160],
+      "position": [1040, 160],
       "parameters": {
         "operation": "sendMessage",
         "chatId": "={{ $vars.TELEGRAM_CHAT_ID }}",
-        "text": "={{ '📊 *Weekly Valuation Update*\\n\\n' + $json.notable_changes + ' notable change\\(s\\)\\.\\ Assets updated: ' + ($json.assets_updated || 0) + '\\nDCF models refreshed: ' + ($json.dcf_refreshed || 0) + '\\n\\n*Top opportunities:*\\n' + (($json.top_opportunities || []).slice(0, 3).map(o => '  • ' + o.symbol.replace(/[_*\\[\\]()~`>#\\+\\-=|{}.!]/g, '\\\\$&') + ': MoS ' + (o.margin_of_safety_pct * 100).toFixed(1) + '%').join('\\n') || 'None') }}",
+        "text": "={{ '📊 *Weekly Valuation \\+ Projection Update*\\n\\n' + $('POST /valuation_update').item.json.notable_changes + ' notable change\\(s\\)\\. Assets updated: ' + ($('POST /valuation_update').item.json.assets_updated || 0) + '\\n\\n*Top opportunities:*\\n' + (($('POST /valuation_update').item.json.top_opportunities || []).slice(0, 3).map(o => '  • ' + o.symbol.replace(/[_*\\[\\]()~`>#\\+\\-=|{}.!]/g, '\\\\$&') + ': MoS ' + (o.margin_of_safety_pct * 100).toFixed(1) + '%').join('\\n') || 'None') + '\\n\\n*20\\-yr Projection \\(1,000 sims\\):*\\n  Median: \\\\$' + (($json.median_20yr || 0) / 1000).toFixed(0) + 'K\\n  SWR survival: ' + (($json.swr_probability || 0) * 100).toFixed(0) + '%' }}",
         "additionalFields": {
           "parse_mode": "MarkdownV2",
           "reply_markup": {
             "inline_keyboard": [[
-              { "text": "📈 View Assets", "url": "={{ $vars.APP_URL + '/assets' }}" }
+              { "text": "📈 View Assets", "url": "={{ $vars.APP_URL + '/assets' }}" },
+              { "text": "🎯 Projections", "url": "={{ $vars.APP_URL + '/projections' }}" }
             ]]
           }
         }
@@ -76,11 +93,11 @@
       "name": "Telegram — No Changes",
       "type": "n8n-nodes-base.telegram",
       "typeVersion": 1.2,
-      "position": [840, 440],
+      "position": [1040, 440],
       "parameters": {
         "operation": "sendMessage",
         "chatId": "={{ $vars.TELEGRAM_CHAT_ID }}",
-        "text": "📊 *Weekly Valuation* — No notable changes\\. All scores stable\\. Assets updated: {{ $json.assets_updated || 0 }}",
+        "text": "={{ '📊 *Weekly Valuation* — No notable changes\\. All scores stable\\. Assets updated: ' + ($('POST /valuation_update').item.json.assets_updated || 0) + '\\n\\n*20\\-yr Projection:* Median \\\\$' + (($json.median_20yr || 0) / 1000).toFixed(0) + 'K · SWR: ' + (($json.swr_probability || 0) * 100).toFixed(0) + '%' }}",
         "additionalFields": { "parse_mode": "MarkdownV2" }
       },
       "credentials": { "telegramApi": { "id": "telegram-cred", "name": "Telegram" } }
@@ -91,6 +108,9 @@
       "main": [[{ "node": "POST /valuation_update", "type": "main", "index": 0 }]]
     },
     "POST /valuation_update": {
+      "main": [[{ "node": "POST /simulation/dashboard_preview", "type": "main", "index": 0 }]]
+    },
+    "POST /simulation/dashboard_preview": {
       "main": [[{ "node": "Check: Notable Changes?", "type": "main", "index": 0 }]]
     },
     "Check: Notable Changes?": {
@@ -107,6 +127,6 @@
     "executionOrder": "v1"
   },
   "staticData": null,
-  "tags": ["ovelhainvest", "valuation"],
+  "tags": ["ovelhainvest", "valuation", "simulation"],
   "pinData": {}
 }
