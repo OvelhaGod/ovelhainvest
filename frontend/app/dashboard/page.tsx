@@ -166,7 +166,7 @@ export default function DashboardPage() {
         </div>
 
         {/* YTD Return */}
-        <div className={glassInner}>
+        <a href="/performance" className={`${glassInner} block hover:border-white/[0.14] transition-colors`}>
           <p className="text-xs text-white/40 uppercase tracking-widest mb-2">YTD Return (TWR)</p>
           {loading ? (
             <Skeleton className="h-9 w-24 mb-2" />
@@ -177,11 +177,11 @@ export default function DashboardPage() {
           ) : (
             <p className="text-3xl font-bold text-white/20 font-mono">—</p>
           )}
-          <p className="text-xs text-white/30 mt-1">Time-weighted return</p>
-        </div>
+          <p className="text-xs text-white/30 mt-1">View full analysis →</p>
+        </a>
 
         {/* Max Drawdown */}
-        <div className={glassInner}>
+        <a href="/performance" className={`${glassInner} block hover:border-white/[0.14] transition-colors`}>
           <p className="text-xs text-white/40 uppercase tracking-widest mb-2">Max Drawdown</p>
           {loading ? (
             <Skeleton className="h-9 w-24 mb-2" />
@@ -192,8 +192,8 @@ export default function DashboardPage() {
           ) : (
             <p className="text-3xl font-bold text-white/20 font-mono">—</p>
           )}
-          <p className="text-xs text-white/30 mt-1">From peak</p>
-        </div>
+          <p className="text-xs text-white/30 mt-1">View full analysis →</p>
+        </a>
 
         {/* Pending Approvals */}
         <div className={glassInner} style={
