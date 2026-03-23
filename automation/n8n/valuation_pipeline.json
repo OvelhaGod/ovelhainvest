@@ -1,96 +1,112 @@
 {
   "name": "OvelhaInvest — Valuation Pipeline",
-  "description": "Runs every Sunday at 6AM ET: triggers full valuation update, notifies if new Tier 1/2 opportunities detected.",
+  "description": "Runs every Sunday at 6AM ET (11:00 UTC). Triggers full valuation update; sends Telegram digest with notable changes and top opportunities.",
   "active": false,
   "nodes": [
     {
-      "id": "cron-trigger",
+      "id": "b2c3d4e5-0001-0001-0001-000000000001",
       "name": "Schedule Trigger",
       "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.1,
+      "position": [240, 300],
       "parameters": {
         "rule": {
           "interval": [{ "field": "cronExpression", "expression": "0 11 * * 0" }]
         }
-      },
-      "position": [250, 300]
+      }
     },
     {
-      "id": "run-valuation-update",
+      "id": "b2c3d4e5-0002-0002-0002-000000000002",
       "name": "POST /valuation_update",
       "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [440, 300],
       "parameters": {
         "method": "POST",
-        "url": "={{ $env.OVELHAINVEST_API_URL }}/valuation_update",
+        "url": "={{ $vars.OVELHAINVEST_API_URL }}/valuation_update",
         "authentication": "none",
         "sendBody": true,
         "contentType": "json",
-        "body": {
-          "user_id": "={{ $env.OVELHAINVEST_USER_ID }}",
-          "dry_run": false
-        },
-        "responseFormat": "json"
-      },
-      "position": [450, 300]
+        "body": "={\"user_id\": \"{{ $vars.OVELHAINVEST_USER_ID }}\", \"dry_run\": false}",
+        "options": { "timeout": 300000 }
+      }
     },
     {
-      "id": "check-opportunities",
-      "name": "Any Tier 1/2 Opportunities?",
+      "id": "b2c3d4e5-0003-0003-0003-000000000003",
+      "name": "Check: Notable Changes?",
       "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [640, 300],
       "parameters": {
         "conditions": {
-          "number": [{
-            "value1": "={{ ($json.tier_opportunities_detected ?? 0) }}",
-            "operation": "larger",
-            "value2": 0
+          "options": { "caseSensitive": true, "leftValue": "", "typeValidation": "strict" },
+          "conditions": [{
+            "id": "cond-1",
+            "leftValue": "={{ $json.notable_changes }}",
+            "rightValue": 0,
+            "operator": { "type": "number", "operation": "larger" }
           }]
-        }
-      },
-      "position": [650, 300]
+        },
+        "combineOperation": "all"
+      }
     },
     {
-      "id": "send-opportunity-alert",
-      "name": "Telegram — Opportunity Alert",
+      "id": "b2c3d4e5-0004-0004-0004-000000000004",
+      "name": "Telegram — Opportunities Found",
       "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [840, 160],
       "parameters": {
         "operation": "sendMessage",
-        "chatId": "={{ $env.TELEGRAM_CHAT_ID }}",
-        "text": "={{ '🚨 *Valuation Update — Opportunities Detected*\n\n' + $json.tier_opportunities_detected + ' asset(s) in buy zone\\.\n\n' + 'Updated: ' + $json.assets_updated + ' assets\n' + 'Open /assets for details\\.' }}",
+        "chatId": "={{ $vars.TELEGRAM_CHAT_ID }}",
+        "text": "={{ '📊 *Weekly Valuation Update*\\n\\n' + $json.notable_changes + ' notable change\\(s\\)\\.\\ Assets updated: ' + ($json.assets_updated || 0) + '\\nDCF models refreshed: ' + ($json.dcf_refreshed || 0) + '\\n\\n*Top opportunities:*\\n' + (($json.top_opportunities || []).slice(0, 3).map(o => '  • ' + o.symbol.replace(/[_*\\[\\]()~`>#\\+\\-=|{}.!]/g, '\\\\$&') + ': MoS ' + (o.margin_of_safety_pct * 100).toFixed(1) + '%').join('\\n') || 'None') }}",
         "additionalFields": {
           "parse_mode": "MarkdownV2",
           "reply_markup": {
             "inline_keyboard": [[
-              { "text": "📊 View Assets", "url": "={{ $env.APP_URL + '/assets' }}" }
+              { "text": "📈 View Assets", "url": "={{ $vars.APP_URL + '/assets' }}" }
             ]]
           }
         }
       },
-      "position": [850, 200]
+      "credentials": { "telegramApi": { "id": "telegram-cred", "name": "Telegram" } }
     },
     {
-      "id": "send-valuation-complete",
-      "name": "Telegram — Valuation Complete",
+      "id": "b2c3d4e5-0005-0005-0005-000000000005",
+      "name": "Telegram — No Changes",
       "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [840, 440],
       "parameters": {
         "operation": "sendMessage",
-        "chatId": "={{ $env.TELEGRAM_CHAT_ID }}",
-        "text": "={{ '✅ *Weekly Valuation Update Complete*\n\n' + 'Updated: ' + $json.assets_updated + ' assets\n' + 'No new tier opportunities this week\\.' }}",
+        "chatId": "={{ $vars.TELEGRAM_CHAT_ID }}",
+        "text": "📊 *Weekly Valuation* — No notable changes\\. All scores stable\\. Assets updated: {{ $json.assets_updated || 0 }}",
         "additionalFields": { "parse_mode": "MarkdownV2" }
       },
-      "position": [850, 400]
+      "credentials": { "telegramApi": { "id": "telegram-cred", "name": "Telegram" } }
     }
   ],
   "connections": {
-    "Schedule Trigger": { "main": [[{ "node": "POST /valuation_update", "type": "main", "index": 0 }]] },
-    "POST /valuation_update": { "main": [[{ "node": "Any Tier 1/2 Opportunities?", "type": "main", "index": 0 }]] },
-    "Any Tier 1/2 Opportunities?": {
+    "Schedule Trigger": {
+      "main": [[{ "node": "POST /valuation_update", "type": "main", "index": 0 }]]
+    },
+    "POST /valuation_update": {
+      "main": [[{ "node": "Check: Notable Changes?", "type": "main", "index": 0 }]]
+    },
+    "Check: Notable Changes?": {
       "main": [
-        [{ "node": "Telegram — Opportunity Alert", "type": "main", "index": 0 }],
-        [{ "node": "Telegram — Valuation Complete", "type": "main", "index": 0 }]
+        [{ "node": "Telegram — Opportunities Found", "type": "main", "index": 0 }],
+        [{ "node": "Telegram — No Changes",          "type": "main", "index": 0 }]
       ]
     }
   },
   "settings": {
     "saveManualExecutions": true,
-    "executionTimeout": 300
-  }
+    "saveExecutionProgress": true,
+    "callerPolicy": "workflowsFromSameOwner",
+    "executionOrder": "v1"
+  },
+  "staticData": null,
+  "tags": ["ovelhainvest", "valuation"],
+  "pinData": {}
 }
