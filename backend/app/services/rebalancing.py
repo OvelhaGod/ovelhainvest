@@ -179,20 +179,31 @@ def propose_hard_rebalance_trades(
 
         account = account_by_id.get(best_holding.get("account_id", ""), {})
         tax_treatment = account.get("tax_treatment", "taxable")
+        symbol = best_holding.get("symbol", "")
+        qty_est = _estimate_qty(symbol, sell_amount, prices)
+        tax_risk = _assess_tax_risk(tax_treatment, best_holding)
+        tax_cost_usd: float | None = None
+
+        # Estimate tax cost for taxable sell trades (Phase 8)
+        if tax_treatment in ("taxable", "brazil_taxable"):
+            tax_cost_usd = _estimate_sell_tax_cost(
+                best_holding, qty_est or 0.0, prices.get(symbol, 0.0), tax_treatment
+            )
+            if tax_cost_usd is not None and tax_cost_usd > 200:
+                tax_risk = "high"
 
         trades.append(ProposedTrade(
             account_name=account.get("name", "Unknown"),
             account_id=account.get("id"),
             trade_type="sell",
-            symbol=best_holding.get("symbol", ""),
+            symbol=symbol,
             asset_class=best_holding.get("asset_class", ""),
             amount_usd=round(sell_amount, 2),
-            quantity_estimate=_estimate_qty(
-                best_holding.get("symbol", ""), sell_amount, prices
-            ),
+            quantity_estimate=qty_est,
             reason=f"Hard rebalance: {sw.sleeve} overweight by {sw.drift_pct:.1f}%",
             sleeve=sw.sleeve,
-            tax_risk_level=_assess_tax_risk(tax_treatment, best_holding),
+            tax_risk_level=tax_risk,
+            tax_cost_usd=round(tax_cost_usd, 2) if tax_cost_usd is not None else None,
             requires_approval=True,  # Hard rebalances always need approval
         ))
 
@@ -385,3 +396,47 @@ def _assess_tax_risk(tax_treatment: str, holding: dict) -> str:
         except Exception:
             pass
     return "medium"
+
+
+def _estimate_sell_tax_cost(
+    holding: dict,
+    quantity: float,
+    current_price: float,
+    tax_treatment: str,
+) -> float | None:
+    """
+    Estimate tax cost for a sell trade using holding's avg_cost_basis.
+
+    Uses a simplified single-lot approximation. For HIFO precision,
+    use tax_lot_engine.estimate_tax_impact() with actual lots.
+    Returns None if insufficient data to compute.
+    """
+    if quantity <= 0 or current_price <= 0:
+        return None
+
+    cost_pu = float(holding.get("avg_cost_basis") or 0.0)
+    if cost_pu <= 0:
+        return None
+
+    gain = (current_price - cost_pu) * quantity
+    if gain <= 0:
+        return None  # No gain → no tax cost (harvest candidate instead)
+
+    # Determine holding period for rate selection
+    acquired = holding.get("acquisition_date")
+    is_long_term = True
+    if acquired:
+        try:
+            acq_date = date.fromisoformat(str(acquired[:10]))
+            is_long_term = (date.today() - acq_date).days >= 365
+        except Exception:
+            pass
+
+    if tax_treatment == "brazil_taxable":
+        rate = 0.15  # Brazil CGT flat rate
+    elif is_long_term:
+        rate = 0.15  # US long-term capital gains
+    else:
+        rate = 0.32  # US short-term (ordinary income)
+
+    return gain * rate

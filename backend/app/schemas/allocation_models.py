@@ -50,6 +50,8 @@ class ProposedTrade(BaseModel):
     requires_approval: bool = False
     opportunity_tier: int | None = None
     margin_of_safety_pct: float | None = None
+    # Phase 8 — tax cost estimate for sell trades in taxable accounts
+    tax_cost_usd: float | None = None
 
 
 class VaultBalance(BaseModel):
@@ -88,6 +90,9 @@ class AllocationRunResponse(BaseModel):
     ai_validation_summary: dict[str, Any] | None = None
     ai_framework_check: dict[str, Any] | None = None
     alerts_dispatched: int = 0
+    # Phase 8 — tax efficiency fields
+    total_estimated_tax_cost: float | None = None
+    tax_efficiency_note: str | None = None
 
 
 class DailyStatusResponse(BaseModel):
