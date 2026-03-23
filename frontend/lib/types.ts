@@ -184,3 +184,95 @@ export interface ValuationUpdateResponse {
   economic_season: string;
   run_timestamp: string;
 }
+
+// ── Performance (Phase 4) ──────────────────────────────────────────────────
+
+export interface PeriodReturn {
+  period: string;
+  twr: number | null;
+  mwr: number | null;
+  benchmark_return: number | null;
+  active_return: number | null;
+}
+
+export interface RatioInterpretation {
+  value: number | null;
+  label: string;
+}
+
+export interface DrawdownInfo {
+  max_drawdown_pct: number | null;
+  peak_date: string | null;
+  trough_date: string | null;
+  current_drawdown_pct: number | null;
+}
+
+export interface PerformanceSummaryResponse {
+  user_id: string | null;
+  as_of_date: string | null;
+  period_returns: PeriodReturn[];
+  sharpe: RatioInterpretation;
+  sortino: RatioInterpretation;
+  calmar: RatioInterpretation;
+  beta: number | null;
+  information_ratio: number | null;
+  volatility_annualized: number | null;
+  drawdown: DrawdownInfo;
+  data_points: number;
+}
+
+export interface SleeveAttributionDetail {
+  sleeve: string;
+  portfolio_weight: number;
+  benchmark_weight: number;
+  portfolio_return: number;
+  benchmark_return: number;
+  allocation_effect: number;
+  selection_effect: number;
+  interaction_effect: number;
+  total_effect: number;
+}
+
+export interface AttributionResponse {
+  user_id: string | null;
+  period_start: string | null;
+  period_end: string | null;
+  portfolio_return: number | null;
+  benchmark_return: number | null;
+  active_return: number | null;
+  total_allocation_effect: number | null;
+  total_selection_effect: number | null;
+  total_interaction_effect: number | null;
+  fx_contribution: number | null;
+  per_sleeve: SleeveAttributionDetail[];
+}
+
+export interface BenchmarkComparisonResponse {
+  benchmark_symbol: string;
+  period: string;
+  portfolio_return: number | null;
+  benchmark_return: number | null;
+  active_return: number | null;
+  beta: number | null;
+  correlation: number | null;
+  information_ratio: number | null;
+}
+
+export interface RollingReturnsResponse {
+  user_id: string | null;
+  data_points: Record<string, number | null>[];
+  windows: string[];
+}
+
+export interface RiskSummaryResponse {
+  user_id: string | null;
+  as_of_date: string | null;
+  var_95: number | null;
+  var_99: number | null;
+  cvar_95: number | null;
+  diversification_ratio: number | null;
+  risk_parity_weights: Record<string, number>;
+  actual_weights: Record<string, number>;
+  correlation_matrix: Record<string, Record<string, number>>;
+  high_correlation_pairs: Record<string, unknown>[];
+}

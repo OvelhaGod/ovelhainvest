@@ -6,7 +6,12 @@
 import type {
   AllocationRunResponse,
   AssetValuation,
+  AttributionResponse,
+  BenchmarkComparisonResponse,
   DailyStatusResponse,
+  PerformanceSummaryResponse,
+  RiskSummaryResponse,
+  RollingReturnsResponse,
   SignalsRun,
   ValuationSummaryResponse,
   ValuationUpdateResponse,
@@ -71,7 +76,46 @@ export const api = {
 
   // Latest valuations (uses valuation_summary for the table)
   getLatestValuations: () =>
-    request<AssetValuation[]>("/valuation_summary").then(
+    request<ValuationSummaryResponse>("/valuation_summary").then(
       (r) => r.top_by_composite as AssetValuation[]
+    ),
+
+  // ── Performance (Phase 4) ─────────────────────────────────────────────────
+
+  performanceSummary: (userId?: string) =>
+    request<PerformanceSummaryResponse>(
+      `/performance/summary${userId ? `?user_id=${userId}` : ""}`
+    ),
+
+  performanceAttribution: (periodStart?: string, periodEnd?: string, userId?: string) => {
+    const params = new URLSearchParams();
+    if (userId) params.set("user_id", userId);
+    if (periodStart) params.set("period_start", periodStart);
+    if (periodEnd) params.set("period_end", periodEnd);
+    const qs = params.toString();
+    return request<AttributionResponse>(`/performance/attribution${qs ? `?${qs}` : ""}`);
+  },
+
+  performanceBenchmark: (benchmark = "SPY", period = "ytd", userId?: string) => {
+    const params = new URLSearchParams({ benchmark, period });
+    if (userId) params.set("user_id", userId);
+    return request<BenchmarkComparisonResponse>(`/performance/benchmark?${params}`);
+  },
+
+  performanceRolling: (windows = "1mo,3mo,1yr", userId?: string) => {
+    const params = new URLSearchParams({ windows });
+    if (userId) params.set("user_id", userId);
+    return request<RollingReturnsResponse>(`/performance/rolling?${params}`);
+  },
+
+  performanceRisk: (userId?: string) =>
+    request<RiskSummaryResponse>(
+      `/performance/risk${userId ? `?user_id=${userId}` : ""}`
+    ),
+
+  triggerSnapshot: (userId?: string) =>
+    request<{ status: string; snapshot_date: string; message: string }>(
+      `/performance/snapshot${userId ? `?user_id=${userId}` : ""}`,
+      { method: "POST" }
     ),
 };
