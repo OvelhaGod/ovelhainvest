@@ -84,6 +84,10 @@ class AllocationRunResponse(BaseModel):
     deferred_dca: bool = False
     deferred_reason: str | None = None
     status: str = "pending"
+    # Phase 5 — AI advisor fields
+    ai_validation_summary: dict[str, Any] | None = None
+    ai_framework_check: dict[str, Any] | None = None
+    alerts_dispatched: int = 0
 
 
 class DailyStatusResponse(BaseModel):

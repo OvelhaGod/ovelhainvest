@@ -26,6 +26,7 @@ from app.schemas.allocation_models import (
     RegimeState,
 )
 from app.services import allocation_engine, opportunity_detector, rebalancing
+from app.services.alert_engine import BUILT_IN_ALERT_RULES
 from app.services.fx_engine import fetch_usd_brl_rate, normalize_to_brl
 from app.services.market_data import fetch_current_prices
 from app.services.volatility_regime import (
@@ -196,7 +197,7 @@ def run_allocation(
         # ── 10. Determine run status ───────────────────────────────────────
         status = "needs_approval" if approval_count > 0 else "auto_ok"
 
-        # ── 11. Write signals_run to DB ────────────────────────────────────
+        # ── 11. Write signals_run to DB (pre-AI, so we have a run_id) ─────
         total_value_brl = normalize_to_brl(total_value_usd, fx_rate)
         run_record = {
             "id": run_id,
@@ -213,14 +214,141 @@ def run_allocation(
                 "factor_weights": get_factor_weights_for_regime(economic_season),
             },
             "proposed_trades": [t.model_dump() for t in proposed_trades],
-            "ai_validation_summary": None,  # Phase 5
+            "ai_validation_summary": None,
             "status": status,
             "notes": body.notes,
         }
         signals_repo.create_signals_run(run_record)
+
+        # ── 12. AI Advisor validation (Phase 5) ────────────────────────────
+        import asyncio
+        from app.services import ai_advisor
+        from app.services.alert_engine import evaluate_all_rules, dispatch_alert
+        from app.db.repositories.valuations import get_valuation_summary_stats
+
+        ai_response = None
+        ai_summary_dict: dict | None = None
+        ai_framework_dict: dict | None = None
+        alerts_dispatched = 0
+
+        try:
+            # Build AI payload
+            val_stats = {}
+            try:
+                val_stats = get_valuation_summary_stats() or {}
+            except Exception:
+                pass
+
+            latest_snapshot = snapshots_repo.get_latest_snapshot(uid)
+            perf_snap = {}
+            if latest_snapshot:
+                perf_snap = {
+                    "twr_ytd": latest_snapshot.get("portfolio_return_ytd"),
+                    "sharpe": latest_snapshot.get("sharpe_ratio"),
+                    "sortino": latest_snapshot.get("sortino_ratio"),
+                    "max_drawdown": latest_snapshot.get("drawdown_from_peak_pct"),
+                    "volatility": latest_snapshot.get("volatility_annualized"),
+                }
+
+            ai_payload = ai_advisor.build_ai_payload(
+                run_context={
+                    "timestamp": run_timestamp.isoformat(),
+                    "event_type": body.event_type,
+                    "regime": regime.value,
+                    "economic_season": economic_season.value,
+                    "vix": vix,
+                    "notes": body.notes,
+                },
+                portfolio_snapshot={
+                    "total_value_usd": round(total_value_usd, 2),
+                    "total_value_brl": round(total_value_brl, 2),
+                    "sleeve_weights": [w.model_dump() for w in drift_weights],
+                    "risk_parity_weights": {},
+                    "correlation_matrix": {},
+                    "concentration_top5": [],
+                },
+                valuation_snapshot={
+                    "top_opportunities": val_stats.get("top_opportunities", []),
+                    "tier_opportunities": [],
+                    "mos_distribution": val_stats.get("margin_of_safety_distribution", {}),
+                    "assets_scored": val_stats.get("assets_scored", 0),
+                },
+                performance_snapshot=perf_snap,
+                proposed_trades=[t.model_dump() for t in proposed_trades],
+                news_and_research={"macro_summary": "", "macro_regime": regime.value},
+                active_config={},
+            )
+
+            # Call Claude API with 30s timeout
+            ai_response = asyncio.get_event_loop().run_until_complete(
+                asyncio.wait_for(
+                    ai_advisor.call_ai_advisor(ai_payload, signals_run_id=run_id),
+                    timeout=30.0,
+                )
+            )
+            ai_summary_dict = ai_response.model_dump()
+            ai_framework_dict = ai_response.investment_framework_check.model_dump()
+
+            # Update signals_run with AI result
+            try:
+                from app.db.supabase_client import get_supabase_client
+                get_supabase_client().table("signals_runs").update(
+                    {"ai_validation_summary": ai_summary_dict}
+                ).eq("id", run_id).execute()
+            except Exception as exc:
+                logger.debug("signals_run AI update failed (non-critical): %s", exc)
+
+            # ── 13. Alert evaluation + dispatch ───────────────────────────
+            current_max_dd = abs(perf_snap.get("max_drawdown") or 0.0)
+            portfolio_state = {
+                "max_drawdown": -current_max_dd,
+                "sleeve_weights": [w.model_dump() for w in drift_weights],
+                "opportunity_tier_1": any(
+                    t.opportunity_tier == 1 for t in proposed_trades
+                ),
+                "opportunity_tier_2": any(
+                    t.opportunity_tier == 2 for t in proposed_trades
+                ),
+                "held_assets_at_sell_target": [],
+                "darf_progress_pct": 0.0,
+                "usd_brl_30d_change": 0.0,
+                "correlation_pairs": [],
+                "recent_deposits": [],
+            }
+            triggered_alerts = evaluate_all_rules(
+                portfolio_state=portfolio_state,
+                alert_rules=BUILT_IN_ALERT_RULES,
+            )
+
+            loop = asyncio.get_event_loop()
+            for alert in triggered_alerts:
+                keyboard = None
+                if alert.get("type") == "opportunity":
+                    keyboard = [
+                        [
+                            {"text": "Approve", "callback_data": f"approve:{run_id}"},
+                            {"text": "Reject", "callback_data": f"reject:{run_id}"},
+                        ]
+                    ]
+                try:
+                    ok = loop.run_until_complete(dispatch_alert(alert, keyboard=keyboard))
+                    if ok:
+                        alerts_dispatched += 1
+                except Exception as exc:
+                    logger.debug("Alert dispatch failed (non-critical): %s", exc)
+
+        except asyncio.TimeoutError:
+            logger.warning("AI advisor timed out for run_id=%s — proceeding without AI", run_id)
+            ai_summary_dict = ai_advisor.FALLBACK_RESPONSE.model_dump()
+            ai_summary_dict["explanation_for_user"]["short_summary"] = (
+                "AI validation timed out — engine recommendation stands."
+            )
+        except Exception as exc:
+            logger.error("AI advisor/alert step failed (non-critical) run_id=%s: %s", run_id, exc)
+
         logger.info(
-            "run_allocation complete run_id=%s trades=%d approvals=%d",
-            run_id, len(proposed_trades), approval_count,
+            "run_allocation complete run_id=%s trades=%d approvals=%d alerts=%d",
+            run_id, len(proposed_trades), approval_count, alerts_dispatched,
         )
 
         return AllocationRunResponse(
@@ -239,6 +367,9 @@ def run_allocation(
             deferred_dca=defer_dca,
             deferred_reason=f"High volatility — deferred {defer_days} days" if defer_dca else None,
             status=status,
+            ai_validation_summary=ai_summary_dict,
+            ai_framework_check=ai_framework_dict,
+            alerts_dispatched=alerts_dispatched,
         )
 
     except HTTPException:
