@@ -214,4 +214,39 @@ export const api = {
       method: "POST",
       body: JSON.stringify(body ?? {}),
     }),
+
+  // ── Tax (Phase 8) ─────────────────────────────────────────────────────────
+
+  taxEstimate: (params?: { user_id?: string; year?: number }) => {
+    const qs = new URLSearchParams(
+      Object.entries(params ?? {})
+        .filter(([, v]) => v != null)
+        .map(([k, v]) => [k, String(v)])
+    ).toString();
+    return request<{
+      unrealized: { total_unrealized_gain: number; open_positions: number };
+      estimated_tax: { on_realized_gains: number };
+      worst_case: { if_close_everything_today: number };
+      harvest_savings: { potential_savings_usd: number; top_candidates: unknown[] };
+      net_estimated_tax: number;
+    }>(`/tax/estimate${qs ? "?" + qs : ""}`);
+  },
+
+  taxBrazilDarf: (params?: { user_id?: string; year?: number; month?: number }) => {
+    const qs = new URLSearchParams(
+      Object.entries(params ?? {})
+        .filter(([, v]) => v != null)
+        .map(([k, v]) => [k, String(v)])
+    ).toString();
+    return request<{
+      darf_status: {
+        exemption_pct_used: number;
+        is_triggered: boolean;
+        darf_due: number | null;
+        gross_sales_brl: number;
+        remaining_before_trigger: number;
+      };
+      history: unknown[];
+    }>(`/tax/brazil_darf${qs ? "?" + qs : ""}`);
+  },
 };

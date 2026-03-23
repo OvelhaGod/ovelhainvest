@@ -371,6 +371,21 @@ def run_allocation(
             run_id, len(proposed_trades), approval_count, alerts_dispatched,
         )
 
+        # ── Phase 8 — aggregate tax cost across sell trades ────────────────
+        total_tax_cost = sum(
+            t.tax_cost_usd for t in proposed_trades
+            if t.tax_cost_usd is not None and t.trade_type == "sell"
+        )
+        tax_efficiency_note: str | None = None
+        if total_tax_cost > 0:
+            if total_tax_cost > 500:
+                tax_efficiency_note = (
+                    f"Selling triggers ~${total_tax_cost:,.0f} in estimated taxes. "
+                    "Consider loss harvesting or waiting for long-term treatment."
+                )
+            else:
+                tax_efficiency_note = f"Estimated tax cost on proposed sells: ~${total_tax_cost:,.0f}."
+
         return AllocationRunResponse(
             run_id=run_id,
             run_timestamp=run_timestamp,
@@ -390,6 +405,8 @@ def run_allocation(
             ai_validation_summary=ai_summary_dict,
             ai_framework_check=ai_framework_dict,
             alerts_dispatched=alerts_dispatched,
+            total_estimated_tax_cost=round(total_tax_cost, 2) if total_tax_cost > 0 else None,
+            tax_efficiency_note=tax_efficiency_note,
         )
 
     except HTTPException:
