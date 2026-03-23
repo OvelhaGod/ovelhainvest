@@ -1,0 +1,358 @@
+<!DOCTYPE html>
+
+<html class="dark" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&amp;family=JetBrains+Mono:wght@400;700&amp;family=Geist+Sans:wght@700;800;900&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<style>
+        .font-geist { font-family: 'Geist Sans', sans-serif; }
+        .font-mono { font-family: 'JetBrains Mono', monospace; }
+        .font-inter { font-family: 'Inter', sans-serif; }
+        
+        body {
+            background-color: #050508;
+            color: #e3e2e3;
+            margin: 0;
+            padding: 0;
+            overflow-x: hidden;
+        }
+
+        .glass-card {
+            background: rgba(31, 32, 33, 0.6);
+            backdrop-filter: blur(20px);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+        }
+
+        .emerald-glow {
+            box-shadow: 0 0 20px rgba(16, 185, 129, 0.1);
+        }
+
+        .violet-left-glow {
+            position: relative;
+        }
+        .violet-left-glow::before {
+            content: '';
+            position: absolute;
+            left: 0;
+            top: 15%;
+            height: 70%;
+            width: 3px;
+            background: #8b5cf6;
+            box-shadow: 0 0 15px #8b5cf6;
+            border-radius: 0 4px 4px 0;
+        }
+
+        .active-nav-glow::before {
+            content: '';
+            position: absolute;
+            left: 0;
+            width: 2px;
+            height: 1.5rem;
+            background-color: #10b981;
+            box-shadow: 0 0 10px #10b981;
+        }
+
+        /* Hide scrollbars but keep functionality */
+        .no-scrollbar::-webkit-scrollbar { display: none; }
+        .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+    </style>
+<script id="tailwind-config">
+        tailwind.config = {
+          darkMode: "class",
+          theme: {
+            extend: {
+              colors: {
+                "surface-container-highest": "#343536",
+                "error-container": "#93000a",
+                "tertiary-fixed-dim": "#ffb95f",
+                "surface-container-high": "#292a2b",
+                "surface-container": "#1f2021",
+                "error": "#ffb4ab",
+                "on-tertiary-fixed-variant": "#653e00",
+                "on-primary-fixed-variant": "#005236",
+                "outline-variant": "#3c4a42",
+                "on-secondary-fixed": "#23005c",
+                "surface-tint": "#4edea3",
+                "on-tertiary": "#472a00",
+                "on-secondary-container": "#c4abff",
+                "inverse-surface": "#e3e2e3",
+                "secondary-container": "#571bc1",
+                "on-tertiary-container": "#523200",
+                "tertiary": "#ffb95f",
+                "inverse-primary": "#006c49",
+                "surface": "#121315",
+                "tertiary-container": "#e29100",
+                "on-surface-variant": "#bbcabf",
+                "on-error": "#690005",
+                "on-tertiary-fixed": "#2a1700",
+                "on-error-container": "#ffdad6",
+                "primary-container": "#10b981",
+                "on-secondary": "#3c0091",
+                "inverse-on-surface": "#303032",
+                "background": "#121315",
+                "surface-container-lowest": "#0d0e0f",
+                "secondary-fixed-dim": "#d0bcff",
+                "secondary-fixed": "#e9ddff",
+                "primary": "#4edea3",
+                "on-secondary-fixed-variant": "#5516be",
+                "tertiary-fixed": "#ffddb8",
+                "surface-variant": "#343536",
+                "on-primary": "#003824",
+                "surface-container-low": "#1b1c1d",
+                "surface-bright": "#38393a",
+                "primary-fixed-dim": "#4edea3",
+                "secondary": "#d0bcff",
+                "primary-fixed": "#6ffbbe",
+                "on-surface": "#e3e2e3",
+                "surface-dim": "#121315",
+                "outline": "#86948a",
+                "on-primary-fixed": "#002113",
+                "on-primary-container": "#00422b",
+                "on-background": "#e3e2e3"
+              },
+              fontFamily: {
+                "headline": ["Geist Sans", "Inter"],
+                "body": ["Inter"],
+                "label": ["Inter"],
+                "mono": ["JetBrains Mono"]
+              },
+              borderRadius: {"DEFAULT": "1rem", "lg": "2rem", "xl": "3rem", "full": "9999px"},
+            },
+          },
+        }
+      </script>
+</head>
+<body class="font-inter antialiased">
+<!-- Sidebar Navigation -->
+<aside class="fixed left-0 top-0 h-screen w-[240px] border-r border-white/10 bg-[#050508]/40 backdrop-blur-3xl flex flex-col py-8 px-4 z-50">
+<div class="mb-12 px-4">
+<h1 class="text-2xl font-bold tracking-tighter text-[#4edea3] font-geist">OvelhaInvest</h1>
+<p class="text-[10px] uppercase tracking-widest text-slate-500 font-mono mt-1">Precision Ledger</p>
+</div>
+<nav class="flex-1 space-y-2">
+<!-- Navigation Items Mapping from JSON -->
+<a class="flex items-center gap-3 px-4 py-3 text-slate-400 hover:text-slate-200 hover:bg-white/5 transition-all duration-300 rounded-lg group" href="#">
+<span class="material-symbols-outlined text-xl" data-icon="dashboard">dashboard</span>
+<span class="text-sm font-medium">Dashboard</span>
+</a>
+<a class="flex items-center gap-3 px-4 py-3 text-slate-400 hover:text-slate-200 hover:bg-white/5 transition-all duration-300 rounded-lg group" href="#">
+<span class="material-symbols-outlined text-xl" data-icon="auto_awesome">auto_awesome</span>
+<span class="text-sm font-medium">Signals</span>
+</a>
+<a class="flex items-center gap-3 px-4 py-3 text-slate-400 hover:text-slate-200 hover:bg-white/5 transition-all duration-300 rounded-lg group" href="#">
+<span class="material-symbols-outlined text-xl" data-icon="account_balance_wallet">account_balance_wallet</span>
+<span class="text-sm font-medium">Assets</span>
+</a>
+<a class="flex items-center gap-3 px-4 py-3 text-slate-400 hover:text-slate-200 hover:bg-white/5 transition-all duration-300 rounded-lg group" href="#">
+<span class="material-symbols-outlined text-xl" data-icon="monitoring">monitoring</span>
+<span class="text-sm font-medium">Performance</span>
+</a>
+<a class="flex items-center gap-3 px-4 py-3 text-slate-400 hover:text-slate-200 hover:bg-white/5 transition-all duration-300 rounded-lg group" href="#">
+<span class="material-symbols-outlined text-xl" data-icon="timeline">timeline</span>
+<span class="text-sm font-medium">Projections</span>
+</a>
+<a class="flex items-center gap-3 px-4 py-3 text-slate-400 hover:text-slate-200 hover:bg-white/5 transition-all duration-300 rounded-lg group" href="#">
+<span class="material-symbols-outlined text-xl" data-icon="receipt_long">receipt_long</span>
+<span class="text-sm font-medium">Tax</span>
+</a>
+<!-- ACTIVE: Journal -->
+<a class="relative flex items-center gap-3 px-4 py-3 text-[#4edea3] active-nav-glow transition-all duration-300 rounded-lg group" href="#">
+<span class="material-symbols-outlined text-xl" data-icon="auto_stories">auto_stories</span>
+<span class="text-sm font-medium">Journal</span>
+</a>
+<a class="flex items-center gap-3 px-4 py-3 text-slate-400 hover:text-slate-200 hover:bg-white/5 transition-all duration-300 rounded-lg group" href="#">
+<span class="material-symbols-outlined text-xl" data-icon="settings">settings</span>
+<span class="text-sm font-medium">Config</span>
+</a>
+</nav>
+<div class="mt-auto border-t border-white/5 pt-6 px-4">
+<a class="flex items-center gap-3 text-slate-400 hover:text-slate-200 transition-colors" href="#">
+<span class="material-symbols-outlined text-xl" data-icon="account_circle">account_circle</span>
+<span class="text-sm font-medium">Profile</span>
+</a>
+</div>
+</aside>
+<!-- Top Bar Navigation -->
+<header class="fixed top-0 right-0 w-[calc(100%-240px)] h-16 bg-transparent flex justify-between items-center px-12 z-40">
+<div class="flex items-center bg-surface-container-low/40 border border-white/5 rounded-full px-4 py-1.5 w-80">
+<span class="material-symbols-outlined text-slate-500 text-lg mr-2" data-icon="search">search</span>
+<input class="bg-transparent border-none text-sm text-slate-200 focus:ring-0 w-full placeholder:text-slate-600" placeholder="Search entries..." type="text"/>
+</div>
+<div class="flex items-center gap-6">
+<button class="text-slate-400 hover:text-[#4edea3] transition-colors">
+<span class="material-symbols-outlined" data-icon="notifications">notifications</span>
+</button>
+<button class="text-slate-400 hover:text-[#4edea3] transition-colors">
+<span class="material-symbols-outlined" data-icon="account_balance">account_balance</span>
+</button>
+<button class="text-slate-400 hover:text-[#4edea3] transition-colors">
+<span class="material-symbols-outlined" data-icon="grid_view">grid_view</span>
+</button>
+<div class="w-8 h-8 rounded-full border border-[#4edea3]/30 overflow-hidden">
+<img class="w-full h-full object-cover" data-alt="User Portrait" src="https://lh3.googleusercontent.com/aida-public/AB6AXuBr-cPReDAXXSRlnjoAANorPv7WXTZXP7YKb5PMOBrE7-CIgX2HbBnPH0tsG3T4J_dt1KCjtTOKWMhcJIeIUvDG-Vwchj3Yighy7x4dVwIlIoh7icgcmN_hEOeA84tg7Tp36msjjcOlliXo3fWvDc4sbe6xFOQajtYBaBedZEd02gVU9dTVUh30llcjI5cFOxuOLnwAwFBHK7BXxU0NCbK3kYcUVxgIM6ngB3zLpmZN5oAa0rtLASWM6YDBS-VFeUW2mgg9hf8_3hQD"/>
+</div>
+</div>
+</header>
+<!-- Main Content Canvas -->
+<main class="ml-[240px] pt-24 pb-12 px-12">
+<!-- Headline Section -->
+<div class="mb-12">
+<h2 class="text-4xl font-black font-geist tracking-tight text-on-surface mb-2 uppercase">Decision Journal</h2>
+<p class="text-slate-400 font-inter">Audit psychological performance and system fidelity metrics.</p>
+</div>
+<!-- Top Strategy Comparison Cards -->
+<div class="grid grid-cols-1 md:grid-cols-2 gap-8 mb-12">
+<!-- Followed System -->
+<div class="glass-card rounded-2xl p-8 emerald-glow border-l-4 border-l-[#10b981]">
+<div class="flex justify-between items-start mb-6">
+<div>
+<span class="text-[10px] font-mono uppercase tracking-[0.2em] text-[#4edea3]">Fidelity Protocol</span>
+<h3 class="text-xl font-bold font-geist mt-1">Followed System</h3>
+</div>
+<span class="material-symbols-outlined text-[#4edea3] bg-[#4edea3]/10 p-2 rounded-lg" data-icon="verified">verified</span>
+</div>
+<div class="flex items-baseline gap-2">
+<span class="text-6xl font-bold font-mono text-[#4edea3] tracking-tighter">74.2</span>
+<span class="text-2xl font-mono text-[#4edea3]/60">%</span>
+</div>
+<div class="mt-4 flex items-center gap-2 text-sm text-slate-400 font-mono">
+<span class="material-symbols-outlined text-sm" data-icon="trending_up">trending_up</span>
+<span>Expected Return Alpha: +12.4%</span>
+</div>
+</div>
+<!-- Overrode System -->
+<div class="glass-card rounded-2xl p-8 border-l-4 border-l-[#ffb95f]">
+<div class="flex justify-between items-start mb-6">
+<div>
+<span class="text-[10px] font-mono uppercase tracking-[0.2em] text-[#ffb95f]">Manual Deviation</span>
+<h3 class="text-xl font-bold font-geist mt-1">Overrode System</h3>
+</div>
+<span class="material-symbols-outlined text-[#ffb95f] bg-[#ffb95f]/10 p-2 rounded-lg" data-icon="warning">warning</span>
+</div>
+<div class="flex items-baseline gap-2">
+<span class="text-6xl font-bold font-mono text-[#ffb95f] tracking-tighter">25.8</span>
+<span class="text-2xl font-mono text-[#ffb95f]/60">%</span>
+</div>
+<div class="mt-4 flex items-center gap-2 text-sm text-slate-400 font-mono">
+<span class="material-symbols-outlined text-sm" data-icon="trending_down">trending_down</span>
+<span>Missed Opportunity Cost: -$14,200</span>
+</div>
+</div>
+</div>
+<!-- Journal Table -->
+<div class="glass-card rounded-2xl overflow-hidden mb-12">
+<div class="p-6 border-b border-white/5 flex justify-between items-center">
+<h3 class="font-geist font-bold text-lg">Execution Ledger</h3>
+<div class="flex gap-2">
+<button class="px-4 py-1.5 rounded-full bg-white/5 border border-white/10 text-xs font-medium text-slate-300 hover:bg-white/10">Filter</button>
+<button class="px-4 py-1.5 rounded-full bg-[#10b981] text-xs font-bold text-[#003824] uppercase tracking-wider shadow-[0_0_12px_rgba(16,185,129,0.3)]">New Entry</button>
+</div>
+</div>
+<div class="overflow-x-auto">
+<table class="w-full text-left">
+<thead>
+<tr class="text-[10px] uppercase tracking-widest text-slate-500 font-mono border-b border-white/5">
+<th class="px-8 py-4 font-normal">Asset / Ticker</th>
+<th class="px-8 py-4 font-normal">Execution Class</th>
+<th class="px-8 py-4 font-normal text-right">30D Return</th>
+<th class="px-8 py-4 font-normal text-right">90D Return</th>
+<th class="px-8 py-4 font-normal">Strategy Note</th>
+</tr>
+</thead>
+<tbody class="divide-y divide-white/5">
+<tr class="hover:bg-white/5 transition-colors">
+<td class="px-8 py-5">
+<div class="flex flex-col">
+<span class="font-mono text-[#4edea3] font-bold">ETH/USD</span>
+<span class="text-[10px] text-slate-500 font-mono">24 Oct, 2025</span>
+</div>
+</td>
+<td class="px-8 py-5">
+<span class="px-3 py-1 rounded-full bg-[#10b981]/10 text-[#10b981] text-[10px] font-bold uppercase tracking-wider border border-[#10b981]/20">Followed</span>
+</td>
+<td class="px-8 py-5 text-right font-mono text-[#4edea3]">+18.42%</td>
+<td class="px-8 py-5 text-right font-mono text-[#4edea3]">+42.10%</td>
+<td class="px-8 py-5 text-slate-400 text-sm italic">Automated rebalancing triggered at Fibonacci level.</td>
+</tr>
+<tr class="hover:bg-white/5 transition-colors">
+<td class="px-8 py-5">
+<div class="flex flex-col">
+<span class="font-mono text-tertiary font-bold">SOL/USDT</span>
+<span class="text-[10px] text-slate-500 font-mono">18 Oct, 2025</span>
+</div>
+</td>
+<td class="px-8 py-5">
+<span class="px-3 py-1 rounded-full bg-[#ffb95f]/10 text-[#ffb95f] text-[10px] font-bold uppercase tracking-wider border border-[#ffb95f]/20">Overrode</span>
+</td>
+<td class="px-8 py-5 text-right font-mono text-error">-4.12%</td>
+<td class="px-8 py-5 text-right font-mono text-slate-500">--</td>
+<td class="px-8 py-5 text-slate-400 text-sm italic">Manual intervention based on sentiment bias. Sub-optimal.</td>
+</tr>
+<tr class="hover:bg-white/5 transition-colors">
+<td class="px-8 py-5">
+<div class="flex flex-col">
+<span class="font-mono text-slate-300 font-bold">WBTC/DAI</span>
+<span class="text-[10px] text-slate-500 font-mono">12 Oct, 2025</span>
+</div>
+</td>
+<td class="px-8 py-5">
+<span class="px-3 py-1 rounded-full bg-slate-400/10 text-slate-400 text-[10px] font-bold uppercase tracking-wider border border-white/10">Deferred</span>
+</td>
+<td class="px-8 py-5 text-right font-mono text-slate-500">0.00%</td>
+<td class="px-8 py-5 text-right font-mono text-slate-500">0.00%</td>
+<td class="px-8 py-5 text-slate-400 text-sm italic">Signal rejected due to insufficient liquidity depth.</td>
+</tr>
+</tbody>
+</table>
+</div>
+</div>
+<!-- AI Behavioral Insights Card -->
+<div class="glass-card rounded-2xl p-10 violet-left-glow">
+<div class="flex flex-col md:flex-row gap-10">
+<div class="md:w-1/3">
+<div class="flex items-center gap-3 mb-4">
+<span class="material-symbols-outlined text-secondary" data-icon="psychology">psychology</span>
+<h4 class="text-xl font-bold font-geist">Behavioral Insight</h4>
+</div>
+<div class="space-y-4">
+<div class="p-4 bg-secondary/5 rounded-xl border border-secondary/10">
+<p class="text-xs text-secondary font-mono uppercase mb-1">Current Bias Detected</p>
+<p class="text-lg font-bold">FOMO Skew: High</p>
+</div>
+<div class="p-4 bg-surface-container-high rounded-xl">
+<p class="text-xs text-slate-500 font-mono uppercase mb-1">Consistency Score</p>
+<p class="text-lg font-bold font-mono">88/100</p>
+</div>
+</div>
+</div>
+<div class="flex-1">
+<h5 class="text-secondary font-mono text-xs uppercase tracking-widest mb-4">Analytical Report</h5>
+<div class="space-y-6 text-slate-300 leading-relaxed max-w-2xl">
+<p>
+                            Your manual overrides typically occur during <span class="text-secondary font-bold">High Volatility (HV)</span> periods. Analysis suggests a 72% correlation between manual exits and "local bottom" sentiment peaks. This behavior has reduced your potential portfolio efficiency by <span class="text-error font-mono font-bold">3.4%</span> over the trailing 90-day window.
+                        </p>
+<p>
+<span class="text-white font-bold italic">Recommendation:</span> Implement a 4-hour "cooling period" for all manual deviations exceeding 5% of portfolio NAV. Your system fidelity is highest during mid-week London session hours.
+                        </p>
+</div>
+<div class="mt-8 flex gap-4">
+<button class="flex items-center gap-2 text-sm font-bold text-secondary hover:underline">
+<span class="material-symbols-outlined text-lg" data-icon="auto_awesome">auto_awesome</span>
+                            Generate Bias Map
+                        </button>
+<button class="flex items-center gap-2 text-sm font-bold text-slate-400 hover:text-white transition-colors">
+<span class="material-symbols-outlined text-lg" data-icon="download">download</span>
+                            Export PDF Report
+                        </button>
+</div>
+</div>
+</div>
+</div>
+</main>
+<!-- Subtle Radial Background Glows -->
+<div class="fixed top-[-10%] right-[-10%] w-[500px] h-[500px] bg-[#10b981]/5 blur-[120px] rounded-full pointer-events-none -z-10"></div>
+<div class="fixed bottom-[-10%] left-[200px] w-[400px] h-[400px] bg-[#8b5cf6]/5 blur-[100px] rounded-full pointer-events-none -z-10"></div>
+</body></html>

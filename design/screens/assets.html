@@ -1,0 +1,460 @@
+<!DOCTYPE html>
+
+<html class="dark" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>OvelhaInvest | Assets &amp; Valuations</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&amp;family=JetBrains+Mono:wght@400;700&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<style>
+        @font-face {
+            font-family: 'Geist Sans';
+            src: url('https://cdn.jsdelivr.net/gh/vercel/geist-font@main/packages/next/dist/fonts/geist-sans/Geist-Variable.woff2') format('woff2-variations');
+        }
+        .font-geist { font-family: 'Geist Sans', sans-serif; }
+        .font-jetbrains { font-family: 'JetBrains Mono', monospace; }
+        .glass-panel {
+            background: rgba(5, 5, 8, 0.4);
+            backdrop-filter: blur(32px);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+        }
+        .text-glow-primary {
+            text-shadow: 0 0 10px rgba(16, 185, 129, 0.4);
+        }
+        body {
+            background-color: #050508;
+            color: #e3e2e3;
+        }
+        ::-webkit-scrollbar { width: 4px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: rgba(255, 255, 255, 0.1); border-radius: 10px; }
+    </style>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    colors: {
+                        "surface-container-highest": "#343536",
+                        "error-container": "#93000a",
+                        "tertiary-fixed-dim": "#ffb95f",
+                        "surface-container-high": "#292a2b",
+                        "surface-container": "#1f2021",
+                        "error": "#ffb4ab",
+                        "outline-variant": "#3c4a42",
+                        "surface-tint": "#4edea3",
+                        "primary": "#4edea3",
+                        "primary-container": "#10b981",
+                        "secondary": "#d0bcff",
+                        "background": "#121315",
+                        "surface-container-lowest": "#0d0e0f",
+                        "surface-container-low": "#1b1c1d",
+                        "on-surface": "#e3e2e3",
+                        "on-primary-container": "#00422b",
+                    },
+                    fontFamily: {
+                        "headline": ["Geist Sans", "sans-serif"],
+                        "body": ["Inter", "sans-serif"],
+                        "label": ["Inter", "sans-serif"],
+                        "mono": ["JetBrains Mono", "monospace"]
+                    },
+                    borderRadius: {"DEFAULT": "1rem", "lg": "2rem", "xl": "3rem", "full": "9999px"},
+                },
+            },
+        }
+    </script>
+</head>
+<body class="font-body selection:bg-primary/30">
+<!-- SideNavBar Shell -->
+<aside class="fixed left-0 top-0 h-screen w-[240px] border-r border-white/10 bg-[#050508]/40 backdrop-blur-3xl flex flex-col py-8 px-4 z-50">
+<div class="mb-12 px-2 flex items-center gap-3">
+<div class="w-8 h-8 rounded-lg bg-primary-container flex items-center justify-center shadow-[0_0_15px_rgba(16,185,129,0.3)]">
+<span class="material-symbols-outlined text-on-primary-container text-xl" style="font-variation-settings: 'FILL' 1;">account_balance</span>
+</div>
+<div>
+<h1 class="text-2xl font-bold tracking-tighter text-[#4edea3] font-geist leading-none">OvelhaInvest</h1>
+<p class="text-[10px] uppercase tracking-widest text-slate-500 font-jetbrains mt-1">Precision Ledger</p>
+</div>
+</div>
+<nav class="flex-1 space-y-2">
+<!-- Navigation Items Mapping from JSON -->
+<a class="group flex items-center gap-3 px-3 py-2.5 rounded-xl transition-colors text-slate-400 hover:text-slate-200 hover:bg-white/5" href="#">
+<span class="material-symbols-outlined text-lg">dashboard</span>
+<span class="text-sm font-medium">Dashboard</span>
+</a>
+<a class="group flex items-center gap-3 px-3 py-2.5 rounded-xl transition-colors text-slate-400 hover:text-slate-200 hover:bg-white/5" href="#">
+<span class="material-symbols-outlined text-lg">auto_awesome</span>
+<span class="text-sm font-medium">Signals</span>
+</a>
+<!-- Active Navigation Logic: Assets -->
+<a class="group relative flex items-center gap-3 px-3 py-2.5 rounded-xl transition-all text-[#4edea3] before:absolute before:left-0 before:w-[2px] before:h-6 before:bg-[#10b981] before:shadow-[0_0_10px_#10b981]" href="#">
+<span class="material-symbols-outlined text-lg" style="font-variation-settings: 'FILL' 1;">account_balance_wallet</span>
+<span class="text-sm font-semibold">Assets</span>
+</a>
+<a class="group flex items-center gap-3 px-3 py-2.5 rounded-xl transition-colors text-slate-400 hover:text-slate-200 hover:bg-white/5" href="#">
+<span class="material-symbols-outlined text-lg">monitoring</span>
+<span class="text-sm font-medium">Performance</span>
+</a>
+<a class="group flex items-center gap-3 px-3 py-2.5 rounded-xl transition-colors text-slate-400 hover:text-slate-200 hover:bg-white/5" href="#">
+<span class="material-symbols-outlined text-lg">timeline</span>
+<span class="text-sm font-medium">Projections</span>
+</a>
+<a class="group flex items-center gap-3 px-3 py-2.5 rounded-xl transition-colors text-slate-400 hover:text-slate-200 hover:bg-white/5" href="#">
+<span class="material-symbols-outlined text-lg">receipt_long</span>
+<span class="text-sm font-medium">Tax</span>
+</a>
+<a class="group flex items-center gap-3 px-3 py-2.5 rounded-xl transition-colors text-slate-400 hover:text-slate-200 hover:bg-white/5" href="#">
+<span class="material-symbols-outlined text-lg">auto_stories</span>
+<span class="text-sm font-medium">Journal</span>
+</a>
+</nav>
+<div class="mt-auto pt-8 border-t border-white/5 space-y-2">
+<a class="group flex items-center gap-3 px-3 py-2.5 rounded-xl transition-colors text-slate-400 hover:text-slate-200 hover:bg-white/5" href="#">
+<span class="material-symbols-outlined text-lg">settings</span>
+<span class="text-sm font-medium">Config</span>
+</a>
+<div class="flex items-center gap-3 px-3 py-2.5 rounded-xl bg-white/5 cursor-pointer">
+<img class="w-8 h-8 rounded-full border border-primary/20" data-alt="User Portrait" src="https://lh3.googleusercontent.com/aida-public/AB6AXuBoHnGxljDrgOaAv2rPNjYa71j8JCMEJcrtM-gReVDUHosYr_ZhyEq3O3nF87U0R9At76BbIuJrDPwB_iK2I-NLj_TfNOuUu9mWQcwgnO-TAsJQ74-El9IC5KXC-YY2K3ujksMResG8Jp3DuS2UQo7bTsGvwLlV3NciwJeokGtK5M-xQ9UaXPtNXmesd-mgxk6LnPNIJp89a6aV7hYkBZ9AyAiD5VseoJn0fJoRnxNH2K8VvUkKhgKnZat4UP6FpdCvVDvi2utAOuVB"/>
+<div class="overflow-hidden">
+<p class="text-xs font-semibold truncate">Alex Sterling</p>
+<p class="text-[10px] text-primary/70 font-jetbrains">Premium Tier</p>
+</div>
+</div>
+</div>
+</aside>
+<!-- TopNavBar Shell -->
+<header class="fixed top-0 right-0 w-[calc(100%-240px)] h-16 flex justify-between items-center px-12 z-40 bg-transparent">
+<div class="flex items-center bg-white/5 rounded-full px-4 py-1.5 border border-white/5 w-96">
+<span class="material-symbols-outlined text-slate-400 text-sm">search</span>
+<input class="bg-transparent border-none text-xs focus:ring-0 text-slate-200 w-full placeholder:text-slate-500" placeholder="Search Assets, Metrics, or Models..." type="text"/>
+<span class="text-[10px] text-slate-500 font-jetbrains bg-white/10 px-1.5 py-0.5 rounded leading-none">⌘K</span>
+</div>
+<div class="flex items-center gap-6">
+<div class="flex items-center gap-1.5 px-3 py-1.5 bg-[#4edea3]/5 rounded-full border border-[#4edea3]/10">
+<span class="w-1.5 h-1.5 rounded-full bg-primary animate-pulse"></span>
+<span class="text-[11px] font-jetbrains text-primary tracking-tight">MARKET OPEN</span>
+</div>
+<div class="flex items-center gap-4 text-slate-400">
+<span class="material-symbols-outlined hover:text-[#4edea3] transition-colors cursor-pointer text-xl">notifications</span>
+<span class="material-symbols-outlined hover:text-[#4edea3] transition-colors cursor-pointer text-xl">account_balance</span>
+<span class="material-symbols-outlined hover:text-[#4edea3] transition-colors cursor-pointer text-xl">grid_view</span>
+</div>
+</div>
+</header>
+<!-- Main Canvas -->
+<main class="ml-[240px] pt-24 px-12 pb-12 w-[calc(100%-400px)]">
+<!-- Header Section -->
+<div class="flex justify-between items-end mb-10">
+<div>
+<h2 class="text-4xl font-geist font-bold tracking-tight mb-2">Assets &amp; Valuations</h2>
+<div class="flex items-center gap-4 text-slate-500 font-jetbrains text-xs">
+<span class="flex items-center gap-1"><span class="material-symbols-outlined text-xs">database</span> 1,248 COVERED</span>
+<span class="w-1 h-1 rounded-full bg-slate-700"></span>
+<span class="flex items-center gap-1 text-primary"><span class="material-symbols-outlined text-xs">verified</span> DCF ENGINE ACTIVE</span>
+</div>
+</div>
+<div class="flex gap-2">
+<button class="px-6 py-2.5 rounded-full bg-white/5 border border-white/10 text-xs font-semibold hover:bg-white/10 transition-all">EXPORT REPORT</button>
+<button class="px-6 py-2.5 rounded-full bg-gradient-to-br from-primary to-primary-container text-on-primary font-bold text-xs shadow-[0_0_12px_rgba(16,185,129,0.2)] hover:shadow-[0_0_20px_rgba(16,185,129,0.4)] transition-all uppercase tracking-wider">ADD ASSET</button>
+</div>
+</div>
+<!-- Valuation Table -->
+<div class="glass-panel rounded-2xl overflow-hidden mb-8">
+<table class="w-full text-left border-collapse">
+<thead class="bg-white/[0.02] border-b border-white/5">
+<tr>
+<th class="py-4 px-6 text-[10px] font-jetbrains text-slate-500 uppercase tracking-widest">Symbol</th>
+<th class="py-4 px-6 text-[10px] font-jetbrains text-slate-500 uppercase tracking-widest">Class</th>
+<th class="py-4 px-6 text-[10px] font-jetbrains text-slate-500 uppercase tracking-widest text-right">Price</th>
+<th class="py-4 px-6 text-[10px] font-jetbrains text-slate-500 uppercase tracking-widest text-right">MoS%</th>
+<th class="py-4 px-6 text-[10px] font-jetbrains text-slate-500 uppercase tracking-widest">Factor Analysis</th>
+</tr>
+</thead>
+<tbody class="divide-y divide-white/[0.03]">
+<!-- Row: NVDA -->
+<tr class="hover:bg-white/[0.02] transition-colors cursor-pointer group bg-primary/5">
+<td class="py-5 px-6">
+<div class="flex items-center gap-3">
+<div class="w-8 h-8 rounded-lg bg-white/5 border border-white/10 flex items-center justify-center text-[10px] font-bold font-jetbrains">NVDA</div>
+<div>
+<p class="text-sm font-semibold text-slate-200">NVIDIA Corp</p>
+<p class="text-[10px] text-slate-500 font-jetbrains">NASDAQ:NVDA</p>
+</div>
+</div>
+</td>
+<td class="py-5 px-6">
+<span class="px-2.5 py-1 rounded-full text-[10px] font-semibold bg-secondary/10 text-secondary border border-secondary/20">GROWTH EQUITY</span>
+</td>
+<td class="py-5 px-6 text-right font-jetbrains font-bold text-sm">
+                            $135.58
+                            <p class="text-[10px] text-primary">+2.41%</p>
+</td>
+<td class="py-5 px-6 text-right">
+<span class="px-2.5 py-1 rounded-full text-[10px] font-bold font-jetbrains bg-primary/10 text-primary border border-primary/20">+38.2%</span>
+</td>
+<td class="py-5 px-6">
+<div class="flex gap-4">
+<div class="w-20">
+<div class="flex justify-between text-[8px] text-slate-500 font-jetbrains mb-1"><span>VALUE</span><span>42</span></div>
+<div class="h-1 w-full bg-white/10 rounded-full overflow-hidden">
+<div class="h-full bg-primary/40" style="width: 42%"></div>
+</div>
+</div>
+<div class="w-20">
+<div class="flex justify-between text-[8px] text-slate-500 font-jetbrains mb-1"><span>MOM</span><span class="text-primary font-bold">98</span></div>
+<div class="h-1 w-full bg-white/10 rounded-full overflow-hidden">
+<div class="h-full bg-primary shadow-[0_0_8px_rgba(16,185,129,0.8)]" style="width: 98%"></div>
+</div>
+</div>
+<div class="w-20">
+<div class="flex justify-between text-[8px] text-slate-500 font-jetbrains mb-1"><span>QUAL</span><span class="text-secondary font-bold">85</span></div>
+<div class="h-1 w-full bg-white/10 rounded-full overflow-hidden">
+<div class="h-full bg-secondary shadow-[0_0_8px_rgba(208,188,255,0.6)]" style="width: 85%"></div>
+</div>
+</div>
+</div>
+</td>
+</tr>
+<!-- Row: VTI -->
+<tr class="hover:bg-white/[0.02] transition-colors cursor-pointer group">
+<td class="py-5 px-6">
+<div class="flex items-center gap-3">
+<div class="w-8 h-8 rounded-lg bg-white/5 border border-white/10 flex items-center justify-center text-[10px] font-bold font-jetbrains">VTI</div>
+<div>
+<p class="text-sm font-semibold text-slate-200">Vanguard Total Market</p>
+<p class="text-[10px] text-slate-500 font-jetbrains">NYSE:VTI</p>
+</div>
+</div>
+</td>
+<td class="py-5 px-6">
+<span class="px-2.5 py-1 rounded-full text-[10px] font-semibold bg-slate-800 text-slate-400 border border-slate-700">ETF / INDEX</span>
+</td>
+<td class="py-5 px-6 text-right font-jetbrains font-bold text-sm">
+                            $268.41
+                            <p class="text-[10px] text-primary">+0.12%</p>
+</td>
+<td class="py-5 px-6 text-right">
+<span class="px-2.5 py-1 rounded-full text-[10px] font-bold font-jetbrains bg-slate-800 text-slate-400 border border-slate-700">-2.1%</span>
+</td>
+<td class="py-5 px-6">
+<div class="flex gap-4 opacity-60">
+<div class="w-20"><div class="h-1 w-full bg-white/10 rounded-full"></div></div>
+<div class="w-20"><div class="h-1 w-full bg-white/10 rounded-full"></div></div>
+<div class="w-20"><div class="h-1 w-full bg-white/10 rounded-full"></div></div>
+</div>
+</td>
+</tr>
+<!-- Row: BTC -->
+<tr class="hover:bg-white/[0.02] transition-colors cursor-pointer group">
+<td class="py-5 px-6">
+<div class="flex items-center gap-3">
+<div class="w-8 h-8 rounded-lg bg-white/5 border border-white/10 flex items-center justify-center text-[10px] font-bold font-jetbrains">BTC</div>
+<div>
+<p class="text-sm font-semibold text-slate-200">Bitcoin</p>
+<p class="text-[10px] text-slate-500 font-jetbrains">COINBASE:BTC</p>
+</div>
+</div>
+</td>
+<td class="py-5 px-6">
+<span class="px-2.5 py-1 rounded-full text-[10px] font-semibold bg-tertiary/10 text-tertiary border border-tertiary/20">DIGITAL GOLD</span>
+</td>
+<td class="py-5 px-6 text-right font-jetbrains font-bold text-sm">
+                            $64,120
+                            <p class="text-[10px] text-error">-1.45%</p>
+</td>
+<td class="py-5 px-6 text-right">
+<span class="px-2.5 py-1 rounded-full text-[10px] font-bold font-jetbrains bg-error/10 text-error border border-error/20">-12.5%</span>
+</td>
+<td class="py-5 px-6">
+<div class="flex gap-4">
+<div class="w-20">
+<div class="h-1 w-full bg-white/10 rounded-full overflow-hidden"><div class="h-full bg-tertiary" style="width: 15%"></div></div>
+</div>
+<div class="w-20">
+<div class="h-1 w-full bg-white/10 rounded-full overflow-hidden"><div class="h-full bg-tertiary" style="width: 78%"></div></div>
+</div>
+<div class="w-20">
+<div class="h-1 w-full bg-white/10 rounded-full overflow-hidden"><div class="h-full bg-slate-500" style="width: 50%"></div></div>
+</div>
+</div>
+</td>
+</tr>
+<!-- Row: PLTR -->
+<tr class="hover:bg-white/[0.02] transition-colors cursor-pointer group">
+<td class="py-5 px-6">
+<div class="flex items-center gap-3">
+<div class="w-8 h-8 rounded-lg bg-white/5 border border-white/10 flex items-center justify-center text-[10px] font-bold font-jetbrains">PLTR</div>
+<div>
+<p class="text-sm font-semibold text-slate-200">Palantir Tech</p>
+<p class="text-[10px] text-slate-500 font-jetbrains">NYSE:PLTR</p>
+</div>
+</div>
+</td>
+<td class="py-5 px-6">
+<span class="px-2.5 py-1 rounded-full text-[10px] font-semibold bg-secondary/10 text-secondary border border-secondary/20">AI / DATA</span>
+</td>
+<td class="py-5 px-6 text-right font-jetbrains font-bold text-sm">
+                            $42.15
+                            <p class="text-[10px] text-primary">+5.11%</p>
+</td>
+<td class="py-5 px-6 text-right">
+<span class="px-2.5 py-1 rounded-full text-[10px] font-bold font-jetbrains bg-primary/10 text-primary border border-primary/20">+15.8%</span>
+</td>
+<td class="py-5 px-6">
+<div class="flex gap-4">
+<div class="w-20">
+<div class="h-1 w-full bg-white/10 rounded-full overflow-hidden"><div class="h-full bg-primary/40" style="width: 30%"></div></div>
+</div>
+<div class="w-20">
+<div class="h-1 w-full bg-white/10 rounded-full overflow-hidden"><div class="h-full bg-primary" style="width: 92%"></div></div>
+</div>
+<div class="w-20">
+<div class="h-1 w-full bg-white/10 rounded-full overflow-hidden"><div class="h-full bg-secondary" style="width: 70%"></div></div>
+</div>
+</div>
+</td>
+</tr>
+</tbody>
+</table>
+</div>
+<!-- Valuation Dispersion Bar Chart (Matching Dashboard) -->
+<div class="glass-panel p-8 rounded-2xl relative overflow-hidden">
+<div class="absolute top-0 right-0 w-64 h-64 bg-primary/5 rounded-full blur-[100px] -mr-32 -mt-32"></div>
+<div class="flex justify-between items-center mb-12">
+<div>
+<h3 class="font-geist font-bold text-lg">Valuation Dispersion</h3>
+<p class="text-xs text-slate-500 font-jetbrains">PORTFOLIO PRICE-TO-FAIR-VALUE SPREAD</p>
+</div>
+<div class="flex items-center gap-6 font-jetbrains">
+<div class="flex items-center gap-2">
+<span class="w-2 h-2 rounded-full bg-primary"></span>
+<span class="text-[10px] text-slate-400">UNDERVALUED</span>
+</div>
+<div class="flex items-center gap-2">
+<span class="w-2 h-2 rounded-full bg-white/20"></span>
+<span class="text-[10px] text-slate-400">OVERVALUED</span>
+</div>
+</div>
+</div>
+<!-- Chart Simulation -->
+<div class="h-40 flex items-end gap-1.5 w-full">
+<!-- Data bars with primary/secondary tints -->
+<div class="flex-1 bg-white/5 h-[40%] rounded-t-sm hover:bg-white/10 transition-all"></div>
+<div class="flex-1 bg-white/5 h-[35%] rounded-t-sm hover:bg-white/10 transition-all"></div>
+<div class="flex-1 bg-white/5 h-[55%] rounded-t-sm hover:bg-white/10 transition-all"></div>
+<div class="flex-1 bg-primary/40 h-[70%] rounded-t-sm shadow-[0_0_15px_rgba(16,185,129,0.1)]"></div>
+<div class="flex-1 bg-primary/60 h-[85%] rounded-t-sm shadow-[0_0_15px_rgba(16,185,129,0.2)]"></div>
+<div class="flex-1 bg-primary h-[95%] rounded-t-sm shadow-[0_0_20px_rgba(16,185,129,0.4)]"></div>
+<div class="flex-1 bg-primary/60 h-[75%] rounded-t-sm"></div>
+<div class="flex-1 bg-white/10 h-[45%] rounded-t-sm"></div>
+<div class="flex-1 bg-white/10 h-[30%] rounded-t-sm"></div>
+<div class="flex-1 bg-error/20 h-[50%] rounded-t-sm"></div>
+<div class="flex-1 bg-error/40 h-[65%] rounded-t-sm shadow-[0_0_15px_rgba(244,63,94,0.1)]"></div>
+<div class="flex-1 bg-error/30 h-[40%] rounded-t-sm"></div>
+<div class="flex-1 bg-white/5 h-[20%] rounded-t-sm"></div>
+<div class="flex-1 bg-white/5 h-[15%] rounded-t-sm"></div>
+<div class="flex-1 bg-white/5 h-[10%] rounded-t-sm"></div>
+</div>
+<div class="flex justify-between mt-4 font-jetbrains text-[9px] text-slate-500 uppercase tracking-widest px-1">
+<span>Extreme Under</span>
+<span>Fair Value (1.0x)</span>
+<span>Extreme Over</span>
+</div>
+</div>
+</main>
+<!-- Right Drawer: Asset Detail -->
+<aside class="fixed right-0 top-0 h-screen w-[400px] border-l border-white/10 bg-[#050508]/60 backdrop-blur-3xl p-8 z-50 shadow-2xl overflow-y-auto">
+<div class="flex justify-between items-center mb-8">
+<div class="flex items-center gap-3">
+<div class="w-10 h-10 rounded-xl bg-gradient-to-br from-[#10b981] to-emerald-900 flex items-center justify-center font-geist font-extrabold text-white text-lg">N</div>
+<div>
+<h3 class="font-geist font-bold text-xl leading-none">NVDA</h3>
+<p class="text-[10px] text-slate-500 font-jetbrains mt-1">NVIDIA CORPORATION</p>
+</div>
+</div>
+<button class="w-8 h-8 flex items-center justify-center rounded-full hover:bg-white/10 text-slate-400">
+<span class="material-symbols-outlined">close</span>
+</button>
+</div>
+<!-- Margin of Safety Badge -->
+<div class="relative bg-primary/10 border border-primary/20 rounded-2xl p-6 mb-8 text-center overflow-hidden">
+<div class="absolute top-0 right-0 w-24 h-24 bg-primary/20 blur-3xl rounded-full -mr-8 -mt-8"></div>
+<p class="text-[10px] font-jetbrains text-primary uppercase tracking-[0.2em] mb-1">Margin of Safety</p>
+<h4 class="text-5xl font-geist font-black text-primary text-glow-primary">+38.2%</h4>
+<div class="flex items-center justify-center gap-2 mt-4 text-[11px] font-medium text-slate-200">
+<span class="material-symbols-outlined text-sm text-primary">auto_graph</span>
+                STRONG BUY SIGNAL
+            </div>
+</div>
+<!-- Semicircle Gauge Simulation -->
+<div class="mb-10 text-center relative">
+<div class="flex justify-center">
+<div class="relative w-48 h-24 overflow-hidden">
+<!-- Gauge Arc -->
+<div class="absolute top-0 left-0 w-48 h-48 border-[12px] border-white/5 rounded-full"></div>
+<div class="absolute top-0 left-0 w-48 h-48 border-[12px] border-transparent border-t-primary border-r-primary rounded-full rotate-[15deg] shadow-[0_0_20px_rgba(16,185,129,0.3)]"></div>
+<!-- Value Label -->
+<div class="absolute bottom-0 left-1/2 -translate-x-1/2 text-center">
+<p class="text-[10px] text-slate-500 font-jetbrains">FAIR VALUE</p>
+<p class="text-2xl font-geist font-bold text-white">$218.40</p>
+</div>
+</div>
+</div>
+</div>
+<!-- Quick Metrics Grid -->
+<div class="grid grid-cols-2 gap-3 mb-10">
+<div class="p-4 rounded-xl bg-white/[0.03] border border-white/5">
+<p class="text-[9px] text-slate-500 font-jetbrains uppercase">Market Cap</p>
+<p class="text-sm font-geist font-semibold mt-1 text-slate-200">3.34T</p>
+</div>
+<div class="p-4 rounded-xl bg-white/[0.03] border border-white/5">
+<p class="text-[9px] text-slate-500 font-jetbrains uppercase">P/E Forward</p>
+<p class="text-sm font-geist font-semibold mt-1 text-slate-200">42.5x</p>
+</div>
+<div class="p-4 rounded-xl bg-white/[0.03] border border-white/5">
+<p class="text-[9px] text-slate-500 font-jetbrains uppercase">Dividend</p>
+<p class="text-sm font-geist font-semibold mt-1 text-slate-200">0.02%</p>
+</div>
+<div class="p-4 rounded-xl bg-white/[0.03] border border-white/5">
+<p class="text-[9px] text-slate-500 font-jetbrains uppercase">Rev Growth</p>
+<p class="text-sm font-geist font-semibold mt-1 text-primary">262%</p>
+</div>
+</div>
+<!-- News Feed -->
+<div>
+<div class="flex justify-between items-center mb-4">
+<h5 class="font-geist font-bold text-sm">Alpha Intel Feed</h5>
+<span class="text-[10px] text-primary font-jetbrains">LIVE</span>
+</div>
+<div class="space-y-4">
+<div class="group p-4 rounded-xl bg-white/[0.02] border border-white/5 hover:bg-white/[0.05] transition-all cursor-pointer">
+<div class="flex justify-between text-[10px] font-jetbrains text-slate-500 mb-2">
+<span>REUTERS</span>
+<span>4m ago</span>
+</div>
+<p class="text-xs text-slate-300 leading-relaxed font-medium group-hover:text-primary transition-colors">NVIDIA unveils next-gen Blackwell Ultra chip architecture at GTC Summit.</p>
+</div>
+<div class="group p-4 rounded-xl bg-white/[0.02] border border-white/5 hover:bg-white/[0.05] transition-all cursor-pointer">
+<div class="flex justify-between text-[10px] font-jetbrains text-slate-500 mb-2">
+<span>BLOOMBERG</span>
+<span>1h ago</span>
+</div>
+<p class="text-xs text-slate-300 leading-relaxed font-medium">HSBC raises NVDA price target to $165, citing sovereign AI demand surge.</p>
+</div>
+<div class="group p-4 rounded-xl bg-white/[0.02] border border-white/5 hover:bg-white/[0.05] transition-all cursor-pointer">
+<div class="flex justify-between text-[10px] font-jetbrains text-slate-500 mb-2">
+<span>OVELHA AI</span>
+<span>3h ago</span>
+</div>
+<p class="text-xs text-secondary leading-relaxed font-medium">Momentum score increased to 98/100 following consolidation breakout.</p>
+</div>
+</div>
+</div>
+<!-- Footer Action -->
+<div class="mt-8">
+<button class="w-full py-4 rounded-xl bg-primary text-on-primary font-bold text-sm tracking-widest uppercase shadow-[0_0_20px_rgba(16,185,129,0.2)] hover:scale-[1.02] transition-transform">RUN DCF MODEL</button>
+</div>
+</aside>
+</body></html>

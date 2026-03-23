@@ -1,0 +1,369 @@
+<!DOCTYPE html>
+
+<html class="dark" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&amp;family=JetBrains+Mono:wght@400;700&amp;display=swap" rel="stylesheet"/>
+<!-- Geist Sans placeholder via system-ui for high-end look -->
+<style>
+        @font-face {
+            font-family: 'Geist';
+            src: url('https://cdn.jsdelivr.net/npm/geist-font@1.1.0/fonts/geist-sans/Geist-Medium.woff2') format('woff2');
+        }
+        :root {
+            --font-geist: 'Geist', 'Inter', system-ui, sans-serif;
+            --font-mono: 'JetBrains Mono', monospace;
+        }
+        .font-geist { font-family: var(--font-geist); }
+        .font-mono { font-family: var(--font-mono); }
+        .glass-panel {
+            background: rgba(31, 32, 33, 0.6);
+            backdrop-filter: blur(20px);
+            border: 1px solid rgba(60, 74, 66, 0.12);
+        }
+        .ghost-border { border: 1px solid rgba(255, 255, 255, 0.08); }
+        .radial-glow-primary {
+            background: radial-gradient(circle at center, rgba(16, 185, 129, 0.05) 0%, transparent 70%);
+        }
+        .material-symbols-outlined {
+            font-family: 'Material Symbols Outlined';
+            font-weight: normal;
+            font-style: normal;
+            font-size: 24px;
+            line-height: 1;
+            letter-spacing: normal;
+            text-transform: none;
+            display: inline-block;
+            white-space: nowrap;
+            word-wrap: normal;
+            direction: ltr;
+            -webkit-font-smoothing: antialiased;
+        }
+    </style>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+      tailwind.config = {
+        darkMode: "class",
+        theme: {
+          extend: {
+            colors: {
+              "surface-container-highest": "#343536",
+              "error-container": "#93000a",
+              "tertiary-fixed-dim": "#ffb95f",
+              "surface-container-high": "#292a2b",
+              "surface-container": "#1f2021",
+              "error": "#ffb4ab",
+              "on-tertiary-fixed-variant": "#653e00",
+              "on-primary-fixed-variant": "#005236",
+              "outline-variant": "#3c4a42",
+              "on-secondary-fixed": "#23005c",
+              "surface-tint": "#4edea3",
+              "on-tertiary": "#472a00",
+              "on-secondary-container": "#c4abff",
+              "inverse-surface": "#e3e2e3",
+              "secondary-container": "#571bc1",
+              "on-tertiary-container": "#523200",
+              "tertiary": "#ffb95f",
+              "inverse-primary": "#006c49",
+              "surface": "#121315",
+              "tertiary-container": "#e29100",
+              "on-surface-variant": "#bbcabf",
+              "on-error": "#690005",
+              "on-tertiary-fixed": "#2a1700",
+              "on-error-container": "#ffdad6",
+              "primary-container": "#10b981",
+              "on-secondary": "#3c0091",
+              "inverse-on-surface": "#303032",
+              "background": "#121315",
+              "surface-container-lowest": "#0d0e0f",
+              "secondary-fixed-dim": "#d0bcff",
+              "secondary-fixed": "#e9ddff",
+              "primary": "#4edea3",
+              "on-secondary-fixed-variant": "#5516be",
+              "tertiary-fixed": "#ffddb8",
+              "surface-variant": "#343536",
+              "on-primary": "#003824",
+              "surface-container-low": "#1b1c1d",
+              "surface-bright": "#38393a",
+              "primary-fixed-dim": "#4edea3",
+              "secondary": "#d0bcff",
+              "primary-fixed": "#6ffbbe",
+              "on-surface": "#e3e2e3",
+              "surface-dim": "#121315",
+              "outline": "#86948a",
+              "on-primary-fixed": "#002113",
+              "on-primary-container": "#00422b",
+              "on-background": "#e3e2e3"
+            },
+            fontFamily: {
+              "headline": ["Inter"],
+              "body": ["Inter"],
+              "label": ["Inter"]
+            },
+            borderRadius: {"DEFAULT": "1rem", "lg": "2rem", "xl": "3rem", "full": "9999px"},
+          },
+        },
+      }
+    </script>
+</head>
+<body class="bg-[#050508] text-on-surface font-body selection:bg-primary/30 selection:text-primary">
+<!-- Sidebar Navigation -->
+<aside class="fixed left-0 top-0 h-screen w-[240px] border-r border-white/10 bg-[#050508]/40 backdrop-blur-3xl flex flex-col py-8 px-4 z-50">
+<div class="mb-12 px-4 flex items-center gap-3">
+<div class="w-8 h-8 rounded bg-primary/20 flex items-center justify-center border border-primary/30 shadow-[0_0_15px_rgba(16,185,129,0.2)]">
+<span class="material-symbols-outlined text-primary text-xl">account_balance</span>
+</div>
+<div>
+<h1 class="text-2xl font-bold tracking-tighter text-[#4edea3] font-geist leading-tight">OvelhaInvest</h1>
+<p class="text-[10px] uppercase tracking-widest text-slate-500 font-mono">Precision Ledger</p>
+</div>
+</div>
+<nav class="flex-1 space-y-1">
+<!-- Dashboard -->
+<a class="flex items-center gap-3 px-4 py-3 rounded-lg text-slate-400 hover:text-slate-200 hover:bg-white/5 transition-all duration-300 group" href="#">
+<span class="material-symbols-outlined text-xl">dashboard</span>
+<span class="font-medium text-sm">Dashboard</span>
+</a>
+<a class="flex items-center gap-3 px-4 py-3 rounded-lg text-slate-400 hover:text-slate-200 hover:bg-white/5 transition-all duration-300 group" href="#">
+<span class="material-symbols-outlined text-xl">auto_awesome</span>
+<span class="font-medium text-sm">Signals</span>
+</a>
+<a class="flex items-center gap-3 px-4 py-3 rounded-lg text-slate-400 hover:text-slate-200 hover:bg-white/5 transition-all duration-300 group" href="#">
+<span class="material-symbols-outlined text-xl">account_balance_wallet</span>
+<span class="font-medium text-sm">Assets</span>
+</a>
+<a class="flex items-center gap-3 px-4 py-3 rounded-lg text-slate-400 hover:text-slate-200 hover:bg-white/5 transition-all duration-300 group" href="#">
+<span class="material-symbols-outlined text-xl">monitoring</span>
+<span class="font-medium text-sm">Performance</span>
+</a>
+<a class="flex items-center gap-3 px-4 py-3 rounded-lg text-slate-400 hover:text-slate-200 hover:bg-white/5 transition-all duration-300 group" href="#">
+<span class="material-symbols-outlined text-xl">timeline</span>
+<span class="font-medium text-sm">Projections</span>
+</a>
+<!-- Active Tab: Tax -->
+<a class="relative flex items-center gap-3 px-4 py-3 rounded-lg text-[#4edea3] before:absolute before:left-0 before:w-[2px] before:h-6 before:bg-[#10b981] before:shadow-[0_0_10px_#10b981] group transition-all" href="#">
+<span class="material-symbols-outlined text-xl" style="font-variation-settings: 'FILL' 1;">receipt_long</span>
+<span class="font-medium text-sm">Tax</span>
+</a>
+<a class="flex items-center gap-3 px-4 py-3 rounded-lg text-slate-400 hover:text-slate-200 hover:bg-white/5 transition-all duration-300 group" href="#">
+<span class="material-symbols-outlined text-xl">auto_stories</span>
+<span class="font-medium text-sm">Journal</span>
+</a>
+<a class="flex items-center gap-3 px-4 py-3 rounded-lg text-slate-400 hover:text-slate-200 hover:bg-white/5 transition-all duration-300 group" href="#">
+<span class="material-symbols-outlined text-xl">settings</span>
+<span class="font-medium text-sm">Config</span>
+</a>
+</nav>
+<div class="mt-auto pt-8">
+<a class="flex items-center gap-3 px-4 py-3 rounded-lg text-slate-400 hover:text-slate-200 hover:bg-white/5 transition-all duration-300" href="#">
+<span class="material-symbols-outlined text-xl">account_circle</span>
+<span class="font-medium text-sm">Profile</span>
+</a>
+</div>
+</aside>
+<!-- Main Content Area -->
+<main class="ml-[240px] min-h-screen p-12">
+<!-- Top Nav Bar (Minimalist) -->
+<header class="fixed top-0 right-0 w-[calc(100%-240px)] h-16 bg-transparent flex justify-between items-center px-12 z-40">
+<div class="flex items-center bg-white/5 rounded-full px-4 py-1.5 border border-white/5 gap-3">
+<span class="material-symbols-outlined text-slate-400 text-lg">search</span>
+<input class="bg-transparent border-none focus:ring-0 text-sm text-on-surface w-64 placeholder:text-slate-500" placeholder="Search tax records..." type="text"/>
+</div>
+<div class="flex items-center gap-6">
+<span class="material-symbols-outlined text-slate-400 hover:text-primary transition-colors cursor-pointer">notifications</span>
+<span class="material-symbols-outlined text-slate-400 hover:text-primary transition-colors cursor-pointer">account_balance</span>
+<span class="material-symbols-outlined text-slate-400 hover:text-primary transition-colors cursor-pointer">grid_view</span>
+<div class="w-8 h-8 rounded-full overflow-hidden border border-white/10">
+<img alt="User portrait" class="w-full h-full object-cover" data-alt="Professional user portrait with dark background" src="https://lh3.googleusercontent.com/aida-public/AB6AXuB5COu9IuEq4wj19IFL_NzHmKJxZYXaDQfX3sJKjD4_qmxH6ur44oOyuXk8RypjaLbn9XAPoXYUk-sn8-7laVFhvUUU8fLY-cUEHp_kw-HOmmdtqM5wFvH-wOiYnH6FxO1yVjiSqPfByknE14j6HPcA48_V5eP5pN8JMZRlDAZSkfcDeTluppi90Z3uSwx2o0ON89x9gOtliy32WEYQPh7_a-R_FOLu_228c9kmuRxSgacwQlOPqLohmVaVjcRZfoYJUvyiAjVP5mvb"/>
+</div>
+</div>
+</header>
+<div class="mt-16 max-w-7xl mx-auto space-y-12">
+<!-- Section 1: Brazil Exemption Glass Card -->
+<section class="relative">
+<div class="absolute -top-24 -left-24 w-96 h-96 bg-primary/5 rounded-full blur-[120px] pointer-events-none"></div>
+<div class="glass-panel rounded-2xl p-8 relative overflow-hidden group">
+<div class="flex justify-between items-start mb-8">
+<div>
+<h2 class="text-3xl font-geist font-bold text-on-surface mb-2">Brazil Exemption Limit</h2>
+<p class="text-slate-400 font-body text-sm max-w-md">Monitoring your R$ 20.000,00 monthly sales threshold for swing trade equity exemptions.</p>
+</div>
+<div class="text-right">
+<span class="font-mono text-2xl text-tertiary">R$ 6.800 / <span class="text-slate-500 text-lg">20.000</span></span>
+<div class="text-[10px] text-slate-500 uppercase tracking-widest mt-1">Total Sales This Month</div>
+</div>
+</div>
+<!-- Progress Bar Container -->
+<div class="relative h-6 bg-surface-container-low rounded-full ghost-border overflow-hidden p-1">
+<!-- Progress -->
+<div class="h-full bg-gradient-to-r from-tertiary/40 to-tertiary rounded-full shadow-[0_0_15px_rgba(255,185,95,0.3)] transition-all duration-1000" style="width: 34%;"></div>
+<!-- Marker at 80% -->
+<div class="absolute left-[80%] top-0 bottom-0 w-[2px] bg-error/60 flex items-center justify-center">
+<div class="absolute -top-6 text-[10px] font-mono text-error font-bold whitespace-nowrap">80% THRESHOLD</div>
+</div>
+</div>
+<div class="mt-4 flex justify-between text-[11px] font-mono text-slate-500">
+<span>0%</span>
+<span>34% UTILIZED</span>
+<span>100% (TAXABLE)</span>
+</div>
+</div>
+</section>
+<!-- Section 2: Tax Lots Table -->
+<section class="space-y-6">
+<div class="flex justify-between items-end px-2">
+<h3 class="text-xl font-geist font-semibold text-slate-200 uppercase tracking-wider">Active Tax Lots</h3>
+<div class="flex gap-4">
+<button class="px-4 py-1.5 rounded-full ghost-border text-xs font-mono text-slate-400 hover:bg-white/5 transition-colors">EXPORT REPORT</button>
+<button class="px-4 py-1.5 rounded-full bg-primary/10 border border-primary/20 text-xs font-mono text-primary hover:bg-primary/20 transition-colors">OPTIMIZE ALL</button>
+</div>
+</div>
+<div class="glass-panel rounded-2xl overflow-hidden">
+<table class="w-full text-left border-collapse">
+<thead>
+<tr class="bg-surface-container-low/50 border-b border-white/5">
+<th class="px-6 py-4 text-[10px] font-mono text-slate-500 uppercase tracking-widest">Symbol</th>
+<th class="px-6 py-4 text-[10px] font-mono text-slate-500 uppercase tracking-widest">Cost Basis</th>
+<th class="px-6 py-4 text-[10px] font-mono text-slate-500 uppercase tracking-widest text-right">G/L</th>
+<th class="px-6 py-4 text-[10px] font-mono text-slate-500 uppercase tracking-widest text-center">Period</th>
+<th class="px-6 py-4 text-[10px] font-mono text-slate-500 uppercase tracking-widest text-right">Est. Tax</th>
+</tr>
+</thead>
+<tbody class="divide-y divide-white/5">
+<tr class="hover:bg-white/[0.02] transition-colors group">
+<td class="px-6 py-5">
+<div class="flex items-center gap-3">
+<div class="w-8 h-8 rounded-lg bg-white/5 flex items-center justify-center text-[10px] font-bold font-mono">AAPL</div>
+<span class="text-sm font-medium text-slate-200">Apple Inc.</span>
+</div>
+</td>
+<td class="px-6 py-5 font-mono text-sm text-slate-400">$142.30</td>
+<td class="px-6 py-5 text-right font-mono text-sm text-primary">+$3,420.12</td>
+<td class="px-6 py-5">
+<div class="flex justify-center">
+<span class="px-3 py-1 rounded-full bg-primary/10 text-primary border border-primary/20 text-[10px] font-mono font-bold tracking-tighter">LONG-TERM</span>
+</div>
+</td>
+<td class="px-6 py-5 text-right font-mono text-sm text-slate-300">$513.02</td>
+</tr>
+<tr class="hover:bg-white/[0.02] transition-colors group">
+<td class="px-6 py-5">
+<div class="flex items-center gap-3">
+<div class="w-8 h-8 rounded-lg bg-white/5 flex items-center justify-center text-[10px] font-bold font-mono">NVDA</div>
+<span class="text-sm font-medium text-slate-200">NVIDIA Corp.</span>
+</div>
+</td>
+<td class="px-6 py-5 font-mono text-sm text-slate-400">$480.15</td>
+<td class="px-6 py-5 text-right font-mono text-sm text-primary">+$12,840.45</td>
+<td class="px-6 py-5">
+<div class="flex justify-center">
+<span class="px-3 py-1 rounded-full bg-secondary/10 text-secondary border border-secondary/20 text-[10px] font-mono font-bold tracking-tighter">SHORT-TERM</span>
+</div>
+</td>
+<td class="px-6 py-5 text-right font-mono text-sm text-slate-300">$3,595.33</td>
+</tr>
+<tr class="hover:bg-white/[0.02] transition-colors group">
+<td class="px-6 py-5">
+<div class="flex items-center gap-3">
+<div class="w-8 h-8 rounded-lg bg-white/5 flex items-center justify-center text-[10px] font-bold font-mono">BNDX</div>
+<span class="text-sm font-medium text-slate-200">Vanguard Bond</span>
+</div>
+</td>
+<td class="px-6 py-5 font-mono text-sm text-slate-400">$48.90</td>
+<td class="px-6 py-5 text-right font-mono text-sm text-error">-$1,120.50</td>
+<td class="px-6 py-5">
+<div class="flex justify-center">
+<span class="px-3 py-1 rounded-full bg-primary/10 text-primary border border-primary/20 text-[10px] font-mono font-bold tracking-tighter">LONG-TERM</span>
+</div>
+</td>
+<td class="px-6 py-5 text-right font-mono text-sm text-slate-500">$0.00</td>
+</tr>
+<tr class="hover:bg-white/[0.02] transition-colors group">
+<td class="px-6 py-5">
+<div class="flex items-center gap-3">
+<div class="w-8 h-8 rounded-lg bg-white/5 flex items-center justify-center text-[10px] font-bold font-mono">PETR4</div>
+<span class="text-sm font-medium text-slate-200">Petrobras PN</span>
+</div>
+</td>
+<td class="px-6 py-5 font-mono text-sm text-slate-400">R$ 32.10</td>
+<td class="px-6 py-5 text-right font-mono text-sm text-error">-R$ 840.00</td>
+<td class="px-6 py-5">
+<div class="flex justify-center">
+<span class="px-3 py-1 rounded-full bg-secondary/10 text-secondary border border-secondary/20 text-[10px] font-mono font-bold tracking-tighter">SHORT-TERM</span>
+</div>
+</td>
+<td class="px-6 py-5 text-right font-mono text-sm text-slate-500">$0.00</td>
+</tr>
+</tbody>
+</table>
+</div>
+</section>
+<!-- Section 3: Harvest Panel -->
+<section class="grid grid-cols-1 md:grid-cols-3 gap-8">
+<div class="md:col-span-2 glass-panel rounded-2xl p-8 relative overflow-hidden border-l-2 border-l-tertiary shadow-[inset_10px_0_20px_rgba(255,185,95,0.03)]">
+<div class="flex items-center gap-4 mb-6">
+<div class="w-12 h-12 rounded-full bg-tertiary/10 flex items-center justify-center border border-tertiary/20">
+<span class="material-symbols-outlined text-tertiary">energy_savings_leaf</span>
+</div>
+<div>
+<h4 class="text-xl font-geist font-bold text-slate-100">Tax-Loss Harvesting Opportunities</h4>
+<p class="text-sm text-slate-400">Offset your gains and reduce your tax liability by realizing strategic losses.</p>
+</div>
+</div>
+<div class="space-y-4">
+<div class="flex items-center justify-between p-4 rounded-xl bg-white/5 ghost-border group hover:bg-white/[0.08] transition-all">
+<div class="flex items-center gap-4">
+<div class="font-mono text-xs font-bold px-2 py-1 bg-white/5 rounded">BNDX</div>
+<div>
+<div class="text-sm font-semibold text-slate-200">Realize -$1,120.50 Loss</div>
+<div class="text-[11px] text-slate-500">Suggested Wash-Sale Buffer: 31 Days</div>
+</div>
+</div>
+<button class="px-6 py-2 rounded-full bg-tertiary text-on-tertiary font-mono text-xs font-bold shadow-[0_4px_15px_rgba(255,185,95,0.2)] hover:scale-105 transition-transform active:scale-95">REVIEW BNDX</button>
+</div>
+<div class="flex items-center justify-between p-4 rounded-xl bg-white/5 ghost-border group hover:bg-white/[0.08] transition-all">
+<div class="flex items-center gap-4">
+<div class="font-mono text-xs font-bold px-2 py-1 bg-white/5 rounded">PETR4</div>
+<div>
+<div class="text-sm font-semibold text-slate-200">Realize -R$ 840.00 Loss</div>
+<div class="text-[11px] text-slate-500">Offset against current month gains</div>
+</div>
+</div>
+<button class="px-6 py-2 rounded-full bg-tertiary text-on-tertiary font-mono text-xs font-bold shadow-[0_4px_15px_rgba(255,185,95,0.2)] hover:scale-105 transition-transform active:scale-95">REVIEW PETR4</button>
+</div>
+</div>
+</div>
+<!-- Summary Widget -->
+<div class="glass-panel rounded-2xl p-8 flex flex-col justify-between">
+<div>
+<h5 class="text-[10px] font-mono text-slate-500 uppercase tracking-widest mb-6">Estimated Savings</h5>
+<div class="space-y-6">
+<div>
+<div class="text-3xl font-mono font-bold text-primary tracking-tighter">+$1,452.10</div>
+<div class="text-[11px] text-slate-500 mt-1">Net Potential Deduction</div>
+</div>
+<div class="h-px bg-white/5"></div>
+<div class="space-y-3">
+<div class="flex justify-between text-xs">
+<span class="text-slate-400">Short-Term Offset</span>
+<span class="font-mono text-slate-200">$840.00</span>
+</div>
+<div class="flex justify-between text-xs">
+<span class="text-slate-400">Long-Term Offset</span>
+<span class="font-mono text-slate-200">$612.10</span>
+</div>
+</div>
+</div>
+</div>
+<button class="w-full mt-8 py-3 rounded-full bg-white/5 border border-white/10 text-slate-300 font-geist font-bold text-sm hover:bg-white/10 transition-colors">
+                        VIEW FULL BREAKDOWN
+                    </button>
+</div>
+</section>
+</div>
+<!-- Footer Decoration / Ambient Light -->
+<div class="fixed bottom-0 right-0 w-[600px] h-[600px] bg-primary/5 rounded-full blur-[150px] -mr-40 -mb-40 pointer-events-none"></div>
+</main>
+</body></html>

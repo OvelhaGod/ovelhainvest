@@ -1,0 +1,317 @@
+<!DOCTYPE html>
+
+<html class="dark" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>OvelhaInvest | Portfolio Configuration</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&amp;family=JetBrains+Mono:wght@400;500&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+      tailwind.config = {
+        darkMode: "class",
+        theme: {
+          extend: {
+            colors: {
+              "surface-container-highest": "#343536",
+              "error-container": "#93000a",
+              "tertiary-fixed-dim": "#ffb95f",
+              "surface-container-high": "#292a2b",
+              "surface-container": "#1f2021",
+              "error": "#ffb4ab",
+              "on-tertiary-fixed-variant": "#653e00",
+              "on-primary-fixed-variant": "#005236",
+              "outline-variant": "#3c4a42",
+              "on-secondary-fixed": "#23005c",
+              "surface-tint": "#4edea3",
+              "on-tertiary": "#472a00",
+              "on-secondary-container": "#c4abff",
+              "inverse-surface": "#e3e2e3",
+              "secondary-container": "#571bc1",
+              "on-tertiary-container": "#523200",
+              "tertiary": "#ffb95f",
+              "inverse-primary": "#006c49",
+              "surface": "#121315",
+              "tertiary-container": "#e29100",
+              "on-surface-variant": "#bbcabf",
+              "on-error": "#690005",
+              "on-tertiary-fixed": "#2a1700",
+              "on-error-container": "#ffdad6",
+              "primary-container": "#10b981",
+              "on-secondary": "#3c0091",
+              "inverse-on-surface": "#303032",
+              "background": "#050508",
+              "surface-container-lowest": "#0d0e0f",
+              "secondary-fixed-dim": "#d0bcff",
+              "secondary-fixed": "#e9ddff",
+              "primary": "#4edea3",
+              "on-secondary-fixed-variant": "#5516be",
+              "tertiary-fixed": "#ffddb8",
+              "surface-variant": "#343536",
+              "on-primary": "#003824",
+              "surface-container-low": "#1b1c1d",
+              "surface-bright": "#38393a",
+              "primary-fixed-dim": "#4edea3",
+              "secondary": "#d0bcff",
+              "primary-fixed": "#6ffbbe",
+              "on-surface": "#e3e2e3",
+              "surface-dim": "#121315",
+              "outline": "#86948a",
+              "on-primary-fixed": "#002113",
+              "on-primary-container": "#00422b",
+              "on-background": "#e3e2e3"
+            },
+            fontFamily: {
+              "headline": ["Inter"],
+              "body": ["Inter"],
+              "label": ["Inter"],
+              "mono": ["JetBrains Mono"],
+              "geist": ["Inter"] /* Fallback as Geist is not standard Google Font, using Inter with tight tracking as specified */
+            },
+            borderRadius: {"DEFAULT": "1rem", "lg": "2rem", "xl": "3rem", "full": "9999px"},
+          },
+        },
+      }
+    </script>
+<style>
+      .font-geist { font-family: 'Inter', sans-serif; letter-spacing: -0.05em; font-weight: 800; }
+      .glass-panel { background: rgba(13, 14, 15, 0.4); backdrop-filter: blur(32px); border: 1px solid rgba(255, 255, 255, 0.08); }
+      .ghost-border { border: 1px solid rgba(60, 74, 66, 0.12); }
+      .radial-glow { background: radial-gradient(circle at center, rgba(16, 185, 129, 0.05) 0%, transparent 70%); }
+      .active-glow { box-shadow: 0 0 15px rgba(16, 185, 129, 0.2); }
+      .syntax-keyword { color: #d0bcff; }
+      .syntax-string { color: #4edea3; }
+      .syntax-number { color: #ffb95f; }
+    </style>
+</head>
+<body class="bg-background text-on-background font-body selection:bg-primary/30 min-h-screen overflow-hidden">
+<!-- SideNavBar Shell -->
+<aside class="fixed left-0 top-0 h-screen w-[240px] border-r border-white/10 bg-[#050508]/40 backdrop-blur-3xl flex flex-col py-8 px-4 z-50">
+<div class="mb-12 px-4">
+<h1 class="text-2xl font-bold tracking-tighter text-[#4edea3] font-geist">OvelhaInvest</h1>
+<p class="text-[10px] uppercase tracking-widest text-slate-500 mt-1 font-mono">Precision Ledger</p>
+</div>
+<nav class="flex-1 space-y-2">
+<!-- Navigation Items Mapping -->
+<a class="flex items-center gap-3 px-4 py-3 text-slate-400 hover:text-slate-200 hover:bg-white/5 transition-all duration-300 rounded-xl group" href="#">
+<span class="material-symbols-outlined text-lg">dashboard</span>
+<span class="text-sm font-medium">Dashboard</span>
+</a>
+<a class="flex items-center gap-3 px-4 py-3 text-slate-400 hover:text-slate-200 hover:bg-white/5 transition-all duration-300 rounded-xl group" href="#">
+<span class="material-symbols-outlined text-lg">auto_awesome</span>
+<span class="text-sm font-medium">Signals</span>
+</a>
+<a class="flex items-center gap-3 px-4 py-3 text-slate-400 hover:text-slate-200 hover:bg-white/5 transition-all duration-300 rounded-xl group" href="#">
+<span class="material-symbols-outlined text-lg">account_balance_wallet</span>
+<span class="text-sm font-medium">Assets</span>
+</a>
+<a class="flex items-center gap-3 px-4 py-3 text-slate-400 hover:text-slate-200 hover:bg-white/5 transition-all duration-300 rounded-xl group" href="#">
+<span class="material-symbols-outlined text-lg">monitoring</span>
+<span class="text-sm font-medium">Performance</span>
+</a>
+<a class="flex items-center gap-3 px-4 py-3 text-slate-400 hover:text-slate-200 hover:bg-white/5 transition-all duration-300 rounded-xl group" href="#">
+<span class="material-symbols-outlined text-lg">timeline</span>
+<span class="text-sm font-medium">Projections</span>
+</a>
+<a class="flex items-center gap-3 px-4 py-3 text-slate-400 hover:text-slate-200 hover:bg-white/5 transition-all duration-300 rounded-xl group" href="#">
+<span class="material-symbols-outlined text-lg">receipt_long</span>
+<span class="text-sm font-medium">Tax</span>
+</a>
+<a class="flex items-center gap-3 px-4 py-3 text-slate-400 hover:text-slate-200 hover:bg-white/5 transition-all duration-300 rounded-xl group" href="#">
+<span class="material-symbols-outlined text-lg">auto_stories</span>
+<span class="text-sm font-medium">Journal</span>
+</a>
+<!-- Active State: Config -->
+<a class="relative flex items-center gap-3 px-4 py-3 text-[#4edea3] before:absolute before:left-0 before:w-[2px] before:h-6 before:bg-[#10b981] before:shadow-[0_0_10px_#10b981] transition-all duration-300 rounded-xl group" href="#">
+<span class="material-symbols-outlined text-lg" style="font-variation-settings: 'FILL' 1;">settings</span>
+<span class="text-sm font-semibold">Config</span>
+</a>
+</nav>
+<div class="mt-auto border-t border-white/5 pt-6 px-4">
+<a class="flex items-center gap-3 text-slate-400 hover:text-slate-200 transition-colors group" href="#">
+<span class="material-symbols-outlined text-lg">account_circle</span>
+<span class="text-sm font-medium">Profile</span>
+</a>
+</div>
+</aside>
+<!-- TopNavBar Shell -->
+<header class="fixed top-0 right-0 w-[calc(100%-240px)] h-16 bg-transparent flex justify-between items-center px-12 z-40">
+<div class="flex items-center gap-4 bg-surface-container-low/40 backdrop-blur-md px-4 py-2 rounded-full ghost-border w-96">
+<span class="material-symbols-outlined text-slate-400 text-lg">search</span>
+<input class="bg-transparent border-none text-sm focus:ring-0 text-on-surface w-full font-body" placeholder="Search parameters..." type="text"/>
+</div>
+<div class="flex items-center gap-6">
+<button class="text-slate-400 hover:text-[#4edea3] transition-colors relative">
+<span class="material-symbols-outlined">notifications</span>
+<span class="absolute top-0 right-0 w-2 h-2 bg-primary rounded-full border-2 border-background"></span>
+</button>
+<button class="text-slate-400 hover:text-[#4edea3] transition-colors">
+<span class="material-symbols-outlined">account_balance</span>
+</button>
+<button class="text-slate-400 hover:text-[#4edea3] transition-colors">
+<span class="material-symbols-outlined">grid_view</span>
+</button>
+<div class="h-8 w-8 rounded-full overflow-hidden border border-white/10 ml-2">
+<img class="h-full w-full object-cover" data-alt="User profile portrait in dark aesthetic" src="https://lh3.googleusercontent.com/aida-public/AB6AXuAoDnVCDMGnQ1Lm54MngEePo91DCsjnXKkX5VJxdzZaypU9IJiw4rWZAwKZeIny9eqXS4_OMpBZsWEUr40Ji63Et-1l6AY6652_rJSCk89lBwqPtYryPq9LurXD9mppHRNR3Y_V9dQxc-IBlao1CZHNxJ7OIhZGpE_0DAcG8KV_1oWpH_hgYyqA0FmSe_hr3s3hnJeg2y3ap7g3BGeiSahU0XkKMRwBE1-qyXzl_kF896Ccla4rm7yujvCPNx9r_s93m_laj4ivmTBV"/>
+</div>
+</div>
+</header>
+<!-- Main Content Canvas -->
+<main class="ml-[240px] mt-16 p-12 h-[calc(100vh-64px)] overflow-y-auto">
+<div class="flex gap-8 h-full">
+<!-- Left (35%): Version History -->
+<section class="w-[35%] flex flex-col gap-6">
+<div class="glass-panel rounded-2xl p-8 flex-1 flex flex-col">
+<div class="flex justify-between items-center mb-10">
+<div>
+<h2 class="text-xl font-bold font-geist tracking-tight text-on-surface">Version History</h2>
+<p class="text-xs text-slate-500 font-mono mt-1">SNAPSHOT_LEDGER_RECORDS</p>
+</div>
+<button class="flex items-center gap-2 px-4 py-2 rounded-full border border-primary/20 text-primary text-xs font-semibold uppercase tracking-wider hover:bg-primary/5 transition-all">
+<span class="material-symbols-outlined text-sm">add</span>
+                            Create
+                        </button>
+</div>
+<div class="space-y-4">
+<!-- Active Version -->
+<div class="relative p-5 rounded-xl bg-primary/5 border border-primary/20 group cursor-pointer transition-all active-glow">
+<div class="flex justify-between items-start mb-2">
+<span class="text-sm font-mono text-primary font-bold">v1.0.0</span>
+<span class="text-[10px] px-2 py-0.5 rounded-full bg-primary/20 text-primary uppercase font-bold tracking-tighter">Active</span>
+</div>
+<p class="text-sm text-on-surface font-medium">Aggressive Swensen Hybrid</p>
+<p class="text-xs text-slate-500 mt-2">Deployed 2h ago by System</p>
+</div>
+<!-- Previous Versions -->
+<div class="p-5 rounded-xl border border-white/5 hover:border-white/10 hover:bg-white/5 transition-all cursor-pointer group">
+<div class="flex justify-between items-start mb-2">
+<span class="text-sm font-mono text-slate-400">v0.9.4</span>
+<span class="text-[10px] text-slate-600 font-mono">2026.05.12</span>
+</div>
+<p class="text-sm text-slate-400">Fixed Income Weighting Bias</p>
+</div>
+<div class="p-5 rounded-xl border border-white/5 hover:border-white/10 hover:bg-white/5 transition-all cursor-pointer group">
+<div class="flex justify-between items-start mb-2">
+<span class="text-sm font-mono text-slate-400">v0.8.1</span>
+<span class="text-[10px] text-slate-600 font-mono">2026.04.28</span>
+</div>
+<p class="text-sm text-slate-400">Initial All-Weather Setup</p>
+</div>
+</div>
+<div class="mt-auto pt-6">
+<div class="p-4 rounded-xl bg-surface-container-low border border-white/5 flex items-center gap-4">
+<div class="w-10 h-10 rounded-full bg-secondary/10 flex items-center justify-center">
+<span class="material-symbols-outlined text-secondary">auto_awesome</span>
+</div>
+<div>
+<p class="text-xs font-semibold text-secondary">AI Insight</p>
+<p class="text-[11px] text-slate-400">v1.0.0 has 14% higher volatility...</p>
+</div>
+</div>
+</div>
+</div>
+</section>
+<!-- Right (65%): Controls and Code -->
+<section class="w-[65%] flex flex-col gap-8">
+<!-- Top Card: Allocation & Toggles -->
+<div class="glass-panel rounded-2xl p-8 h-[40%] flex gap-12 items-center relative overflow-hidden">
+<div class="absolute top-0 right-0 w-64 h-64 radial-glow opacity-50 -mr-20 -mt-20"></div>
+<!-- Small Donut Chart Simulation -->
+<div class="relative w-40 h-40 flex items-center justify-center flex-shrink-0">
+<svg class="w-full h-full -rotate-90">
+<circle class="text-white/5" cx="80" cy="80" fill="transparent" r="70" stroke="currentColor" stroke-width="12"></circle>
+<circle class="text-primary" cx="80" cy="80" fill="transparent" r="70" stroke="currentColor" stroke-dasharray="440" stroke-dashoffset="110" stroke-width="12"></circle>
+<circle class="text-secondary" cx="80" cy="80" fill="transparent" r="70" stroke="currentColor" stroke-dasharray="440" stroke-dashoffset="300" stroke-width="12"></circle>
+<circle class="text-tertiary" cx="80" cy="80" fill="transparent" r="70" stroke="currentColor" stroke-dasharray="440" stroke-dashoffset="380" stroke-width="12"></circle>
+</svg>
+<div class="absolute inset-0 flex flex-col items-center justify-center">
+<span class="text-2xl font-mono font-bold text-on-surface">1.0.0</span>
+<span class="text-[9px] text-slate-500 uppercase tracking-widest">Active</span>
+</div>
+</div>
+<div class="flex-1">
+<div class="mb-6">
+<h3 class="text-lg font-bold text-on-surface">Simulation Strategy</h3>
+<p class="text-xs text-slate-500">Compare current model with historical benchmarks</p>
+</div>
+<div class="flex p-1 bg-surface-container-lowest rounded-full border border-white/5 w-fit">
+<button class="px-6 py-2 rounded-full text-xs font-semibold text-primary bg-primary/10 transition-all">Current</button>
+<button class="px-6 py-2 rounded-full text-xs font-semibold text-slate-500 hover:text-slate-300 transition-all">Swensen</button>
+<button class="px-6 py-2 rounded-full text-xs font-semibold text-slate-500 hover:text-slate-300 transition-all">All-Weather</button>
+</div>
+<div class="grid grid-cols-3 gap-6 mt-8">
+<div>
+<p class="text-[10px] text-slate-500 uppercase font-mono mb-1">Risk Score</p>
+<p class="text-lg font-mono text-on-surface">0.84</p>
+</div>
+<div>
+<p class="text-[10px] text-slate-500 uppercase font-mono mb-1">Yield Target</p>
+<p class="text-lg font-mono text-primary">+12.4%</p>
+</div>
+<div>
+<p class="text-[10px] text-slate-500 uppercase font-mono mb-1">Volatility</p>
+<p class="text-lg font-mono text-tertiary">0.12σ</p>
+</div>
+</div>
+</div>
+</div>
+<!-- Bottom Card: JSON Editor -->
+<div class="glass-panel rounded-2xl flex-1 flex flex-col overflow-hidden">
+<div class="px-8 py-4 border-b border-white/5 flex justify-between items-center bg-surface-container-low/40">
+<div class="flex items-center gap-2">
+<span class="material-symbols-outlined text-sm text-primary">data_object</span>
+<span class="text-xs font-mono font-medium text-slate-400">config.ledger.v1.0.0.json</span>
+</div>
+<div class="flex items-center gap-4">
+<span class="text-[10px] font-mono text-slate-500">UTF-8 • JSON</span>
+<button class="px-4 py-1.5 rounded-full bg-primary text-on-primary text-[10px] font-bold uppercase tracking-wider hover:brightness-110 transition-all">Deploy Changes</button>
+</div>
+</div>
+<div class="flex-1 p-8 font-mono text-sm leading-relaxed overflow-y-auto bg-surface-container-lowest/20">
+<pre class="space-y-1"><span class="text-slate-600">01</span> {
+<span class="text-slate-600">02</span>   <span class="syntax-keyword">"strategy"</span>: <span class="syntax-string">"Aggressive Swensen Hybrid"</span>,
+<span class="text-slate-600">03</span>   <span class="syntax-keyword">"version"</span>: <span class="syntax-string">"1.0.0"</span>,
+<span class="text-slate-600">04</span>   <span class="syntax-keyword">"allocation"</span>: {
+<span class="text-slate-600">05</span>     <span class="syntax-keyword">"equities"</span>: {
+<span class="text-slate-600">06</span>       <span class="syntax-keyword">"domestic"</span>: <span class="syntax-number">0.35</span>,
+<span class="text-slate-600">07</span>       <span class="syntax-keyword">"international"</span>: <span class="syntax-number">0.15</span>,
+<span class="text-slate-600">08</span>       <span class="syntax-keyword">"emerging"</span>: <span class="syntax-number">0.10</span>
+<span class="text-slate-600">09</span>     },
+<span class="text-slate-600">10</span>     <span class="syntax-keyword">"real_assets"</span>: {
+<span class="text-slate-600">11</span>       <span class="syntax-keyword">"reits"</span>: <span class="syntax-number">0.15</span>,
+<span class="text-slate-600">12</span>       <span class="syntax-keyword">"commodities"</span>: <span class="syntax-number">0.05</span>
+<span class="text-slate-600">13</span>     },
+<span class="text-slate-600">14</span>     <span class="syntax-keyword">"fixed_income"</span>: {
+<span class="text-slate-600">15</span>       <span class="syntax-keyword">"treasuries"</span>: <span class="syntax-number">0.15</span>,
+<span class="text-slate-600">16</span>       <span class="syntax-keyword">"tips"</span>: <span class="syntax-number">0.05</span>
+<span class="text-slate-600">17</span>     }
+<span class="text-slate-600">18</span>   },
+<span class="text-slate-600">19</span>   <span class="syntax-keyword">"rebalancing"</span>: {
+<span class="text-slate-600">20</span>     <span class="syntax-keyword">"threshold"</span>: <span class="syntax-number">0.02</span>,
+<span class="text-slate-600">21</span>     <span class="syntax-keyword">"frequency"</span>: <span class="syntax-string">"quarterly"</span>
+<span class="text-slate-600">22</span>   }
+<span class="text-slate-600">23</span> }</pre>
+</div>
+</div>
+</section>
+</div>
+</main>
+<!-- Contextual Status Bar -->
+<footer class="fixed bottom-0 right-0 w-[calc(100%-240px)] h-8 bg-surface-container-lowest/80 backdrop-blur-md px-12 flex items-center justify-between border-t border-white/5 z-40">
+<div class="flex items-center gap-6">
+<div class="flex items-center gap-2">
+<div class="w-1.5 h-1.5 rounded-full bg-primary animate-pulse"></div>
+<span class="text-[10px] font-mono text-slate-500">NODE_SYNCED: 100%</span>
+</div>
+<div class="flex items-center gap-2">
+<span class="material-symbols-outlined text-[12px] text-slate-500">database</span>
+<span class="text-[10px] font-mono text-slate-500">LEDGER_STABLE</span>
+</div>
+</div>
+<div class="flex items-center gap-4 text-[10px] font-mono text-slate-500 uppercase tracking-widest">
+<span>Lat: 12ms</span>
+<span class="text-primary/50">2026.05.15 14:42:01</span>
+</div>
+</footer>
+</body></html>
