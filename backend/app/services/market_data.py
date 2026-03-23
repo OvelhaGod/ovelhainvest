@@ -138,6 +138,10 @@ def fetch_fundamentals(symbol: str) -> dict[str, Any]:
             "free_cashflow": _safe_float(info.get("freeCashflow")),
             "revenue_growth": _safe_float(info.get("revenueGrowth")),
             "earnings_growth": _safe_float(info.get("earningsGrowth")),
+            # DCF inputs
+            "shares_outstanding": _safe_float(info.get("sharesOutstanding")),
+            "total_debt": _safe_float(info.get("totalDebt")),
+            "cash_and_equivalents": _safe_float(info.get("totalCash")),
             "symbol": symbol,
         }
         _set_cached(cache_key, data, TTL_FUNDAMENTALS)
