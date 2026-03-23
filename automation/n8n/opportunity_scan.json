@@ -1,0 +1,104 @@
+{
+  "name": "OvelhaInvest — Opportunity Scan",
+  "description": "Runs daily at 8AM ET: scans for Tier 1/2 opportunity triggers (30-50% drawdown from 6-12mo high with margin of safety). Alerts immediately via Telegram.",
+  "active": false,
+  "nodes": [
+    {
+      "id": "cron-trigger",
+      "name": "Schedule Trigger",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "parameters": {
+        "rule": {
+          "interval": [{ "field": "cronExpression", "expression": "0 13 * * 1-5" }]
+        }
+      },
+      "position": [250, 300]
+    },
+    {
+      "id": "get-valuation-summary",
+      "name": "GET /valuation_summary",
+      "type": "n8n-nodes-base.httpRequest",
+      "parameters": {
+        "method": "GET",
+        "url": "={{ $env.OVELHAINVEST_API_URL }}/valuation_summary",
+        "authentication": "none",
+        "responseFormat": "json"
+      },
+      "position": [450, 300]
+    },
+    {
+      "id": "check-tier-opportunities",
+      "name": "Tier 1 or 2 Triggered?",
+      "type": "n8n-nodes-base.if",
+      "parameters": {
+        "conditions": {
+          "number": [{
+            "value1": "={{ ($json.tier_1_count ?? 0) + ($json.tier_2_count ?? 0) }}",
+            "operation": "larger",
+            "value2": 0
+          }]
+        }
+      },
+      "position": [650, 300]
+    },
+    {
+      "id": "run-allocation-opportunity",
+      "name": "POST /run_allocation (opportunity)",
+      "type": "n8n-nodes-base.httpRequest",
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.OVELHAINVEST_API_URL }}/run_allocation",
+        "authentication": "none",
+        "sendBody": true,
+        "contentType": "json",
+        "body": {
+          "user_id": "={{ $env.OVELHAINVEST_USER_ID }}",
+          "event_type": "opportunity",
+          "notes": "Automated opportunity scan — Tier trigger detected"
+        },
+        "responseFormat": "json"
+      },
+      "position": [850, 200]
+    },
+    {
+      "id": "send-opportunity-telegram",
+      "name": "Telegram — Opportunity Alert",
+      "type": "n8n-nodes-base.telegram",
+      "parameters": {
+        "operation": "sendMessage",
+        "chatId": "={{ $env.TELEGRAM_CHAT_ID }}",
+        "text": "={{ '🚨 *OPPORTUNITY ALERT*\n\n' + 'Tier 1: ' + ($json.approval_required_count ?? '?') + ' trade(s) proposed\\.\n\n*This requires your approval\\.*\n\nMarks principle: Buy when fear is highest\\.' }}",
+        "additionalFields": {
+          "parse_mode": "MarkdownV2",
+          "reply_markup": {
+            "inline_keyboard": [[
+              { "text": "✅ Review Now", "url": "={{ $env.APP_URL + '/signals' }}" }
+            ]]
+          }
+        }
+      },
+      "position": [1050, 200]
+    },
+    {
+      "id": "no-opportunities",
+      "name": "No Action — Log",
+      "type": "n8n-nodes-base.noOp",
+      "position": [850, 400]
+    }
+  ],
+  "connections": {
+    "Schedule Trigger": { "main": [[{ "node": "GET /valuation_summary", "type": "main", "index": 0 }]] },
+    "GET /valuation_summary": { "main": [[{ "node": "Tier 1 or 2 Triggered?", "type": "main", "index": 0 }]] },
+    "Tier 1 or 2 Triggered?": {
+      "main": [
+        [{ "node": "POST /run_allocation (opportunity)", "type": "main", "index": 0 }],
+        [{ "node": "No Action — Log", "type": "main", "index": 0 }]
+      ]
+    },
+    "POST /run_allocation (opportunity)": { "main": [[{ "node": "Telegram — Opportunity Alert", "type": "main", "index": 0 }]] }
+  },
+  "settings": {
+    "saveManualExecutions": true,
+    "executionTimeout": 120
+  }
+}

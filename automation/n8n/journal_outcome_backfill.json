@@ -1,0 +1,107 @@
+{
+  "name": "OvelhaInvest — Journal Outcome Backfill",
+  "description": "Runs daily at midnight. Finds journal entries without 30d or 90d outcomes where sufficient time has passed, computes returns, and backfills via PATCH /journal/{id}/outcome.",
+  "active": false,
+  "nodes": [
+    {
+      "id": "cron-trigger",
+      "name": "Schedule Trigger",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "parameters": {
+        "rule": {
+          "interval": [{ "field": "cronExpression", "expression": "0 5 * * *" }]
+        }
+      },
+      "position": [250, 300]
+    },
+    {
+      "id": "get-journal-entries",
+      "name": "GET /journal (no outcomes)",
+      "type": "n8n-nodes-base.httpRequest",
+      "parameters": {
+        "method": "GET",
+        "url": "={{ $env.OVELHAINVEST_API_URL }}/journal?limit=200",
+        "authentication": "none",
+        "responseFormat": "json"
+      },
+      "position": [450, 300]
+    },
+    {
+      "id": "filter-needs-30d",
+      "name": "Filter: Needs 30d Backfill",
+      "type": "n8n-nodes-base.code",
+      "parameters": {
+        "jsCode": "// Filter entries that are 30+ days old and missing outcome_30d\nconst entries = $input.all().map(i => i.json);\nconst now = new Date();\nconst needs30d = entries.filter(e => {\n  if (e.outcome_30d != null) return false;\n  const age = (now - new Date(e.event_date)) / (1000 * 60 * 60 * 24);\n  return age >= 30;\n});\nconst needs90d = entries.filter(e => {\n  if (e.outcome_90d != null) return false;\n  const age = (now - new Date(e.event_date)) / (1000 * 60 * 60 * 24);\n  return age >= 90;\n});\n// Combine into unique list with flags\nconst combined = {};\nfor (const e of needs30d) { combined[e.id] = { ...e, backfill_30d: true, backfill_90d: false }; }\nfor (const e of needs90d) {\n  if (combined[e.id]) combined[e.id].backfill_90d = true;\n  else combined[e.id] = { ...e, backfill_30d: false, backfill_90d: true };\n}\nreturn Object.values(combined).map(item => ({ json: item }));"
+      },
+      "position": [650, 300]
+    },
+    {
+      "id": "check-has-entries",
+      "name": "Any Entries to Backfill?",
+      "type": "n8n-nodes-base.if",
+      "parameters": {
+        "conditions": {
+          "number": [{
+            "value1": "={{ $items().length }}",
+            "operation": "larger",
+            "value2": 0
+          }]
+        }
+      },
+      "position": [850, 300]
+    },
+    {
+      "id": "fetch-portfolio-return",
+      "name": "GET /performance/summary (for return)",
+      "type": "n8n-nodes-base.httpRequest",
+      "parameters": {
+        "method": "GET",
+        "url": "={{ $env.OVELHAINVEST_API_URL }}/performance/summary",
+        "authentication": "none",
+        "responseFormat": "json"
+      },
+      "position": [1050, 200]
+    },
+    {
+      "id": "patch-outcomes",
+      "name": "PATCH /journal/{id}/outcome",
+      "type": "n8n-nodes-base.httpRequest",
+      "parameters": {
+        "method": "PATCH",
+        "url": "={{ $env.OVELHAINVEST_API_URL }}/journal/{{ $json.id }}/outcome",
+        "authentication": "none",
+        "sendBody": true,
+        "contentType": "json",
+        "body": {
+          "outcome_30d": "={{ $json.backfill_30d ? ($('GET /performance/summary (for return)').first().json.period_returns?.['1mo']?.portfolio ?? null) : undefined }}",
+          "outcome_90d": "={{ $json.backfill_90d ? ($('GET /performance/summary (for return)').first().json.period_returns?.['3mo']?.portfolio ?? null) : undefined }}"
+        },
+        "responseFormat": "json"
+      },
+      "position": [1250, 200]
+    },
+    {
+      "id": "nothing-to-backfill",
+      "name": "No Action Needed",
+      "type": "n8n-nodes-base.noOp",
+      "position": [1050, 400]
+    }
+  ],
+  "connections": {
+    "Schedule Trigger": { "main": [[{ "node": "GET /journal (no outcomes)", "type": "main", "index": 0 }]] },
+    "GET /journal (no outcomes)": { "main": [[{ "node": "Filter: Needs 30d Backfill", "type": "main", "index": 0 }]] },
+    "Filter: Needs 30d Backfill": { "main": [[{ "node": "Any Entries to Backfill?", "type": "main", "index": 0 }]] },
+    "Any Entries to Backfill?": {
+      "main": [
+        [{ "node": "GET /performance/summary (for return)", "type": "main", "index": 0 }],
+        [{ "node": "No Action Needed", "type": "main", "index": 0 }]
+      ]
+    },
+    "GET /performance/summary (for return)": { "main": [[{ "node": "PATCH /journal/{id}/outcome", "type": "main", "index": 0 }]] }
+  },
+  "settings": {
+    "saveManualExecutions": true,
+    "saveExecutionProgress": true,
+    "executionTimeout": 180
+  }
+}
