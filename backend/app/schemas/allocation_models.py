@@ -101,3 +101,7 @@ class DailyStatusResponse(BaseModel):
     ytd_return_twr: float | None
     max_drawdown_pct: float | None
     portfolio_snapshot_date: date | None
+    # Phase 4 — performance fields
+    ytd_vs_benchmark: float | None = None       # active return vs SPY YTD
+    sharpe_trailing_12mo: float | None = None   # trailing 12-month Sharpe
+    max_drawdown_current: float | None = None   # current drawdown from peak (live)
