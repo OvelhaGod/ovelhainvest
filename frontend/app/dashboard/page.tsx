@@ -92,6 +92,7 @@ export default function DashboardPage() {
   const [valSummary, setValSummary]       = useState<ValuationSummaryResponse | null>(null);
   const [alertHistory, setAlertHistory]   = useState<AlertHistoryItem[]>([]);
   const [adminStatus, setAdminStatus]     = useState<AdminStatus | null>(null);
+  const [mcPreview, setMcPreview]         = useState<{ median_10yr: number; median_20yr: number; swr_probability: number } | null>(null);
   const [loading, setLoading]             = useState(true);
   const [error, setError]                 = useState<string | null>(null);
   const [lastRefresh, setLastRefresh]     = useState<Date>(new Date());
@@ -114,6 +115,7 @@ export default function DashboardPage() {
     api.valuationSummary().then(setValSummary).catch(() => null);
     api.listAlertHistory({ limit: 10 }).then(setAlertHistory).catch(() => null);
     api.adminStatus().then(setAdminStatus).catch(() => null);
+    api.simulationDashboardPreview().then(setMcPreview).catch(() => null);
   }, []);
 
   useEffect(() => {
@@ -510,6 +512,64 @@ export default function DashboardPage() {
                 </div>
               );
             })}
+          </div>
+        </div>
+      )}
+
+      {/* ── Monte Carlo Preview card ── */}
+      {mcPreview && (
+        <div
+          className={glassInner}
+          style={{ borderColor: "rgba(99,102,241,0.2)", boxShadow: "0 0 20px rgba(99,102,241,0.06)" }}
+        >
+          <div className="flex items-center justify-between mb-3">
+            <p className="text-xs text-white/40 uppercase tracking-widest">20-Year Projection Preview</p>
+            <a href="/projections" className="text-[10px] text-violet-400/70 hover:text-violet-400 transition-colors">
+              Run full simulation →
+            </a>
+          </div>
+          <div className="grid grid-cols-3 gap-4">
+            <div>
+              <p className="text-[10px] text-white/30 mb-1">Median at 10yr</p>
+              <p className="text-xl font-bold font-mono text-white/90">
+                {mcPreview.median_10yr >= 1_000_000
+                  ? `$${(mcPreview.median_10yr / 1_000_000).toFixed(2)}M`
+                  : `$${(mcPreview.median_10yr / 1_000).toFixed(0)}K`}
+              </p>
+            </div>
+            <div>
+              <p className="text-[10px] text-white/30 mb-1">Median at 20yr</p>
+              <p className="text-xl font-bold font-mono" style={{ color: "#10b981" }}>
+                {mcPreview.median_20yr >= 1_000_000
+                  ? `$${(mcPreview.median_20yr / 1_000_000).toFixed(2)}M`
+                  : `$${(mcPreview.median_20yr / 1_000).toFixed(0)}K`}
+              </p>
+            </div>
+            <div>
+              <p className="text-[10px] text-white/30 mb-1">4% SWR Survival</p>
+              <div className="flex items-center gap-2">
+                <p
+                  className="text-xl font-bold font-mono"
+                  style={{
+                    color: mcPreview.swr_probability >= 0.80 ? "#10b981"
+                      : mcPreview.swr_probability >= 0.60 ? "#f59e0b"
+                      : "#ef4444",
+                  }}
+                >
+                  {(mcPreview.swr_probability * 100).toFixed(0)}%
+                </p>
+                <span
+                  className="text-[10px] px-1.5 py-0.5 rounded-full font-medium"
+                  style={{
+                    background: mcPreview.swr_probability >= 0.80 ? "rgba(16,185,129,0.1)" : "rgba(245,158,11,0.1)",
+                    color: mcPreview.swr_probability >= 0.80 ? "#34d399" : "#fbbf24",
+                    border: `1px solid ${mcPreview.swr_probability >= 0.80 ? "rgba(16,185,129,0.2)" : "rgba(245,158,11,0.2)"}`,
+                  }}
+                >
+                  {mcPreview.swr_probability >= 0.80 ? "Safe" : mcPreview.swr_probability >= 0.60 ? "Fair" : "At Risk"}
+                </span>
+              </div>
+            </div>
           </div>
         </div>
       )}
