@@ -93,6 +93,14 @@ export default function DashboardPage() {
   const [alertHistory, setAlertHistory]   = useState<AlertHistoryItem[]>([]);
   const [adminStatus, setAdminStatus]     = useState<AdminStatus | null>(null);
   const [mcPreview, setMcPreview]         = useState<{ median_10yr: number; median_20yr: number; swr_probability: number } | null>(null);
+  const [taxSnapshot, setTaxSnapshot]     = useState<{
+    unrealized_gain: number;
+    worst_case_tax: number;
+    harvest_savings: number;
+    harvest_count: number;
+    darf_pct: number;
+    darf_triggered: boolean;
+  } | null>(null);
   const [loading, setLoading]             = useState(true);
   const [error, setError]                 = useState<string | null>(null);
   const [lastRefresh, setLastRefresh]     = useState<Date>(new Date());
@@ -116,6 +124,21 @@ export default function DashboardPage() {
     api.listAlertHistory({ limit: 10 }).then(setAlertHistory).catch(() => null);
     api.adminStatus().then(setAdminStatus).catch(() => null);
     api.simulationDashboardPreview().then(setMcPreview).catch(() => null);
+    // Tax snapshot — combine estimate + DARF
+    Promise.all([
+      api.taxEstimate().catch(() => null),
+      api.taxBrazilDarf().catch(() => null),
+    ]).then(([est, darf]) => {
+      if (!est && !darf) return;
+      setTaxSnapshot({
+        unrealized_gain: est?.unrealized?.total_unrealized_gain ?? 0,
+        worst_case_tax: est?.worst_case?.if_close_everything_today ?? 0,
+        harvest_savings: est?.harvest_savings?.potential_savings_usd ?? 0,
+        harvest_count: (est?.harvest_savings?.top_candidates?.length ?? 0) as number,
+        darf_pct: darf?.darf_status?.exemption_pct_used ?? 0,
+        darf_triggered: darf?.darf_status?.is_triggered ?? false,
+      });
+    });
   }, []);
 
   useEffect(() => {
@@ -572,6 +595,90 @@ export default function DashboardPage() {
             </div>
           </div>
         </div>
+      )}
+
+      {/* ── Tax Snapshot card ── */}
+      {taxSnapshot && (
+        <a
+          href="/tax"
+          className={`${glassInner} block hover:border-white/[0.14] transition-colors`}
+          style={{ borderColor: "rgba(245,158,11,0.15)", boxShadow: "0 0 20px rgba(245,158,11,0.04)" }}
+        >
+          <div className="flex items-center justify-between mb-3">
+            <p className="text-xs text-white/40 uppercase tracking-widest">Tax Snapshot</p>
+            <div className="flex items-center gap-2">
+              {taxSnapshot.darf_triggered && (
+                <span
+                  className="text-[10px] px-1.5 py-0.5 rounded-full font-medium border"
+                  style={{ background: "rgba(239,68,68,0.1)", color: "#f87171", borderColor: "rgba(239,68,68,0.2)" }}
+                >
+                  🇧🇷 DARF Due
+                </span>
+              )}
+              <span className="text-[10px] text-white/30 hover:text-white/50 transition-colors">View details →</span>
+            </div>
+          </div>
+          <div className="grid grid-cols-4 gap-4">
+            {/* Unrealized Gains */}
+            <div>
+              <p className="text-[10px] text-white/30 mb-1">Unrealized Gains</p>
+              <p
+                className="text-lg font-bold font-mono"
+                style={{ color: taxSnapshot.unrealized_gain >= 0 ? "#10b981" : "#ef4444" }}
+              >
+                {taxSnapshot.unrealized_gain >= 0 ? "+" : ""}
+                {fmtUSD(taxSnapshot.unrealized_gain)}
+              </p>
+            </div>
+            {/* Worst-Case Tax */}
+            <div>
+              <p className="text-[10px] text-white/30 mb-1">Worst-Case Tax</p>
+              <p className="text-lg font-bold font-mono text-amber-400">
+                {fmtUSD(taxSnapshot.worst_case_tax)}
+              </p>
+            </div>
+            {/* Harvest Savings */}
+            <div>
+              <p className="text-[10px] text-white/30 mb-1">Harvest Savings</p>
+              <p className="text-lg font-bold font-mono text-emerald-400">
+                {taxSnapshot.harvest_savings > 0 ? fmtUSD(taxSnapshot.harvest_savings) : "—"}
+              </p>
+              {taxSnapshot.harvest_count > 0 && (
+                <p className="text-[10px] text-emerald-500/60 mt-0.5">
+                  {taxSnapshot.harvest_count} candidate{taxSnapshot.harvest_count !== 1 ? "s" : ""}
+                </p>
+              )}
+            </div>
+            {/* Brazil DARF */}
+            <div>
+              <p className="text-[10px] text-white/30 mb-1">Brazil DARF</p>
+              <div className="flex items-center gap-2">
+                <p
+                  className="text-lg font-bold font-mono"
+                  style={{
+                    color: taxSnapshot.darf_triggered
+                      ? "#ef4444"
+                      : taxSnapshot.darf_pct >= 0.80 ? "#f59e0b" : "#10b981",
+                  }}
+                >
+                  {(taxSnapshot.darf_pct * 100).toFixed(0)}%
+                </p>
+                <div className="flex-1 h-1.5 rounded-full bg-white/[0.06] overflow-hidden">
+                  <div
+                    className="h-full rounded-full transition-all"
+                    style={{
+                      width: `${Math.min(taxSnapshot.darf_pct * 100, 100)}%`,
+                      background: taxSnapshot.darf_triggered
+                        ? "#ef4444"
+                        : taxSnapshot.darf_pct >= 0.80 ? "#f59e0b" : "#10b981",
+                    }}
+                  />
+                </div>
+              </div>
+              <p className="text-[10px] text-white/25 mt-0.5">of R$20k limit</p>
+            </div>
+          </div>
+        </a>
       )}
 
       {/* ── Error banner ── */}
