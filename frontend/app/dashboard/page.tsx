@@ -8,7 +8,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip } from "recharts";
 import { api } from "@/lib/api";
-import type { DailyStatusResponse, SleeveWeight, ValuationSummaryResponse, VaultBalance } from "@/lib/types";
+import type { AdminStatus, AlertHistoryItem, DailyStatusResponse, SleeveWeight, ValuationSummaryResponse, VaultBalance } from "@/lib/types";
 
 // ── Design tokens (DESIGN.md) ─────────────────────────────────────────────────
 const SLEEVE_COLORS: Record<string, string> = {
@@ -34,6 +34,18 @@ const REGIME_CONFIG = {
   high_vol:    { label: "HIGH VOLATILITY",    color: "#f59e0b", bg: "rgba(245,158,11,0.08)", border: "rgba(245,158,11,0.25)" },
   opportunity: { label: "OPPORTUNITY MODE",   color: "#8b5cf6", bg: "rgba(139,92,246,0.08)", border: "rgba(139,92,246,0.25)" },
   paused:      { label: "AUTOMATION PAUSED",  color: "#ef4444", bg: "rgba(239,68,68,0.08)", border: "rgba(239,68,68,0.25)" },
+};
+
+const ALERT_TYPE_CONFIG: Record<string, { icon: string; color: string }> = {
+  drawdown:     { icon: "📉", color: "#ef4444" },
+  drift:        { icon: "⚖️", color: "#f59e0b" },
+  opportunity:  { icon: "🚨", color: "#8b5cf6" },
+  sell_target:  { icon: "🎯", color: "#10b981" },
+  earnings:     { icon: "📅", color: "#06b6d4" },
+  brazil_darf:  { icon: "🇧🇷", color: "#22c55e" },
+  fx_move:      { icon: "💱", color: "#f59e0b" },
+  correlation:  { icon: "🔗", color: "#f43f5e" },
+  deposit:      { icon: "💰", color: "#10b981" },
 };
 
 const VAULT_CONFIG = {
@@ -76,11 +88,13 @@ function DonutTooltip({ active, payload }: { active?: boolean; payload?: { name:
 
 // ── Main component ────────────────────────────────────────────────────────────
 export default function DashboardPage() {
-  const [status, setStatus]       = useState<DailyStatusResponse | null>(null);
-  const [valSummary, setValSummary] = useState<ValuationSummaryResponse | null>(null);
-  const [loading, setLoading]     = useState(true);
-  const [error, setError]         = useState<string | null>(null);
-  const [lastRefresh, setLastRefresh] = useState<Date>(new Date());
+  const [status, setStatus]               = useState<DailyStatusResponse | null>(null);
+  const [valSummary, setValSummary]       = useState<ValuationSummaryResponse | null>(null);
+  const [alertHistory, setAlertHistory]   = useState<AlertHistoryItem[]>([]);
+  const [adminStatus, setAdminStatus]     = useState<AdminStatus | null>(null);
+  const [loading, setLoading]             = useState(true);
+  const [error, setError]                 = useState<string | null>(null);
+  const [lastRefresh, setLastRefresh]     = useState<Date>(new Date());
 
   const fetchStatus = useCallback(async () => {
     try {
@@ -95,9 +109,11 @@ export default function DashboardPage() {
     }
   }, []);
 
-  // Fetch valuation summary independently — gracefully degrades if not yet run
+  // Parallel independent fetches — all gracefully degrade
   useEffect(() => {
     api.valuationSummary().then(setValSummary).catch(() => null);
+    api.listAlertHistory({ limit: 10 }).then(setAlertHistory).catch(() => null);
+    api.adminStatus().then(setAdminStatus).catch(() => null);
   }, []);
 
   useEffect(() => {
@@ -115,8 +131,39 @@ export default function DashboardPage() {
     color: SLEEVE_COLORS[sw.sleeve] ?? "#64748b",
   }));
 
+  const isPaused = adminStatus?.automation_paused ?? (status?.regime_state === "paused");
+
   return (
     <div className="min-h-screen p-6 space-y-5" style={{ background: "#050508" }}>
+
+      {/* ── Automation Paused Banner ── */}
+      {isPaused && (
+        <div
+          className="rounded-xl border px-4 py-3 flex items-center justify-between"
+          style={{ background: "rgba(239,68,68,0.08)", borderColor: "rgba(239,68,68,0.3)" }}
+        >
+          <div className="flex items-center gap-3">
+            <span className="text-rose-400 text-base">⛔</span>
+            <div>
+              <p className="text-sm font-semibold text-rose-400">Automation Paused</p>
+              <p className="text-xs text-rose-400/60">
+                {adminStatus?.pause_reason === "drawdown"
+                  ? "Drawdown gate triggered (≥40%). Manual override required."
+                  : adminStatus?.pause_reason
+                    ? `Reason: ${adminStatus.pause_reason}`
+                    : "Automation is paused. Use /admin/resume to re-enable."}
+              </p>
+            </div>
+          </div>
+          <a
+            href="/config"
+            className="text-xs text-rose-400/70 hover:text-rose-400 border border-rose-500/30 rounded px-2 py-1 transition-colors"
+          >
+            View Config →
+          </a>
+        </div>
+      )}
+
       {/* ── Header ── */}
       <div className="flex items-center justify-between">
         <div>
@@ -127,12 +174,20 @@ export default function DashboardPage() {
             {loading ? "Loading..." : error ? "⚠ Error" : `Updated ${lastRefresh.toLocaleTimeString()}`}
           </p>
         </div>
-        <div
-          className="flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-medium border"
-          style={{ color: regime.color, background: regime.bg, borderColor: regime.border }}
-        >
-          <span className="w-1.5 h-1.5 rounded-full animate-pulse" style={{ background: regime.color }} />
-          {regime.label}
+        {/* Regime badge — shows regime + Dalio season */}
+        <div className="flex flex-col items-end gap-1">
+          <div
+            className="flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-medium border"
+            style={{ color: regime.color, background: regime.bg, borderColor: regime.border }}
+          >
+            <span className="w-1.5 h-1.5 rounded-full animate-pulse" style={{ background: regime.color }} />
+            {regime.label}
+          </div>
+          {status?.economic_season && status.economic_season !== "normal" && (
+            <p className="text-[10px] text-white/30 font-mono pr-1">
+              {seasonIcon(status.economic_season)} {seasonLabel(status.economic_season)}
+            </p>
+          )}
         </div>
       </div>
 
@@ -414,6 +469,47 @@ export default function DashboardPage() {
                 </div>
               </div>
             )}
+          </div>
+        </div>
+      )}
+
+      {/* ── Recent Alerts panel ── */}
+      {alertHistory.length > 0 && (
+        <div className={glassInner}>
+          <div className="flex items-center justify-between mb-3">
+            <p className="text-xs text-white/40 uppercase tracking-widest">Recent Alerts</p>
+            <a href="/config" className="text-[10px] text-white/30 hover:text-white/50 transition-colors">
+              Manage rules →
+            </a>
+          </div>
+          <div className="space-y-1">
+            {alertHistory.slice(0, 8).map((alert) => {
+              const ruleType = alert.alert_rules?.rule_type ?? "";
+              const cfg = ALERT_TYPE_CONFIG[ruleType] ?? { icon: "🔔", color: "#94a3b8" };
+              const ruleName = alert.alert_rules?.rule_name ?? ruleType;
+              const ts = new Date(alert.triggered_at);
+              const isToday = ts.toDateString() === new Date().toDateString();
+              const timeStr = isToday
+                ? ts.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })
+                : ts.toLocaleDateString([], { month: "short", day: "numeric" });
+              return (
+                <div
+                  key={alert.id}
+                  className="flex items-center justify-between py-1.5 px-2 rounded-lg hover:bg-white/[0.02] transition-colors"
+                >
+                  <div className="flex items-center gap-2">
+                    <span className="text-sm">{cfg.icon}</span>
+                    <span className="text-xs text-white/70">{ruleName}</span>
+                    {!alert.delivered && (
+                      <span className="text-[9px] px-1 py-0.5 rounded bg-amber-500/10 text-amber-400 border border-amber-500/20">
+                        undelivered
+                      </span>
+                    )}
+                  </div>
+                  <span className="text-[10px] text-white/30 font-mono">{timeStr}</span>
+                </div>
+              );
+            })}
           </div>
         </div>
       )}

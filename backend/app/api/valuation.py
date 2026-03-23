@@ -4,7 +4,7 @@ Valuation API endpoints (Phase 3).
 POST /valuation_update         — run weekly valuation pipeline
 GET  /valuation_summary        — top opportunities + MoS distribution
 GET  /valuation/{symbol}       — full detail for a single asset
-POST /admin/seed               — seed SEED_ASSETS for dev environment
+POST /admin/seed               — seed SEED_ASSETS + alert rules + benchmarks + strategy config
 """
 
 from __future__ import annotations
@@ -26,22 +26,198 @@ from app.schemas.allocation_models import EconomicSeason
 logger = logging.getLogger(__name__)
 router = APIRouter()
 
+_DEFAULT_USER = "00000000-0000-0000-0000-000000000001"
+
 
 # ── POST /admin/seed ──────────────────────────────────────────────────────────
 
 @router.post("/admin/seed", tags=["admin"])
-def seed_dev_data() -> dict:
+def seed_dev_data(user_id: str = Query(default=_DEFAULT_USER)) -> dict:
     """
-    Seed all SEED_ASSETS (25 assets) into the assets table.
-    Idempotent — safe to call multiple times (upserts, never duplicates).
-    Only for dev/staging environments.
+    Full dev seed — idempotent, safe to call multiple times.
+
+    Seeds:
+    1. 25 SEED_ASSETS into assets table
+    2. 11 BUILT_IN_ALERT_RULES into alert_rules table
+    3. 3 benchmark records (SPY, ACWI, AGG) into benchmarks table
+    4. Default strategy_config v1.0.0 (is_active=true) into strategy_configs table
     """
     from app.db.repositories.assets import run_seed_data
-    result = run_seed_data()
+    from app.db.supabase_client import get_supabase_client
+    from app.services.alert_engine import BUILT_IN_ALERT_RULES
+
+    results: dict = {"assets": {}, "alert_rules": {}, "benchmarks": {}, "strategy_config": {}}
+
+    # ── 1. Assets ──
+    try:
+        results["assets"] = run_seed_data()
+    except Exception as exc:
+        results["assets"] = {"error": str(exc)}
+        logger.error("seed assets failed: %s", exc)
+
+    client = get_supabase_client()
+
+    # ── 2. Alert Rules ──
+    try:
+        rules_to_insert = []
+        for rule in BUILT_IN_ALERT_RULES:
+            conditions: dict = {}
+            if "threshold" in rule:
+                conditions["threshold"] = rule["threshold"]
+            if "action" in rule:
+                conditions["action"] = rule["action"]
+            if "tier" in rule:
+                conditions["tier"] = rule["tier"]
+            if "days_ahead" in rule:
+                conditions["days_ahead"] = rule["days_ahead"]
+            if "threshold_pct" in rule:
+                conditions["threshold_pct"] = rule["threshold_pct"]
+            if "pair" in rule:
+                conditions["pair"] = rule["pair"]
+            if "priority" in rule:
+                conditions["priority"] = rule["priority"]
+            rules_to_insert.append({
+                "user_id": user_id,
+                "rule_name": rule["name"],
+                "rule_type": rule["type"],
+                "conditions": conditions,
+                "channel": rule.get("channel", "telegram"),
+                "is_active": True,
+            })
+        # Upsert: ignore duplicates by rule_name + user_id
+        inserted_rules = 0
+        skipped_rules = 0
+        for rule_rec in rules_to_insert:
+            try:
+                existing = (
+                    client.table("alert_rules")
+                    .select("id")
+                    .eq("user_id", user_id)
+                    .eq("rule_name", rule_rec["rule_name"])
+                    .execute()
+                )
+                if existing.data:
+                    skipped_rules += 1
+                else:
+                    client.table("alert_rules").insert(rule_rec).execute()
+                    inserted_rules += 1
+            except Exception as exc_r:
+                logger.warning("seed alert_rule insert failed: %s", exc_r)
+                skipped_rules += 1
+        results["alert_rules"] = {
+            "total": len(rules_to_insert),
+            "inserted": inserted_rules,
+            "skipped": skipped_rules,
+        }
+    except Exception as exc:
+        results["alert_rules"] = {"error": str(exc)}
+        logger.error("seed alert_rules failed: %s", exc)
+
+    # ── 3. Benchmarks ──
+    BENCHMARKS = [
+        {"symbol": "SPY",  "description": "S&P 500 — primary US equity benchmark", "blend_weights": {"SPY": 1.0}},
+        {"symbol": "ACWI", "description": "MSCI All Country World — global benchmark", "blend_weights": {"ACWI": 1.0}},
+        {"symbol": "AGG",  "description": "US Aggregate Bond — bond benchmark",     "blend_weights": {"AGG": 1.0}},
+    ]
+    try:
+        inserted_bench = 0
+        skipped_bench = 0
+        for bm in BENCHMARKS:
+            try:
+                existing = (
+                    client.table("benchmarks")
+                    .select("id")
+                    .eq("symbol", bm["symbol"])
+                    .execute()
+                )
+                if existing.data:
+                    skipped_bench += 1
+                else:
+                    client.table("benchmarks").insert(bm).execute()
+                    inserted_bench += 1
+            except Exception as exc_b:
+                logger.warning("seed benchmark insert failed: %s", exc_b)
+                skipped_bench += 1
+        results["benchmarks"] = {
+            "total": len(BENCHMARKS),
+            "inserted": inserted_bench,
+            "skipped": skipped_bench,
+        }
+    except Exception as exc:
+        results["benchmarks"] = {"error": str(exc)}
+        logger.error("seed benchmarks failed: %s", exc)
+
+    # ── 4. Default Strategy Config v1.0.0 ──
+    STRATEGY_CONFIG_V1 = {
+        "version": "1.0.0",
+        "sleeve_targets": {
+            "us_equity":     {"target": 0.45, "min": 0.40, "max": 0.50},
+            "intl_equity":   {"target": 0.15, "min": 0.10, "max": 0.20},
+            "bonds":         {"target": 0.20, "min": 0.10, "max": 0.30},
+            "brazil_equity": {"target": 0.10, "min": 0.05, "max": 0.15},
+            "crypto":        {"target": 0.07, "min": 0.05, "max": 0.10},
+            "cash":          {"target": 0.03, "min": 0.02, "max": 0.10},
+        },
+        "drift_threshold": 0.05,
+        "hard_rebalance_cooldown_days": 30,
+        "min_trade_usd": 50,
+        "max_single_trade_pct": 0.05,
+        "max_daily_trades_pct": 0.10,
+        "volatility_regime": {
+            "vix_threshold": 30,
+            "equity_daily_move_pct": 0.03,
+            "crypto_daily_move_pct": 0.10,
+            "defer_dca_days": [1, 3],
+        },
+        "drawdown_thresholds": {
+            "alert": 0.25,
+            "pause_automation": 0.40,
+            "behavioral_max": 0.35,
+        },
+        "opportunity_rules": {
+            "max_events_per_year": 5,
+            "required_min_margin_of_safety": 0.15,
+            "tier_1": {"drawdown_from_6_12m_high": 0.30, "deploy_fraction_of_vault": 0.20, "max_portfolio_fraction": 0.02},
+            "tier_2": {"drawdown_from_6_12m_high": 0.50, "deploy_additional_vault_fraction": 0.30, "max_total_portfolio_fraction": 0.05},
+        },
+        "concentration_limits": {
+            "max_single_stock_pct": 0.07,
+            "max_single_sector_pct": 0.25,
+            "max_single_country_ex_us_pct": 0.15,
+            "max_crypto_pct": 0.10,
+            "min_crypto_pct": 0.03,
+            "max_individual_stocks_of_equity": 0.30,
+        },
+    }
+    try:
+        existing = (
+            client.table("strategy_configs")
+            .select("id")
+            .eq("user_id", user_id)
+            .eq("version", "1.0.0")
+            .execute()
+        )
+        if existing.data:
+            results["strategy_config"] = {"status": "skipped", "version": "1.0.0"}
+        else:
+            # Deactivate any existing active config
+            client.table("strategy_configs").update({"is_active": False}).eq("user_id", user_id).eq("is_active", True).execute()
+            client.table("strategy_configs").insert({
+                "user_id": user_id,
+                "version": "1.0.0",
+                "is_active": True,
+                "config": STRATEGY_CONFIG_V1,
+            }).execute()
+            results["strategy_config"] = {"status": "inserted", "version": "1.0.0"}
+    except Exception as exc:
+        results["strategy_config"] = {"error": str(exc)}
+        logger.error("seed strategy_config failed: %s", exc)
+
+    total_errors = sum(1 for v in results.values() if isinstance(v, dict) and "error" in v)
     return {
-        "status": "ok",
-        "message": f"Seeded {result['inserted']}/{result['total']} assets",
-        **result,
+        "status": "ok" if total_errors == 0 else "partial",
+        "message": f"Seed complete — {total_errors} section(s) with errors",
+        "results": results,
     }
 
 

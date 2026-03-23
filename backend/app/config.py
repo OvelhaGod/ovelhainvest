@@ -32,6 +32,11 @@ class Settings(BaseSettings):
     # App
     app_env: str = "development"
     secret_key: str = "change-me-in-production"
+    admin_secret: str = "change-me-in-production"
+    app_base_url: str = "http://localhost:8000"
+
+    # Telegram webhook
+    telegram_webhook_secret: str = ""  # X-Telegram-Bot-Api-Secret-Token header value
 
     @property
     def is_production(self) -> bool:

@@ -85,6 +85,49 @@ export interface DailyStatusResponse {
   portfolio_snapshot_date: string | null;
 }
 
+// ── Alert types (Phase 6) ─────────────────────────────────────────────────────
+
+export interface AlertHistoryItem {
+  id: string;
+  alert_rule_id: string;
+  triggered_at: string;
+  payload: Record<string, unknown> | null;
+  channel: string;
+  delivered: boolean;
+  alert_rules?: {
+    rule_name: string;
+    rule_type: string;
+    user_id: string;
+  } | null;
+}
+
+export interface AlertRule {
+  id: string;
+  user_id: string;
+  rule_name: string;
+  rule_type: string;
+  conditions: Record<string, unknown>;
+  is_active: boolean;
+  last_triggered: string | null;
+  created_at: string;
+  source?: string;
+}
+
+// ── Admin types (Phase 6) ─────────────────────────────────────────────────────
+
+export interface AdminStatus {
+  automation_paused: boolean;
+  pause_reason: string | null;
+  last_daily_check: string | null;
+  last_valuation_update: string | null;
+  last_alert_dispatched: string | null;
+  pending_approvals: number;
+  telegram_connected: boolean;
+  redis_connected: boolean;
+  supabase_connected: boolean;
+  anthropic_connected: boolean;
+}
+
 export interface AllocationRunResponse {
   run_id: string;
   run_timestamp: string;
