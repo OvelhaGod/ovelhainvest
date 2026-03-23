@@ -111,6 +111,55 @@ def get_valuation_history(asset_id: str, days: int = 90) -> list[dict]:
         raise
 
 
+def get_top_by_composite_score(
+    limit: int = 10,
+    min_quality_score: float = 0.0,
+    asset_class_filter: str | None = None,
+) -> list[dict]:
+    """
+    Fetch top-ranked assets by composite_score from the latest valuations.
+
+    Args:
+        limit:              Max rows to return (default 10).
+        min_quality_score:  Minimum quality score filter.
+        asset_class_filter: Optional asset class (e.g. "US_equity").
+
+    Returns:
+        List of valuation dicts joined with asset metadata, sorted by composite_score desc.
+    """
+    try:
+        client = get_supabase_client()
+        query = (
+            client.table("asset_valuations")
+            .select("*, assets(symbol, name, asset_class, currency, moat_rating, is_dcf_eligible)")
+            .gte("quality_score", min_quality_score)
+            .order("composite_score", desc=True)
+            .limit(limit * 3)   # over-fetch to allow dedup by asset
+        )
+        resp = query.execute()
+        rows = resp.data or []
+
+        # Dedup: keep only most recent per asset, then apply asset_class filter
+        seen: set[str] = set()
+        results = []
+        for row in rows:
+            asset_id = row.get("asset_id")
+            if asset_id in seen:
+                continue
+            seen.add(asset_id)
+            asset_info = row.get("assets") or {}
+            if asset_class_filter and asset_info.get("asset_class") != asset_class_filter:
+                continue
+            results.append({**asset_info, **row})
+            if len(results) >= limit:
+                break
+
+        return results
+    except Exception as exc:
+        logger.error("get_top_by_composite_score failed: %s", exc)
+        raise
+
+
 def get_opportunity_candidates(
     min_margin_of_safety: float = 0.15,
     min_drawdown: float = 0.30,
@@ -139,3 +188,88 @@ def get_opportunity_candidates(
     except Exception as exc:
         logger.error("get_opportunity_candidates failed: %s", exc)
         raise
+
+
+def get_valuation_by_symbol(symbol: str) -> dict | None:
+    """
+    Fetch the latest valuation for a single asset by ticker symbol.
+
+    Args:
+        symbol: Ticker (e.g. "NVDA").
+
+    Returns:
+        Valuation dict joined with asset metadata, or None if not found.
+    """
+    try:
+        client = get_supabase_client()
+        # Join with assets to resolve symbol → asset_id
+        asset_resp = (
+            client.table("assets")
+            .select("id, symbol, name, asset_class, currency, moat_rating, is_dcf_eligible, sector, region")
+            .eq("symbol", symbol)
+            .eq("is_active", True)
+            .limit(1)
+            .execute()
+        )
+        assets = asset_resp.data or []
+        if not assets:
+            return None
+        asset = assets[0]
+        asset_id = asset["id"]
+
+        val_resp = (
+            client.table("asset_valuations")
+            .select("*")
+            .eq("asset_id", asset_id)
+            .order("as_of_date", desc=True)
+            .limit(1)
+            .execute()
+        )
+        vals = val_resp.data or []
+        if not vals:
+            return None
+        return {**asset, **vals[0]}
+    except Exception as exc:
+        logger.error("get_valuation_by_symbol failed for %s: %s", symbol, exc)
+        return None
+
+
+def get_valuation_summary_stats() -> dict:
+    """
+    Return high-level stats across the valuation universe for the summary endpoint.
+
+    Returns:
+        Dict with counts: assets_scored, positive_mos, negative_mos,
+        top_opportunities (tier_1 + tier_2 count), last_updated date.
+    """
+    try:
+        client = get_supabase_client()
+        resp = (
+            client.table("asset_valuations")
+            .select("as_of_date, margin_of_safety_pct, tier, composite_score")
+            .order("as_of_date", desc=True)
+            .limit(200)
+            .execute()
+        )
+        rows = resp.data or []
+        # Dedup by as_of_date — only count most recent run
+        if not rows:
+            return {"assets_scored": 0, "positive_mos": 0, "negative_mos": 0, "opportunities": 0}
+
+        latest_date = rows[0].get("as_of_date")
+        today_rows  = [r for r in rows if r.get("as_of_date") == latest_date]
+
+        positive_mos = sum(1 for r in today_rows if (r.get("margin_of_safety_pct") or 0) > 0)
+        negative_mos = sum(1 for r in today_rows if (r.get("margin_of_safety_pct") or 0) < 0)
+        opportunities = sum(1 for r in today_rows if r.get("tier") in ("tier_1", "tier_2"))
+
+        return {
+            "assets_scored": len(today_rows),
+            "positive_mos":  positive_mos,
+            "negative_mos":  negative_mos,
+            "opportunities": opportunities,
+            "last_updated":  latest_date,
+        }
+    except Exception as exc:
+        logger.error("get_valuation_summary_stats failed: %s", exc)
+        return {"assets_scored": 0, "positive_mos": 0, "negative_mos": 0, "opportunities": 0}
