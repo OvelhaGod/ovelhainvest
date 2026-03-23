@@ -213,6 +213,51 @@ def seed_dev_data(user_id: str = Query(default=_DEFAULT_USER)) -> dict:
         results["strategy_config"] = {"error": str(exc)}
         logger.error("seed strategy_config failed: %s", exc)
 
+    # ── 5. Sync tax lots from existing transactions (idempotent) ──
+    results["tax_lots_sync"] = {}
+    try:
+        from app.services.tax_lot_engine import sync_lots_from_transactions
+        # Fetch all taxable + brazil_taxable accounts for this user
+        taxable_accts = (
+            client.table("accounts")
+            .select("id, tax_treatment")
+            .eq("user_id", user_id)
+            .in_("tax_treatment", ["taxable", "brazil_taxable"])
+            .execute()
+        )
+        lots_opened = 0
+        lots_closed = 0
+        sync_errors: list[str] = []
+        for acct in (taxable_accts.data or []):
+            acct_id = acct["id"]
+            txn_resp = (
+                client.table("transactions")
+                .select("*")
+                .eq("account_id", acct_id)
+                .order("executed_at")
+                .execute()
+            )
+            txns = txn_resp.data or []
+            if not txns:
+                continue
+            result = sync_lots_from_transactions(
+                account_id=acct_id,
+                transactions=txns,
+                db=client,
+            )
+            lots_opened += result.lots_opened
+            lots_closed += result.lots_closed
+            sync_errors.extend(result.errors[:5])  # cap errors per account
+        results["tax_lots_sync"] = {
+            "accounts_processed": len(taxable_accts.data or []),
+            "lots_opened": lots_opened,
+            "lots_closed": lots_closed,
+            "errors": sync_errors[:10],
+        }
+    except Exception as exc:
+        results["tax_lots_sync"] = {"error": str(exc)}
+        logger.error("seed tax_lots_sync failed: %s", exc)
+
     total_errors = sum(1 for v in results.values() if isinstance(v, dict) and "error" in v)
     return {
         "status": "ok" if total_errors == 0 else "partial",

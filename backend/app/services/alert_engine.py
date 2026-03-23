@@ -694,6 +694,138 @@ async def send_telegram_alert(
 
 # ── Telegram callback handler ─────────────────────────────────────────────────
 
+def _wire_lot_tracking_for_run(client: Any, run_id: str, user_id: str) -> None:
+    """
+    After a signals_run is approved via Telegram, record tax lots for executed trades.
+
+    - BUY trades in taxable/brazil_taxable accounts → open_lot()
+    - SELL trades in taxable/brazil_taxable accounts → close_lots()
+    - SELL trades in brazil_taxable accounts → update_brazil_darf()
+
+    Tax-advantaged accounts (tax_deferred, tax_free) are skipped — lot tracking
+    is irrelevant there. All errors are swallowed; lot tracking must never block approval.
+    """
+    from datetime import date, datetime as _dt
+    from app.services.tax_lot_engine import open_lot, update_brazil_darf
+    from app.services.market_data import fetch_current_prices
+
+    # Fetch signals_run record
+    run_resp = client.table("signals_runs").select("proposed_trades").eq("id", run_id).limit(1).execute()
+    run_data = (run_resp.data or [{}])[0]
+    proposed_trades: list[dict] = run_data.get("proposed_trades") or []
+    if not proposed_trades:
+        return
+
+    # Build account tax_treatment map
+    accts_resp = client.table("accounts").select("id, name, tax_treatment, currency").eq("user_id", user_id).execute()
+    acct_map: dict[str, dict] = {}
+    acct_name_map: dict[str, dict] = {}
+    for a in (accts_resp.data or []):
+        acct_map[a["id"]] = a
+        acct_name_map[a["name"]] = a
+
+    # Build asset_id map by symbol
+    symbols = list({t.get("symbol", "") for t in proposed_trades if t.get("symbol")})
+    assets_resp = client.table("assets").select("id, symbol").in_("symbol", symbols).execute()
+    asset_id_map: dict[str, str] = {a["symbol"]: a["id"] for a in (assets_resp.data or [])}
+
+    # Fetch current prices for quantity estimation
+    prices = {}
+    try:
+        prices = fetch_current_prices(symbols)
+    except Exception:
+        pass
+
+    today = date.today()
+
+    for trade in proposed_trades:
+        trade_type = str(trade.get("trade_type", "")).lower()
+        symbol = str(trade.get("symbol", "")).upper()
+        account_id = trade.get("account_id") or ""
+        account_name = str(trade.get("account_name", ""))
+        amount_usd = float(trade.get("amount_usd", 0.0))
+        qty_est = float(trade.get("quantity_estimate") or 0.0)
+
+        # Resolve account
+        acct = acct_map.get(account_id) or acct_name_map.get(account_name) or {}
+        tax_treatment = acct.get("tax_treatment", "")
+        resolved_account_id = acct.get("id", account_id)
+
+        # Only track lots for taxable accounts
+        if tax_treatment not in ("taxable", "brazil_taxable"):
+            continue
+
+        asset_id = asset_id_map.get(symbol, "")
+        if not resolved_account_id or not asset_id:
+            continue
+
+        current_price = prices.get(symbol) or (amount_usd / qty_est if qty_est > 0 else 0.0)
+        if current_price <= 0:
+            continue
+
+        if trade_type == "buy":
+            quantity = qty_est if qty_est > 0 else (amount_usd / current_price)
+            try:
+                open_lot(
+                    account_id=resolved_account_id,
+                    asset_id=asset_id,
+                    symbol=symbol,
+                    quantity=quantity,
+                    price=current_price,
+                    acquisition_date=today,
+                    db=client,
+                )
+                logger.info("Lot opened: %s qty=%.4f acct=%s", symbol, quantity, resolved_account_id)
+            except Exception as exc:
+                logger.warning("open_lot failed symbol=%s: %s", symbol, exc)
+
+        elif trade_type in ("sell", "rebalance") and trade.get("trade_type", "").lower() == "sell" or trade_type == "rebalance":
+            # For rebalance sells, only close lots when trade_type is explicitly sell
+            if trade_type != "sell":
+                continue
+
+            quantity = qty_est if qty_est > 0 else (amount_usd / current_price)
+            try:
+                from app.db.repositories.tax_lots import get_open_lots
+                open_lots = get_open_lots(db=client, account_id=resolved_account_id, symbol=symbol)
+                from app.services.tax_lot_engine import close_lots, LotMethod
+                closed = close_lots(
+                    lots_to_close=open_lots,
+                    current_price=current_price,
+                    sale_date=today,
+                    db=client,
+                    quantity_override=quantity,
+                )
+                logger.info("Lots closed: %s qty=%.4f count=%d", symbol, quantity, len(closed))
+
+                # Brazil DARF update
+                if tax_treatment == "brazil_taxable":
+                    try:
+                        usd_brl = 5.70
+                        try:
+                            from app.services.fx_engine import fetch_usd_brl_rate
+                            usd_brl = fetch_usd_brl_rate()
+                        except Exception:
+                            pass
+                        sale_brl = amount_usd * usd_brl
+                        gain_brl = sum(
+                            float(c.get("realized_gain_loss", 0.0)) * usd_brl
+                            for c in closed
+                        )
+                        update_brazil_darf(
+                            user_id=user_id,
+                            sale_amount_brl=sale_brl,
+                            realized_gain_brl=gain_brl,
+                            sale_date=today,
+                            db=client,
+                        )
+                        logger.info("Brazil DARF updated: symbol=%s sale_brl=%.2f", symbol, sale_brl)
+                    except Exception as exc:
+                        logger.warning("Brazil DARF update failed: %s", exc)
+            except Exception as exc:
+                logger.warning("close_lots failed symbol=%s: %s", symbol, exc)
+
+
 async def handle_telegram_callback(
     callback_query: dict[str, Any],
     user_id: str = "00000000-0000-0000-0000-000000000001",
@@ -744,6 +876,13 @@ async def handle_telegram_callback(
                 }).execute()
             except Exception as exc:
                 logger.debug("Journal entry from callback failed: %s", exc)
+
+            # ── Tax lot tracking on approve ──────────────────────────────────
+            if action == "approve":
+                try:
+                    _wire_lot_tracking_for_run(client, resource_id, user_id)
+                except Exception as exc_lot:
+                    logger.warning("Lot tracking post-approve failed (non-critical): %s", exc_lot)
 
             confirmation = f"✅ Trades approved\\!" if action == "approve" else "❌ Trades rejected\\."
             result = updated
