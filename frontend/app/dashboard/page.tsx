@@ -8,7 +8,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip } from "recharts";
 import { api } from "@/lib/api";
-import type { DailyStatusResponse, SleeveWeight, VaultBalance } from "@/lib/types";
+import type { DailyStatusResponse, SleeveWeight, ValuationSummaryResponse, VaultBalance } from "@/lib/types";
 
 // ── Design tokens (DESIGN.md) ─────────────────────────────────────────────────
 const SLEEVE_COLORS: Record<string, string> = {
@@ -76,9 +76,10 @@ function DonutTooltip({ active, payload }: { active?: boolean; payload?: { name:
 
 // ── Main component ────────────────────────────────────────────────────────────
 export default function DashboardPage() {
-  const [status, setStatus] = useState<DailyStatusResponse | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const [status, setStatus]       = useState<DailyStatusResponse | null>(null);
+  const [valSummary, setValSummary] = useState<ValuationSummaryResponse | null>(null);
+  const [loading, setLoading]     = useState(true);
+  const [error, setError]         = useState<string | null>(null);
   const [lastRefresh, setLastRefresh] = useState<Date>(new Date());
 
   const fetchStatus = useCallback(async () => {
@@ -92,6 +93,11 @@ export default function DashboardPage() {
     } finally {
       setLoading(false);
     }
+  }, []);
+
+  // Fetch valuation summary independently — gracefully degrades if not yet run
+  useEffect(() => {
+    api.valuationSummary().then(setValSummary).catch(() => null);
   }, []);
 
   useEffect(() => {
@@ -303,6 +309,114 @@ export default function DashboardPage() {
           )}
         </div>
       </div>
+
+      {/* ── Valuation insights row ── */}
+      {valSummary && (valSummary.top_opportunities.length > 0 || valSummary.top_by_composite.length > 0) && (
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+          {/* Top Opportunities */}
+          <div className={glassInner} style={{ borderColor: "rgba(16,185,129,0.15)" }}>
+            <div className="flex items-center justify-between mb-3">
+              <p className="text-xs text-white/40 uppercase tracking-widest">Top Opportunities</p>
+              {valSummary.opportunity_count > 0 && (
+                <span className="text-[10px] px-1.5 py-0.5 rounded-full border border-emerald-500/30 text-emerald-400 bg-emerald-500/8">
+                  {valSummary.opportunity_count} active
+                </span>
+              )}
+            </div>
+            <div className="space-y-2">
+              {(valSummary.top_opportunities.length > 0
+                ? valSummary.top_opportunities
+                : valSummary.top_by_composite
+              ).slice(0, 4).map((asset, i) => {
+                const mos = asset.margin_of_safety_pct;
+                const mosColor = mos != null && mos >= 0.20 ? "#10b981" : mos != null && mos >= 0.10 ? "#f59e0b" : "#94a3b8";
+                return (
+                  <a key={i} href="/assets" className="flex items-center justify-between py-1.5 border-b border-white/[0.04] hover:bg-white/[0.02] transition-colors rounded px-1">
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs font-mono font-semibold text-white/90">{asset.symbol}</span>
+                      {asset.tier && (
+                        <span className="text-[9px] px-1 py-0.5 rounded bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
+                          {asset.tier?.replace("_", " ")}
+                        </span>
+                      )}
+                    </div>
+                    <div className="flex items-center gap-3 text-xs font-mono">
+                      {mos != null && (
+                        <span style={{ color: mosColor }}>
+                          {mos >= 0 ? "+" : ""}{(mos * 100).toFixed(0)}% MoS
+                        </span>
+                      )}
+                      <span className="text-white/30">
+                        {asset.composite_score?.toFixed(2) ?? "—"}
+                      </span>
+                    </div>
+                  </a>
+                );
+              })}
+            </div>
+            <a href="/assets" className="text-[10px] text-white/30 hover:text-white/50 mt-2 block transition-colors">
+              View all assets →
+            </a>
+          </div>
+
+          {/* Valuation stats + overvalued */}
+          <div className={glassInner}>
+            <div className="flex items-center justify-between mb-3">
+              <p className="text-xs text-white/40 uppercase tracking-widest">Valuation Universe</p>
+              {valSummary.as_of_date && (
+                <span className="text-[10px] text-white/25 font-mono">
+                  {new Date(valSummary.as_of_date).toLocaleDateString()}
+                </span>
+              )}
+            </div>
+            <div className="grid grid-cols-3 gap-3 mb-3">
+              {[
+                { label: "Scored",       value: valSummary.assets_scored,     color: "#94a3b8" },
+                { label: "Positive MoS", value: valSummary.positive_mos_count, color: "#10b981" },
+                { label: "Overvalued",   value: valSummary.negative_mos_count, color: "#ef4444" },
+              ].map(({ label, value, color }) => (
+                <div key={label} className="text-center rounded-xl bg-white/[0.02] p-2">
+                  <div className="text-lg font-mono font-bold" style={{ color }}>{value}</div>
+                  <div className="text-[10px] text-white/30">{label}</div>
+                </div>
+              ))}
+            </div>
+            {/* MoS distribution bar */}
+            {valSummary.margin_of_safety_distribution && (
+              <div>
+                <p className="text-[10px] text-white/30 mb-1.5">Margin of Safety Distribution</p>
+                <div className="flex h-2 rounded-full overflow-hidden gap-px">
+                  {[
+                    { key: "above_20pct", color: "#10b981" },
+                    { key: "10_to_20pct", color: "#f59e0b" },
+                    { key: "0_to_10pct",  color: "#94a3b8" },
+                    { key: "negative",    color: "#ef4444" },
+                  ].map(({ key, color }) => {
+                    const count = valSummary.margin_of_safety_distribution[key] ?? 0;
+                    const pct = valSummary.assets_scored > 0
+                      ? (count / valSummary.assets_scored) * 100
+                      : 0;
+                    return pct > 0 ? (
+                      <div
+                        key={key}
+                        className="h-full"
+                        style={{ width: `${pct}%`, background: color, opacity: 0.7 }}
+                        title={`${key}: ${count}`}
+                      />
+                    ) : null;
+                  })}
+                </div>
+                <div className="flex gap-3 mt-1.5 text-[9px] text-white/25">
+                  <span className="text-emerald-500/70">&gt;20% safe</span>
+                  <span className="text-amber-500/70">10-20%</span>
+                  <span className="text-white/30">0-10%</span>
+                  <span className="text-red-500/70">overvalued</span>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
 
       {/* ── Error banner ── */}
       {error && (
