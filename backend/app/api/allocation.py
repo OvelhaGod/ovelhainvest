@@ -26,7 +26,14 @@ from app.schemas.allocation_models import (
     RegimeState,
 )
 from app.services import allocation_engine, opportunity_detector, rebalancing
-from app.services.alert_engine import BUILT_IN_ALERT_RULES
+from app.services.alert_engine import (
+    BUILT_IN_ALERT_RULES,
+    clear_automation_paused,
+    is_automation_paused,
+    send_telegram_alert,
+    set_automation_paused,
+)
+from app.db.redis_client import check_redis_connection
 from app.services.fx_engine import fetch_usd_brl_rate, normalize_to_brl
 from app.services.market_data import fetch_current_prices
 from app.services.volatility_regime import (
@@ -68,6 +75,19 @@ def run_allocation(
 
     AI validation happens async (Phase 5) — stored in signals_run later.
     """
+    # ── Automation pause gate ──────────────────────────────────────────────
+    if body.event_type != "manual_override" and is_automation_paused():
+        logger.warning("run_allocation blocked — automation paused (event_type=%s)", body.event_type)
+        raise HTTPException(
+            status_code=503,
+            detail={
+                "status": "paused",
+                "reason": "Portfolio drawdown >= 40% or manual pause active. Automation suspended.",
+                "resume_endpoint": "POST /admin/resume",
+                "override_hint": "Set event_type='manual_override' to force execution.",
+            },
+        )
+
     run_id = str(uuid.uuid4())
     run_timestamp = datetime.now(timezone.utc)
     uid = body.user_id or user_id
@@ -504,3 +524,74 @@ def daily_status(user_id: str = Depends(_get_user_id)) -> DailyStatusResponse:
     except Exception as exc:
         logger.error("daily_status failed user=%s: %s", user_id, exc, exc_info=True)
         raise HTTPException(status_code=500, detail=f"Daily status failed: {exc}")
+
+
+# ── Admin endpoints ───────────────────────────────────────────────────────────
+
+def _verify_admin(authorization: str | None) -> None:
+    """Verify Bearer token from Authorization header matches ADMIN_SECRET."""
+    from fastapi import Header as _Header
+    expected = f"Bearer {settings.admin_secret}"
+    if not authorization or authorization != expected:
+        raise HTTPException(status_code=403, detail="Forbidden — invalid admin token")
+
+
+@router.post("/admin/resume", tags=["admin"])
+async def admin_resume(
+    authorization: str | None = Query(default=None),
+) -> dict:
+    """
+    Resume automation after a pause (drawdown recovery or manual).
+    Requires Authorization: Bearer {ADMIN_SECRET}.
+    """
+    if authorization != settings.admin_secret:
+        raise HTTPException(status_code=403, detail="Forbidden — invalid admin token")
+
+    import asyncio as _asyncio
+    clear_automation_paused()
+
+    if settings.telegram_enabled:
+        try:
+            _asyncio.get_event_loop().run_until_complete(
+                send_telegram_alert(
+                    "▶️ *Automation Resumed*\nScheduled runs are now active\\.",
+                    settings.telegram_chat_id,
+                    settings.telegram_bot_token,
+                )
+            )
+        except Exception as exc:
+            logger.debug("Resume Telegram notify failed: %s", exc)
+
+    logger.info("Automation resumed via /admin/resume")
+    return {"status": "resumed", "automation_paused": False}
+
+
+@router.post("/admin/pause", tags=["admin"])
+async def admin_pause(
+    reason: str = Query(default="manual"),
+    authorization: str | None = Query(default=None),
+) -> dict:
+    """
+    Manually pause automation.
+    Requires Authorization: Bearer {ADMIN_SECRET}.
+    """
+    if authorization != settings.admin_secret:
+        raise HTTPException(status_code=403, detail="Forbidden — invalid admin token")
+
+    import asyncio as _asyncio
+    set_automation_paused(reason)
+
+    if settings.telegram_enabled:
+        try:
+            _asyncio.get_event_loop().run_until_complete(
+                send_telegram_alert(
+                    f"⏸️ *Automation Paused Manually*\nReason: {reason}\nUse /admin/resume to re\\-enable\\.",
+                    settings.telegram_chat_id,
+                    settings.telegram_bot_token,
+                )
+            )
+        except Exception as exc:
+            logger.debug("Pause Telegram notify failed: %s", exc)
+
+    logger.info("Automation paused manually reason=%s", reason)
+    return {"status": "paused", "reason": reason, "automation_paused": True}
