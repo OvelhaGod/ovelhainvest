@@ -2854,3 +2854,73 @@ module.exports = {
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet" />
 ```
 
+---
+
+## 36. STITCH MCP — DESIGN CONTEXT INTEGRATION
+
+### Connection Status
+- **Stitch Project ID:** `11580419759191253062`
+- **Stitch Project URL:** `https://stitch.withgoogle.com/u/1/projects/11580419759191253062`
+- **MCP Package:** `@_davideast/stitch-mcp` (v installed globally)
+- **Claude Code config:** `C:/Users/Thiago/.claude.json` → project `D:/python/ovelhainvest` → `mcpServers.stitch`
+
+### Auth Method
+**API Key (no gcloud required).**
+Key is read from `STITCH_API_KEY` environment variable.
+
+To activate:
+1. Open `https://stitch.withgoogle.com/u/1/settings` → API Keys
+2. Generate a persistent API key
+3. Add to Windows environment variables: `STITCH_API_KEY=your-key`
+4. Restart Claude Code — the `stitch` MCP server will connect automatically
+
+### MCP Config (already in `.claude.json`)
+```json
+{
+  "mcpServers": {
+    "stitch": {
+      "command": "npx",
+      "args": ["@_davideast/stitch-mcp", "proxy"],
+      "env": {
+        "STITCH_API_KEY": "REPLACE_WITH_KEY_FROM_STITCH_SETTINGS"
+      }
+    }
+  }
+}
+```
+
+### Available MCP Tools (once auth is active)
+| Tool | Purpose |
+|---|---|
+| `list_projects` | List all Stitch projects |
+| `list_screens` | List all screens in project |
+| `get_screen` | Get screen metadata |
+| `get_screen_code` | Download screen HTML/CSS |
+| `get_screen_image` | Download screen PNG (base64) |
+| `extract_design_context` | Extract Design DNA (colors, fonts, layouts) |
+| `generate_screen_from_text` | Generate new screen from prompt |
+| `build_site` | Build all screens into structured site |
+
+### Design Files Location
+- `design/screens/` — HTML + PNG per screen (populated by `scripts/load_stitch_context.ps1`)
+- `design/DESIGN.md` — Screen index with IDs and file links
+- `STITCH_PROMPT.md` — Full design spec used to generate screens
+
+### Load Design Context
+```powershell
+$env:STITCH_API_KEY = "your-key"
+.\scripts\load_stitch_context.ps1
+```
+
+### Screen Naming (per STITCH_PROMPT.md)
+| # | Screen Name | Route |
+|---|---|---|
+| 1 | Dashboard | `/dashboard` |
+| 2 | Signals | `/signals` |
+| 3 | Assets | `/assets` |
+| 4 | Performance | `/performance` |
+| 5 | Projections | `/projections` |
+| 6 | Tax | `/tax` |
+| 7 | Journal | `/journal` |
+| 8 | Config | `/config` |
+

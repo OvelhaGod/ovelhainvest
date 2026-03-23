@@ -25,3 +25,7 @@ Thumbs.db
 
 # Tools
 .claude/cache/
+
+# Playwright MCP artifacts
+.playwright-mcp/
+*.png
