@@ -1,14 +1,15 @@
 """
-Alert engine: rule evaluation and Telegram dispatch.
+Alert engine — rule evaluation + Telegram dispatch.
 
-Evaluates all active alert_rules against current portfolio state.
-Dispatches alerts via Telegram Bot API.
-Inline keyboard buttons enable approve/reject flows directly from Telegram.
+Phase 6: fully implemented evaluators for all 11 rule types.
+Each evaluator reads conditions from the rule dict, checks cooldowns via
+alert_history, and returns a rich payload for Telegram formatting.
 """
 
 from __future__ import annotations
 
 import logging
+import re
 from datetime import datetime, timedelta, timezone
 from typing import Any
 
@@ -32,9 +33,312 @@ BUILT_IN_ALERT_RULES = [
     {"name": "Deposit Detected",       "type": "deposit",     "conditions": {}, "channel": "telegram"},
 ]
 
-# Default cooldown between repeated alerts of the same type (hours)
 DEFAULT_COOLDOWN_HOURS = 6
 TELEGRAM_API_BASE = "https://api.telegram.org"
+DARF_MONTHLY_EXEMPTION_BRL = 20_000.0
+
+
+# ── Redis helpers (graceful fallback if Redis unavailable) ────────────────────
+
+def _redis_get(key: str) -> str | None:
+    try:
+        from app.db.redis_client import get_redis_client
+        return get_redis_client().get(key)
+    except Exception:
+        return None
+
+
+def _redis_set(key: str, value: str, ex: int | None = None) -> None:
+    try:
+        from app.db.redis_client import get_redis_client
+        get_redis_client().set(key, value, ex=ex)
+    except Exception as exc:
+        logger.debug("Redis set failed (non-critical): %s", exc)
+
+
+def _redis_delete(key: str) -> None:
+    try:
+        from app.db.redis_client import get_redis_client
+        get_redis_client().delete(key)
+    except Exception as exc:
+        logger.debug("Redis delete failed (non-critical): %s", exc)
+
+
+def is_automation_paused() -> bool:
+    """Return True if automation is paused (drawdown >= 40% or manual pause)."""
+    return _redis_get("automation_paused") is not None
+
+
+def set_automation_paused(reason: str = "drawdown") -> None:
+    """Pause automation; sets Redis key indefinitely (cleared by /admin/resume)."""
+    _redis_set("automation_paused", reason)
+    logger.warning("AUTOMATION PAUSED — reason=%s", reason)
+
+
+def clear_automation_paused() -> None:
+    """Resume automation by clearing the Redis key."""
+    _redis_delete("automation_paused")
+    logger.info("Automation resumed — Redis key cleared")
+
+
+# ── MarkdownV2 escaper ────────────────────────────────────────────────────────
+
+def _esc(s: str | int | float) -> str:
+    """Escape a string for Telegram MarkdownV2."""
+    return re.sub(r"([_*\[\]()~`>#\+\-=|{}.!])", r"\\\1", str(s))
+
+
+# ── Rule evaluators ───────────────────────────────────────────────────────────
+
+def _eval_drawdown(conditions: dict, portfolio_state: dict) -> dict | None:
+    threshold = conditions.get("threshold", 0.25)
+    current_dd = abs(portfolio_state.get("max_drawdown", 0.0))
+    if current_dd < threshold:
+        return None
+
+    current_value = portfolio_state.get("total_value_usd", 0.0)
+    peak_value = portfolio_state.get("portfolio_value_at_peak", current_value)
+    is_pause_trigger = conditions.get("action") == "pause_runs" or current_dd >= 0.40
+
+    if is_pause_trigger:
+        set_automation_paused("drawdown")
+
+    return {
+        "drawdown_pct": current_dd,
+        "threshold": threshold,
+        "current_value_usd": current_value,
+        "portfolio_value_at_peak": peak_value,
+        "automation_paused": is_pause_trigger,
+        "recovery_needed_pct": round(current_dd / (1 - current_dd), 4) if current_dd < 1 else 0,
+    }
+
+
+def _eval_drift(conditions: dict, portfolio_state: dict) -> dict | None:
+    threshold = conditions.get("threshold", 0.05)
+    sleeve_weights = portfolio_state.get("sleeve_weights", [])
+    breached = [
+        {
+            "sleeve": s.get("sleeve", ""),
+            "current_weight": s.get("current_weight", 0.0),
+            "target_weight": s.get("target_weight", 0.0),
+            "drift": s.get("drift", 0.0),
+            "drift_pct": s.get("drift_pct", 0.0),
+            "proposed_action": "buy" if s.get("drift", 0.0) < 0 else "trim",
+        }
+        for s in sleeve_weights
+        if abs(s.get("drift", 0.0)) >= threshold
+    ]
+    if not breached:
+        return None
+    return {"breached_sleeves": breached, "threshold": threshold, "count": len(breached)}
+
+
+def _eval_opportunity(conditions: dict, portfolio_state: dict) -> dict | None:
+    tier = conditions.get("tier", 1)
+    key = f"opportunity_tier_{tier}"
+    if not portfolio_state.get(key, False):
+        return None
+    asset = portfolio_state.get(f"opportunity_tier_{tier}_asset", "")
+    drawdown = portfolio_state.get(f"opportunity_tier_{tier}_drawdown", 0.0)
+    mos = portfolio_state.get(f"opportunity_tier_{tier}_mos", 0.0)
+    opp_vault = portfolio_state.get("opportunity_vault_balance_usd", 0.0)
+    deploy_frac = 0.20 if tier == 1 else 0.30
+    deploy_usd = opp_vault * deploy_frac
+
+    return {
+        "tier": tier,
+        "asset_symbol": asset,
+        "drawdown_pct": drawdown,
+        "margin_of_safety_pct": mos,
+        "vault_balance_usd": opp_vault,
+        "vault_recommended_deployment": deploy_frac,
+        "vault_deployment_usd": round(deploy_usd, 2),
+        "ai_commentary": portfolio_state.get(f"opportunity_tier_{tier}_ai_commentary", ""),
+    }
+
+
+def _eval_sell_target(conditions: dict, portfolio_state: dict) -> dict | None:  # noqa: ARG001
+    targets_hit = portfolio_state.get("held_assets_at_sell_target", [])
+    if not targets_hit:
+        return None
+    # targets_hit: list of dicts with symbol, current_price, sell_target, etc.
+    if isinstance(targets_hit, list) and targets_hit and isinstance(targets_hit[0], str):
+        # legacy: list of symbols only
+        targets_hit = [{"symbol": s} for s in targets_hit]
+    return {"assets": targets_hit[:5], "count": len(targets_hit)}
+
+
+def _eval_earnings(conditions: dict, portfolio_state: dict) -> dict | None:
+    days_ahead = conditions.get("days_ahead", 3)
+    # portfolio_state["upcoming_earnings"] is populated by run_allocation or n8n
+    upcoming = portfolio_state.get("upcoming_earnings", [])
+    # Also try Finnhub if configured
+    if not upcoming and settings.finnhub_api_key:
+        upcoming = _fetch_finnhub_earnings(
+            portfolio_state.get("held_symbols", []), days_ahead
+        )
+    alerts = [e for e in upcoming if e.get("days_until", 999) <= days_ahead]
+    if not alerts:
+        return None
+    return {"upcoming": alerts[:5], "days_ahead": days_ahead}
+
+
+def _fetch_finnhub_earnings(symbols: list[str], days_ahead: int) -> list[dict]:
+    """Fetch earnings calendar from Finnhub for held symbols. Returns [] on failure."""
+    if not symbols or not settings.finnhub_api_key:
+        return []
+    try:
+        from datetime import date
+        today = date.today()
+        end = today + timedelta(days=days_ahead)
+        import httpx as _httpx
+        resp = _httpx.get(
+            "https://finnhub.io/api/v1/calendar/earnings",
+            params={"from": today.isoformat(), "to": end.isoformat(),
+                    "token": settings.finnhub_api_key},
+            timeout=8.0,
+        )
+        if resp.status_code != 200:
+            return []
+        data = resp.json().get("earningsCalendar", [])
+        held_upper = {s.upper() for s in symbols}
+        results = []
+        for item in data:
+            if item.get("symbol", "").upper() not in held_upper:
+                continue
+            try:
+                ed = date.fromisoformat(item["date"])
+                days = (ed - today).days
+            except Exception:
+                days = 999
+            results.append({
+                "symbol": item.get("symbol"),
+                "earnings_date": item.get("date"),
+                "days_until": days,
+                "expected_eps": item.get("epsEstimate"),
+                "prior_eps": item.get("epsPrior"),
+            })
+        return results
+    except Exception as exc:
+        logger.debug("Finnhub earnings fetch failed (non-critical): %s", exc)
+        return []
+
+
+def _eval_brazil_darf(conditions: dict, portfolio_state: dict) -> dict | None:
+    threshold_pct = conditions.get("threshold_pct", 0.80)
+    # Try DB first; fall back to portfolio_state
+    gross_sales = portfolio_state.get("darf_gross_sales_brl", 0.0)
+    if not gross_sales:
+        gross_sales = _fetch_darf_month_sales()
+    progress = gross_sales / DARF_MONTHLY_EXEMPTION_BRL
+    if progress < threshold_pct:
+        return None
+    remaining = max(DARF_MONTHLY_EXEMPTION_BRL - gross_sales, 0.0)
+    return {
+        "gross_sales_brl": round(gross_sales, 2),
+        "threshold_brl": DARF_MONTHLY_EXEMPTION_BRL,
+        "progress_pct": round(progress, 4),
+        "threshold_pct": threshold_pct,
+        "remaining_before_darf": round(remaining, 2),
+        "month": datetime.now(timezone.utc).strftime("%Y-%m"),
+    }
+
+
+def _fetch_darf_month_sales() -> float:
+    """Query brazil_darf_tracker for current month's gross sales."""
+    try:
+        from app.db.supabase_client import get_supabase_client
+        now = datetime.now(timezone.utc)
+        resp = (
+            get_supabase_client()
+            .table("brazil_darf_tracker")
+            .select("gross_sales_brl")
+            .eq("year", now.year)
+            .eq("month", now.month)
+            .limit(1)
+            .execute()
+        )
+        if resp.data:
+            return float(resp.data[0].get("gross_sales_brl", 0.0))
+    except Exception as exc:
+        logger.debug("DARF DB fetch failed (non-critical): %s", exc)
+    return 0.0
+
+
+def _eval_fx_move(conditions: dict, portfolio_state: dict) -> dict | None:
+    threshold = conditions.get("threshold", 0.10)
+    change = portfolio_state.get("usd_brl_30d_change", 0.0)
+    if abs(change) < threshold:
+        return None
+    current_rate = portfolio_state.get("usd_brl_rate", 0.0)
+    prior_rate = current_rate / (1 + change) if change != -1 else current_rate
+    brazil_sleeve_usd = portfolio_state.get("brazil_sleeve_value_usd", 0.0)
+    impact_usd = brazil_sleeve_usd * change if brazil_sleeve_usd else 0.0
+    return {
+        "pair": "USDBRL",
+        "current_rate": round(current_rate, 4),
+        "rate_30d_ago": round(prior_rate, 4),
+        "change_pct": round(change, 4),
+        "threshold": threshold,
+        "brazil_sleeve_impact_usd": round(impact_usd, 2),
+    }
+
+
+def _eval_correlation(conditions: dict, portfolio_state: dict) -> dict | None:
+    threshold = conditions.get("threshold", 0.85)
+    pairs = portfolio_state.get("correlation_pairs", [])
+    high = []
+    for p in pairs:
+        corr = abs(p.get("correlation", 0.0))
+        if corr >= threshold:
+            # Normalise to sleeve_a / sleeve_b format
+            sleeves = p.get("sleeves", "")
+            if isinstance(sleeves, str) and "/" in sleeves:
+                a, b = sleeves.split("/", 1)
+            elif isinstance(p.get("sleeve_a"), str):
+                a, b = p["sleeve_a"], p.get("sleeve_b", "")
+            else:
+                a, b = str(sleeves), ""
+            high.append({"sleeve_a": a.strip(), "sleeve_b": b.strip(),
+                          "correlation": round(corr, 3),
+                          "diversification_concern": corr >= 0.90})
+    if not high:
+        return None
+    return {"high_correlation_pairs": high[:3], "threshold": threshold}
+
+
+def _eval_deposit(conditions: dict, portfolio_state: dict) -> dict | None:  # noqa: ARG001
+    deposits = portfolio_state.get("recent_deposits", [])
+    # Also check if SoFi vault balance increased since last snapshot
+    sofi_delta = portfolio_state.get("sofi_balance_delta_usd", 0.0)
+    if not deposits and sofi_delta <= 0:
+        return None
+    total = sum(d.get("amount", 0) for d in deposits) + max(sofi_delta, 0)
+    return {
+        "deposit_count": len(deposits) + (1 if sofi_delta > 0 and not deposits else 0),
+        "total_amount_usd": round(total, 2),
+        "detected_at": datetime.now(timezone.utc).isoformat(),
+        "suggested_vault_allocation": {
+            "future_investments": round(total * 0.80, 2),
+            "opportunity": round(total * 0.15, 2),
+            "cash_buffer": round(total * 0.05, 2),
+        },
+    }
+
+
+# ── Master evaluator ──────────────────────────────────────────────────────────
+
+_EVALUATORS = {
+    "drawdown":    _eval_drawdown,
+    "drift":       _eval_drift,
+    "opportunity": _eval_opportunity,
+    "sell_target": _eval_sell_target,
+    "earnings":    _eval_earnings,
+    "brazil_darf": _eval_brazil_darf,
+    "fx_move":     _eval_fx_move,
+    "correlation": _eval_correlation,
+    "deposit":     _eval_deposit,
+}
 
 
 def evaluate_all_rules(
@@ -45,30 +349,15 @@ def evaluate_all_rules(
     """
     Evaluate all active alert rules against current portfolio state.
 
-    Args:
-        portfolio_state: Keys used:
-            - max_drawdown: float (negative decimal)
-            - sleeve_weights: list of SleeveWeight dicts
-            - opportunity_tier_1: bool
-            - opportunity_tier_2: bool
-            - held_assets_at_sell_target: list of symbol strings
-            - darf_progress_pct: float (0-1, monthly DARF usage)
-            - usd_brl_30d_change: float (pct change)
-            - correlation_pairs: list of {sleeves, correlation} dicts
-            - recent_deposits: list of transaction dicts
-        alert_rules: Active rules from alert_rules table (or BUILT_IN_ALERT_RULES).
-        recent_history: Recent alert_history entries to check cooldowns.
-
-    Returns:
-        List of triggered alert dicts: {rule_name, type, payload, priority}.
+    Each rule reads conditions from the rule dict and checks cooldowns via
+    recent_history (alert_history rows). Returns triggered alert dicts.
     """
     recent_history = recent_history or []
-    triggered: list[dict[str, Any]] = []
 
-    # Build cooldown index: rule_name -> last_triggered_at
+    # Cooldown index: rule_name -> last_triggered_at (UTC)
     cooldown_map: dict[str, datetime] = {}
     for h in recent_history:
-        rule_name = h.get("rule_name", "")
+        rule_name = h.get("rule_name") or (h.get("alert_rules") or {}).get("rule_name", "")
         ts_str = h.get("triggered_at", "")
         if ts_str and rule_name:
             try:
@@ -79,11 +368,16 @@ def evaluate_all_rules(
                 pass
 
     now = datetime.now(timezone.utc)
+    triggered: list[dict[str, Any]] = []
 
     for rule in alert_rules:
         rule_name = rule.get("name", "")
-        rule_type = rule.get("type", "")
+        rule_type = rule.get("type", rule.get("rule_type", ""))
         conditions = rule.get("conditions", {})
+        is_active = rule.get("is_active", True)
+
+        if not is_active:
+            continue
 
         # Cooldown check
         last_triggered = cooldown_map.get(rule_name)
@@ -92,246 +386,225 @@ def evaluate_all_rules(
             if (now - last_triggered).total_seconds() < cooldown_h * 3600:
                 continue
 
-        alert: dict[str, Any] | None = None
+        evaluator = _EVALUATORS.get(rule_type)
+        if evaluator is None:
+            continue
 
-        if rule_type == "drawdown":
-            threshold = conditions.get("threshold", 0.25)
-            current_dd = abs(portfolio_state.get("max_drawdown", 0.0))
-            if current_dd >= threshold:
-                action = conditions.get("action", "")
-                alert = {
-                    "rule_name": rule_name,
-                    "type": rule_type,
-                    "priority": "CRITICAL" if current_dd >= 0.40 else "HIGH",
-                    "payload": {
-                        "drawdown_pct": current_dd,
-                        "threshold": threshold,
-                        "action": action,
-                    },
-                }
+        try:
+            payload = evaluator(conditions, portfolio_state)
+        except Exception as exc:
+            logger.error("Alert evaluator %s failed: %s", rule_type, exc)
+            continue
 
-        elif rule_type == "drift":
-            threshold = conditions.get("threshold", 0.05)
-            sleeve_weights = portfolio_state.get("sleeve_weights", [])
-            breached = [
-                s for s in sleeve_weights
-                if abs(s.get("drift", 0.0)) >= threshold
-            ]
-            if breached:
-                alert = {
-                    "rule_name": rule_name,
-                    "type": rule_type,
-                    "priority": "MEDIUM",
-                    "payload": {
-                        "breached_sleeves": [
-                            {"sleeve": s["sleeve"], "drift": s["drift"]}
-                            for s in breached
-                        ],
-                        "threshold": threshold,
-                    },
-                }
+        if payload is None:
+            continue
 
-        elif rule_type == "opportunity":
-            tier = conditions.get("tier", 1)
-            key = f"opportunity_tier_{tier}"
-            if portfolio_state.get(key, False):
-                alert = {
-                    "rule_name": rule_name,
-                    "type": rule_type,
-                    "priority": "HIGH",
-                    "payload": {
-                        "tier": tier,
-                        "asset": portfolio_state.get(f"opportunity_tier_{tier}_asset", ""),
-                        "drawdown_pct": portfolio_state.get(f"opportunity_tier_{tier}_drawdown", 0.0),
-                        "margin_of_safety_pct": portfolio_state.get(f"opportunity_tier_{tier}_mos", 0.0),
-                    },
-                }
+        priority = rule.get("priority", "MEDIUM")
+        if rule_type == "drawdown" and payload.get("drawdown_pct", 0) >= 0.40:
+            priority = "CRITICAL"
 
-        elif rule_type == "sell_target":
-            at_target = portfolio_state.get("held_assets_at_sell_target", [])
-            if at_target:
-                alert = {
-                    "rule_name": rule_name,
-                    "type": rule_type,
-                    "priority": "MEDIUM",
-                    "payload": {"symbols_at_sell_target": at_target},
-                }
-
-        elif rule_type == "brazil_darf":
-            threshold_pct = conditions.get("threshold_pct", 0.80)
-            progress = portfolio_state.get("darf_progress_pct", 0.0)
-            if progress >= threshold_pct:
-                alert = {
-                    "rule_name": rule_name,
-                    "type": rule_type,
-                    "priority": "HIGH",
-                    "payload": {
-                        "progress_pct": progress,
-                        "threshold_pct": threshold_pct,
-                        "gross_sales_brl": portfolio_state.get("darf_gross_sales_brl", 0.0),
-                    },
-                }
-
-        elif rule_type == "fx_move":
-            threshold = conditions.get("threshold", 0.10)
-            change = abs(portfolio_state.get("usd_brl_30d_change", 0.0))
-            if change >= threshold:
-                alert = {
-                    "rule_name": rule_name,
-                    "type": rule_type,
-                    "priority": "MEDIUM",
-                    "payload": {
-                        "pair": "USDBRL",
-                        "change_30d": portfolio_state.get("usd_brl_30d_change", 0.0),
-                        "threshold": threshold,
-                    },
-                }
-
-        elif rule_type == "correlation":
-            threshold = conditions.get("threshold", 0.85)
-            pairs = portfolio_state.get("correlation_pairs", [])
-            high_corr = [p for p in pairs if abs(p.get("correlation", 0.0)) >= threshold]
-            if high_corr:
-                alert = {
-                    "rule_name": rule_name,
-                    "type": rule_type,
-                    "priority": "MEDIUM",
-                    "payload": {"high_correlation_pairs": high_corr[:3]},
-                }
-
-        elif rule_type == "deposit":
-            deposits = portfolio_state.get("recent_deposits", [])
-            if deposits:
-                alert = {
-                    "rule_name": rule_name,
-                    "type": rule_type,
-                    "priority": "LOW",
-                    "payload": {
-                        "deposit_count": len(deposits),
-                        "total_amount": sum(d.get("amount", 0) for d in deposits),
-                    },
-                }
-
-        if alert:
-            triggered.append(alert)
+        triggered.append({
+            "rule_id": rule.get("id", f"builtin-{rule_type}"),
+            "rule_name": rule_name,
+            "type": rule_type,
+            "priority": priority,
+            "channel": rule.get("channel", "telegram"),
+            "payload": payload,
+        })
 
     return triggered
 
 
+# ── Rich Telegram message formatters ─────────────────────────────────────────
+
+def _fmt_drawdown(payload: dict) -> str:
+    pct = payload.get("drawdown_pct", 0) * 100
+    threshold = payload.get("threshold", 0.25) * 100
+    current = payload.get("current_value_usd", 0)
+    peak = payload.get("portfolio_value_at_peak", current)
+    paused = payload.get("automation_paused", False)
+
+    lines = [
+        f"🔴 *DRAWDOWN ALERT — {_esc(f'{pct:.1f}')}%*",
+        f"Portfolio has dropped *{_esc(f'{pct:.1f}')}%* from peak\\.",
+        f"Peak value: {_esc(f'${peak:,.0f}')} → Current: {_esc(f'${current:,.0f}')}",
+    ]
+    if paused:
+        lines.append("⛔ *AUTOMATION PAUSED* — manual override required\\.")
+        lines.append("Use /admin/resume to re\\-enable scheduled runs\\.")
+    lines.append(f"_Threshold: {_esc(f'{threshold:.0f}')}%_")
+    return "\n".join(lines)
+
+
+def _fmt_drift(payload: dict) -> str:
+    sleeves = payload.get("breached_sleeves", [])
+    parts = []
+    for s in sleeves:
+        cur = _esc(f"{s.get('current_weight', 0)*100:.1f}")
+        tgt = _esc(f"{s.get('target_weight', 0)*100:.1f}")
+        dft = _esc(f"{s.get('drift', 0)*100:+.1f}")
+        slv = _esc(s.get("sleeve", ""))
+        parts.append(f"  • {slv}: {cur}% vs target {tgt}% \\({dft}%\\)")
+    sleeve_lines = "\n".join(parts)
+    count = _esc(payload.get("count", len(sleeves)))
+    threshold = _esc(f"{payload.get('threshold', 0.05)*100:.0f}")
+    return (
+        f"⚖️ *SLEEVE DRIFT BREACH*\n"
+        f"{count} sleeve\\(s\\) outside ±{threshold}% band:\n"
+        f"{sleeve_lines}\n"
+        f"Run /run\\_allocation to rebalance\\."
+    )
+
+
+def _fmt_opportunity(payload: dict) -> str:
+    tier = payload.get("tier", 1)
+    symbol = payload.get("asset_symbol", "Unknown")
+    drawdown = payload.get("drawdown_pct", 0) * 100
+    mos = payload.get("margin_of_safety_pct", 0) * 100
+    deploy_pct = payload.get("vault_recommended_deployment", 0) * 100
+    deploy_usd = payload.get("vault_deployment_usd", 0)
+    commentary = payload.get("ai_commentary", "")
+
+    lines = [
+        f"🎯 *TIER {_esc(tier)} OPPORTUNITY — {_esc(symbol)}*",
+        f"Drawdown from 6\\-12mo high: *{_esc(f'{drawdown:.1f}')}%*",
+        f"Margin of safety: *{_esc(f'{mos:.1f}')}%*",
+        f"Recommended deployment: {_esc(f'{deploy_pct:.0f}')}% of Opportunity Vault \\(~{_esc(f'${deploy_usd:,.0f}')}\\)",
+    ]
+    if commentary:
+        lines.append(f"_{_esc(commentary[:120])}_")
+    return "\n".join(lines)
+
+
+def _fmt_sell_target(payload: dict) -> str:
+    assets = payload.get("assets", [])
+    lines = ["💰 *SELL TARGET REACHED*"]
+    for a in assets[:3]:
+        sym = a.get("symbol", "?")
+        price = a.get("current_price", 0)
+        target = a.get("sell_target", 0)
+        gain = a.get("unrealized_gain_pct", 0) * 100
+        tax = a.get("estimated_tax_impact", 0)
+        lines.append(
+            f"• *{_esc(sym)}*: {_esc(f'${price:.2f}')} → target {_esc(f'${target:.2f}')} "
+            f"\\| gain: {_esc(f'+{gain:.1f}')}% \\| est\\. tax: {_esc(f'${tax:,.0f}')}"
+        )
+    return "\n".join(lines)
+
+
+def _fmt_earnings(payload: dict) -> str:
+    upcoming = payload.get("upcoming", [])
+    if not upcoming:
+        return "📅 *EARNINGS ALERT*\nUpcoming earnings for held positions\\."
+    item = upcoming[0]
+    days = item.get("days_until", "?")
+    sym = item.get("symbol", "?")
+    edate = item.get("earnings_date", "?")
+    eps_est = item.get("expected_eps")
+    prior = item.get("prior_eps")
+    lines = [
+        f"📅 *EARNINGS IN {_esc(days)} DAYS — {_esc(sym)}*",
+        f"Date: {_esc(edate)}",
+    ]
+    if eps_est is not None:
+        lines.append(f"Expected EPS: {_esc(f'${eps_est}')}")
+    if prior is not None:
+        lines.append(f"Prior quarter: {_esc(f'${prior}')}")
+    if len(upcoming) > 1:
+        others = ", ".join(_esc(u["symbol"]) for u in upcoming[1:3])
+        lines.append(f"Also upcoming: {others}")
+    return "\n".join(lines)
+
+
+def _fmt_darf(payload: dict) -> str:
+    pct = payload.get("progress_pct", 0) * 100
+    gross = payload.get("gross_sales_brl", 0)
+    remaining = payload.get("remaining_before_darf", 0)
+    month = payload.get("month", "")
+    return (
+        f"🇧🇷 *DARF WARNING — {_esc(f'{pct:.0f}')}% of exemption used*\n"
+        f"Gross sales this month: R\\${_esc(f'{gross:,.0f}')} / R\\$20,000\n"
+        f"Remaining before tax trigger: R\\${_esc(f'{remaining:,.0f}')}\n"
+        f"Month: {_esc(month)} — avoid additional BRL stock sales\\."
+    )
+
+
+def _fmt_fx(payload: dict) -> str:
+    change = payload.get("change_pct", 0) * 100
+    current = payload.get("current_rate", 0)
+    prior = payload.get("rate_30d_ago", 0)
+    impact = payload.get("brazil_sleeve_impact_usd", 0)
+    direction = "weakened" if change > 0 else "strengthened"
+    sign = "+" if change >= 0 else ""
+    return (
+        f"💱 *BRL/USD MOVED {_esc(f'{sign}{change:.1f}')}% in 30 days*\n"
+        f"BRL has {_esc(direction)} vs USD\\.\n"
+        f"Rate: {_esc(f'{current:.4f}')} \\(was {_esc(f'{prior:.4f}')}\\)\n"
+        f"Brazil sleeve impact: {_esc(f'{impact:+.0f}')} USD"
+    )
+
+
+def _fmt_correlation(payload: dict) -> str:
+    pairs = payload.get("high_correlation_pairs", [])
+    threshold = payload.get("threshold", 0.85)
+    lines = [f"⚠️ *CORRELATION SPIKE — Diversification Risk*"]
+    for p in pairs[:2]:
+        a, b = p.get("sleeve_a", "?"), p.get("sleeve_b", "?")
+        corr = p.get("correlation", 0)
+        lines.append(
+            f"• {_esc(a)} ↔ {_esc(b)}: {_esc(f'{corr:.2f}')} \\(threshold: {_esc(f'{threshold:.2f}')}\\)"
+        )
+    lines.append("Diversification benefit reduced — consider reviewing allocation\\.")
+    return "\n".join(lines)
+
+
+def _fmt_deposit(payload: dict) -> str:
+    count = payload.get("deposit_count", 1)
+    total = payload.get("total_amount_usd", 0)
+    alloc = payload.get("suggested_vault_allocation", {})
+    lines = [
+        f"💰 *DEPOSIT DETECTED*",
+        f"{_esc(count)} deposit\\(s\\) totaling {_esc(f'${total:,.0f}')}",
+    ]
+    if alloc:
+        fi = alloc.get("future_investments", 0)
+        opp = alloc.get("opportunity", 0)
+        lines.append(f"Suggested routing: {_esc(f'${fi:,.0f}')} → Future Investments, {_esc(f'${opp:,.0f}')} → Opportunity Vault")
+    lines.append("Run /run\\_allocation to optimally route new funds\\.")
+    return "\n".join(lines)
+
+
+_FORMATTERS = {
+    "drawdown":    _fmt_drawdown,
+    "drift":       _fmt_drift,
+    "opportunity": _fmt_opportunity,
+    "sell_target": _fmt_sell_target,
+    "earnings":    _fmt_earnings,
+    "brazil_darf": _fmt_darf,
+    "fx_move":     _fmt_fx,
+    "correlation": _fmt_correlation,
+    "deposit":     _fmt_deposit,
+}
+
+
 def format_alert_message(alert_type: str, payload: dict[str, Any]) -> str:
-    """
-    Format a Telegram alert message with emoji + title + numbers + action.
-
-    Args:
-        alert_type: Rule type string.
-        payload: Alert-specific data.
-
-    Returns:
-        Plain text formatted message (Telegram MarkdownV2 escaped).
-    """
-    import re
-
-    def esc(s: str) -> str:
-        return re.sub(r"([_*\[\]()~`>#\+\-=|{}.!])", r"\\\1", str(s))
-
-    templates: dict[str, str] = {
-        "drawdown": (
-            "=📉 *DRAWDOWN ALERT*\n"
-            "Portfolio down *{drawdown_pct:.1f}%* from peak \\(threshold: {threshold:.0%}\\)\\.\n"
-            "Action: Review allocation and consider pausing automated trades\\."
-        ),
-        "drift": (
-            "⚖️ *SLEEVE DRIFT BREACH*\n"
-            "Sleeves out of target band:\n{sleeves}\n"
-            "Run /run\\_allocation to rebalance\\."
-        ),
-        "opportunity": (
-            "🟡 *TIER {tier} OPPORTUNITY TRIGGERED*\n"
-            "Asset: *{asset}*\n"
-            "Drawdown: *{drawdown_pct:.1f}%* \\| MoS: *{mos_pct:.1f}%*\n"
-            "Vault deployment ready\\. Approve below\\."
-        ),
-        "sell_target": (
-            "📈 *SELL TARGET REACHED*\n"
-            "Assets at or above sell target: {symbols}\n"
-            "Review your position sizing\\."
-        ),
-        "brazil_darf": (
-            "🇧🇷 *BRAZIL DARF WARNING*\n"
-            "Monthly exemption used: *{pct:.0f}%* of R\\$20,000\n"
-            "Gross sales: R\\${gross:,.0f} this month\\. Avoid additional BRL sales\\."
-        ),
-        "fx_move": (
-            "💱 *BRL WEAKENING ALERT*\n"
-            "USD/BRL moved *{change:.1f}%* in 30 days \\(threshold: {threshold:.0%}\\)\\.\n"
-            "Brazil sleeve returns affected in USD terms\\."
-        ),
-        "correlation": (
-            "📊 *HIGH CORRELATION DETECTED*\n"
-            "Diversification may be breaking down:\n{pairs}\n"
-            "Consider reducing correlated positions\\."
-        ),
-        "deposit": (
-            "💰 *DEPOSIT DETECTED*\n"
-            "{count} deposit\\(s\\) totaling ${total:,.0f}\n"
-            "Run /run\\_allocation to optimally route new funds\\."
-        ),
-    }
-
-    template = templates.get(alert_type, "🔔 *ALERT*\n{details}")
-
+    """Format a Telegram alert message in MarkdownV2 from alert type + payload."""
+    formatter = _FORMATTERS.get(alert_type)
     try:
-        if alert_type == "drawdown":
-            msg = template.format(
-                drawdown_pct=abs(payload.get("drawdown_pct", 0)) * 100,
-                threshold=payload.get("threshold", 0.25),
-            )
-        elif alert_type == "drift":
-            sleeves_text = "\n".join(
-                f"  • {esc(s['sleeve'])}: {s['drift']*100:+.1f}%"
-                for s in payload.get("breached_sleeves", [])
-            )
-            msg = template.format(sleeves=sleeves_text)
-        elif alert_type == "opportunity":
-            msg = template.format(
-                tier=payload.get("tier", 1),
-                asset=esc(payload.get("asset", "Unknown")),
-                drawdown_pct=abs(payload.get("drawdown_pct", 0)) * 100,
-                mos_pct=payload.get("margin_of_safety_pct", 0) * 100,
-            )
-        elif alert_type == "sell_target":
-            symbols = ", ".join(payload.get("symbols_at_sell_target", []))
-            msg = template.format(symbols=esc(symbols))
-        elif alert_type == "brazil_darf":
-            msg = template.format(
-                pct=payload.get("progress_pct", 0) * 100,
-                gross=payload.get("gross_sales_brl", 0),
-            )
-        elif alert_type == "fx_move":
-            msg = template.format(
-                change=payload.get("change_30d", 0) * 100,
-                threshold=payload.get("threshold", 0.10),
-            )
-        elif alert_type == "correlation":
-            pairs_text = "\n".join(
-                f"  • {esc(p['sleeves'])}: {p['correlation']:.2f}"
-                for p in payload.get("high_correlation_pairs", [])
-            )
-            msg = template.format(pairs=pairs_text)
-        elif alert_type == "deposit":
-            msg = template.format(
-                count=payload.get("deposit_count", 1),
-                total=payload.get("total_amount", 0),
-            )
+        if formatter:
+            msg = formatter(payload)
         else:
-            msg = f"=🔔 *ALERT \\({esc(alert_type)}\\)*\n{esc(str(payload))}"
+            msg = f"🔔 *ALERT \\({_esc(alert_type)}\\)*\n{_esc(str(payload))}"
     except Exception as exc:
-        logger.warning("Alert message format failed for type=%s: %s", alert_type, exc)
-        msg = f"=🔔 Alert: {esc(alert_type)}"
+        logger.warning("Alert format failed type=%s: %s", alert_type, exc)
+        msg = f"🔔 Alert: {_esc(alert_type)}"
 
-    msg += f"\n\n_OvelhaInvest — http://ovelhainvest\\.local_"
+    now_str = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M UTC")
+    msg += f"\n\n_{_esc(now_str)} — OvelhaInvest_"
     return msg
 
+
+# ── Dispatch ──────────────────────────────────────────────────────────────────
 
 async def dispatch_alert(
     alert: dict[str, Any],
@@ -339,17 +612,8 @@ async def dispatch_alert(
     inline_keyboard: list[list[dict[str, Any]]] | None = None,
 ) -> bool:
     """
-    Dispatch a triggered alert to the configured channel.
-
-    Stores result in alert_history via supabase on success.
-
-    Args:
-        alert: Triggered alert dict from evaluate_all_rules().
-        channel: "telegram" (only channel supported in Phase 5).
-        inline_keyboard: Optional Telegram inline keyboard markup.
-
-    Returns:
-        True if dispatched successfully.
+    Format and dispatch a triggered alert to the configured channel.
+    Logs result to alert_history. Never raises — returns False on failure.
     """
     if channel != "telegram":
         logger.warning("Unsupported alert channel: %s", channel)
@@ -359,7 +623,19 @@ async def dispatch_alert(
         logger.info("Telegram not configured — alert suppressed: %s", alert.get("rule_name"))
         return False
 
-    message = format_alert_message(alert.get("type", ""), alert.get("payload", {}))
+    alert_type = alert.get("type", "")
+    payload = alert.get("payload", {})
+
+    # Auto-attach approval keyboard for opportunity alerts
+    if inline_keyboard is None and alert_type == "opportunity":
+        run_id = payload.get("run_id", "")
+        if run_id:
+            inline_keyboard = [[
+                {"text": "✅ Approve", "callback_data": f"approve:{run_id}"},
+                {"text": "❌ Reject",  "callback_data": f"reject:{run_id}"},
+            ]]
+
+    message = format_alert_message(alert_type, payload)
     success = await send_telegram_alert(
         message=message,
         chat_id=settings.telegram_chat_id,
@@ -367,14 +643,13 @@ async def dispatch_alert(
         inline_keyboard=inline_keyboard,
     )
 
-    # Log to alert_history
+    # Write to alert_history
     try:
         from app.db.supabase_client import get_supabase_client
-        client = get_supabase_client()
-        client.table("alert_history").insert({
+        get_supabase_client().table("alert_history").insert({
             "alert_rule_id": alert.get("rule_id", "00000000-0000-0000-0000-000000000001"),
             "triggered_at": datetime.now(timezone.utc).isoformat(),
-            "payload": alert.get("payload", {}),
+            "payload": payload,
             "channel": channel,
             "delivered": success,
         }).execute()
@@ -390,39 +665,25 @@ async def send_telegram_alert(
     bot_token: str,
     inline_keyboard: list[list[dict[str, Any]]] | None = None,
 ) -> bool:
-    """
-    Send a Telegram message via Bot API.
-
-    Args:
-        message: MarkdownV2 formatted text.
-        chat_id: Telegram chat ID.
-        bot_token: Bot API token.
-        inline_keyboard: Optional inline keyboard for approval flows.
-
-    Returns:
-        True if delivered successfully.
-    """
+    """Send a MarkdownV2 Telegram message. Returns True on success."""
     url = f"{TELEGRAM_API_BASE}/bot{bot_token}/sendMessage"
-    payload: dict[str, Any] = {
+    body: dict[str, Any] = {
         "chat_id": chat_id,
         "text": message,
         "parse_mode": "MarkdownV2",
         "disable_web_page_preview": True,
     }
     if inline_keyboard:
-        payload["reply_markup"] = {"inline_keyboard": inline_keyboard}
+        body["reply_markup"] = {"inline_keyboard": inline_keyboard}
 
     try:
         async with httpx.AsyncClient(timeout=15.0) as client:
-            resp = await client.post(url, json=payload)
+            resp = await client.post(url, json=body)
             if resp.status_code == 200:
                 logger.info("Telegram alert sent to chat_id=%s", chat_id)
                 return True
-            else:
-                logger.error(
-                    "Telegram API error %d: %s", resp.status_code, resp.text[:200]
-                )
-                return False
+            logger.error("Telegram API error %d: %s", resp.status_code, resp.text[:200])
+            return False
     except httpx.TimeoutException:
         logger.error("Telegram send timed out")
         return False
@@ -431,73 +692,125 @@ async def send_telegram_alert(
         return False
 
 
+# ── Telegram callback handler ─────────────────────────────────────────────────
+
 async def handle_telegram_callback(
     callback_query: dict[str, Any],
     user_id: str = "00000000-0000-0000-0000-000000000001",
 ) -> dict[str, Any]:
     """
-    Process approve/reject callbacks from Telegram inline keyboard.
+    Process inline keyboard callbacks from Telegram.
 
-    Args:
-        callback_query: Full Telegram callback_query object.
-        user_id: User UUID for authorization.
-
-    Returns:
-        Updated signal run dict.
+    Supported callback_data formats:
+      approve:{run_id}            — approve signal run
+      reject:{run_id}             — reject signal run
+      snooze:{alert_rule_id}:{days} — snooze an alert rule
     """
     from app.db.supabase_client import get_supabase_client
 
     callback_data = callback_query.get("data", "")
     callback_id = callback_query.get("id", "")
-    chat_id = callback_query.get("message", {}).get("chat", {}).get("id", "")
+    chat_id = str(callback_query.get("message", {}).get("chat", {}).get("id", ""))
 
-    if ":" not in callback_data:
-        logger.warning("Invalid callback_data format: %s", callback_data)
-        return {"error": "invalid_callback"}
+    parts = callback_data.split(":", 2)
+    if len(parts) < 2:
+        return {"error": "invalid_callback_format"}
 
-    action, run_id = callback_data.split(":", 1)
-    action = action.lower()
-
-    if action not in ("approve", "reject"):
-        return {"error": f"unknown_action:{action}"}
-
-    new_status = "approved" if action == "approve" else "rejected"
+    action = parts[0].lower()
+    resource_id = parts[1]
 
     try:
         client = get_supabase_client()
-        resp = (
-            client.table("signals_runs")
-            .update({"status": new_status})
-            .eq("id", run_id)
-            .eq("user_id", user_id)
-            .execute()
-        )
-        updated = resp.data[0] if resp.data else {"id": run_id, "status": new_status}
 
-        # Answer the callback (removes loading state in Telegram)
+        if action in ("approve", "reject"):
+            new_status = "approved" if action == "approve" else "rejected"
+            resp = (
+                client.table("signals_runs")
+                .update({"status": new_status})
+                .eq("id", resource_id)
+                .eq("user_id", user_id)
+                .execute()
+            )
+            updated = resp.data[0] if resp.data else {"id": resource_id, "status": new_status}
+
+            # Create journal entry
+            action_type = "followed" if action == "approve" else "overrode"
+            try:
+                client.table("decision_journal").insert({
+                    "user_id": user_id,
+                    "signal_run_id": resource_id,
+                    "action_type": action_type,
+                    "reasoning": f"Telegram {action} callback",
+                }).execute()
+            except Exception as exc:
+                logger.debug("Journal entry from callback failed: %s", exc)
+
+            confirmation = f"✅ Trades approved\\!" if action == "approve" else "❌ Trades rejected\\."
+            result = updated
+
+        elif action == "snooze":
+            days = int(parts[2]) if len(parts) > 2 else 7
+            # Insert snooze as delivered alert_history entry
+            client.table("alert_history").insert({
+                "alert_rule_id": resource_id,
+                "triggered_at": datetime.now(timezone.utc).isoformat(),
+                "payload": {"snoozed_days": days},
+                "channel": "telegram",
+                "delivered": True,
+            }).execute()
+            # Optionally update last_triggered on the rule
+            client.table("alert_rules").update({
+                "last_triggered": datetime.now(timezone.utc).isoformat()
+            }).eq("id", resource_id).execute()
+            confirmation = f"🔕 Alert snoozed for {days} days\\."
+            result = {"snoozed": True, "days": days}
+        else:
+            return {"error": f"unknown_action:{action}"}
+
+        # Answer callback to remove Telegram loading state
         if settings.telegram_bot_token and callback_id:
-            confirmation = f"Trades {new_status}!" if action == "approve" else "Trades rejected."
+            plain_confirmation = confirmation.replace("\\", "").replace("*", "")
             try:
                 async with httpx.AsyncClient(timeout=5.0) as http:
                     await http.post(
                         f"{TELEGRAM_API_BASE}/bot{settings.telegram_bot_token}/answerCallbackQuery",
-                        json={"callback_query_id": callback_id, "text": confirmation},
+                        json={"callback_query_id": callback_id, "text": plain_confirmation},
                     )
                     if chat_id:
                         await http.post(
                             f"{TELEGRAM_API_BASE}/bot{settings.telegram_bot_token}/sendMessage",
-                            json={
-                                "chat_id": str(chat_id),
-                                "text": f"*{confirmation}*\nRun ID: `{run_id[:8]}...`",
-                                "parse_mode": "MarkdownV2",
-                            },
+                            json={"chat_id": chat_id, "text": confirmation,
+                                  "parse_mode": "MarkdownV2"},
                         )
             except Exception as exc:
-                logger.debug("Telegram answer callback failed (non-critical): %s", exc)
+                logger.debug("Telegram answer callback failed: %s", exc)
 
-        logger.info("Telegram callback: action=%s run_id=%s -> status=%s", action, run_id, new_status)
-        return updated
+        logger.info("Telegram callback: action=%s id=%s", action, resource_id)
+        return result
 
     except Exception as exc:
         logger.error("handle_telegram_callback failed: %s", exc)
         return {"error": str(exc)}
+
+
+async def register_telegram_webhook(base_url: str) -> bool:
+    """Register the Telegram webhook URL with Bot API. Called on app startup in production."""
+    if not settings.telegram_bot_token:
+        return False
+    webhook_url = f"{base_url.rstrip('/')}/webhooks/telegram"
+    secret = settings.telegram_webhook_secret or settings.telegram_bot_token[-32:]
+    try:
+        async with httpx.AsyncClient(timeout=10.0) as client:
+            resp = await client.post(
+                f"{TELEGRAM_API_BASE}/bot{settings.telegram_bot_token}/setWebhook",
+                json={"url": webhook_url, "secret_token": secret,
+                      "allowed_updates": ["callback_query", "message"]},
+            )
+            if resp.status_code == 200 and resp.json().get("ok"):
+                logger.info("Telegram webhook registered: %s", webhook_url)
+                return True
+            logger.error("Telegram setWebhook failed: %s", resp.text[:200])
+            return False
+    except Exception as exc:
+        logger.error("Telegram setWebhook error: %s", exc)
+        return False
