@@ -49,11 +49,11 @@ app.add_middleware(
 # ---------------------------------------------------------------------------
 # Routers
 # ---------------------------------------------------------------------------
-from app.api import allocation
+from app.api import allocation, valuation
 app.include_router(allocation.router, prefix="", tags=["allocation"])
+app.include_router(valuation.router, prefix="", tags=["valuation"])
 # Future phases:
-# from app.api import valuation, backtest, performance, simulation, tax, alerts, reports
-# app.include_router(valuation.router, tags=["valuation"])
+# from app.api import backtest, performance, simulation, tax, alerts, reports
 # app.include_router(performance.router, tags=["performance"])
 
 # ---------------------------------------------------------------------------
@@ -75,7 +75,7 @@ def health_check() -> dict:
 @app.get("/version", tags=["system"])
 def version() -> dict:
     """Return API version info."""
-    return {"version": "2.0.0", "phase": "2", "env": settings.app_env}
+    return {"version": "3.0.0", "phase": "3", "env": settings.app_env}
 
 
 @app.get("/", tags=["system"])

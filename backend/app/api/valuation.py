@@ -27,6 +27,24 @@ logger = logging.getLogger(__name__)
 router = APIRouter()
 
 
+# ── POST /admin/seed ──────────────────────────────────────────────────────────
+
+@router.post("/admin/seed", tags=["admin"])
+def seed_dev_data() -> dict:
+    """
+    Seed all SEED_ASSETS (25 assets) into the assets table.
+    Idempotent — safe to call multiple times (upserts, never duplicates).
+    Only for dev/staging environments.
+    """
+    from app.db.repositories.assets import run_seed_data
+    result = run_seed_data()
+    return {
+        "status": "ok",
+        "message": f"Seeded {result['inserted']}/{result['total']} assets",
+        **result,
+    }
+
+
 # ── POST /valuation_update ────────────────────────────────────────────────────
 
 @router.post("/valuation_update", response_model=ValuationUpdateResponse, tags=["valuation"])
