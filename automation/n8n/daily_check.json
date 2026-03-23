@@ -1,0 +1,124 @@
+{
+  "name": "OvelhaInvest — Daily Check",
+  "description": "Runs every weekday at 7AM ET: daily_status → snapshot → run_allocation → Telegram digest",
+  "active": false,
+  "nodes": [
+    {
+      "id": "cron-trigger",
+      "name": "Schedule Trigger",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "parameters": {
+        "rule": {
+          "interval": [{ "field": "cronExpression", "expression": "0 12 * * 1-5" }]
+        }
+      },
+      "position": [250, 300]
+    },
+    {
+      "id": "get-daily-status",
+      "name": "GET /daily_status",
+      "type": "n8n-nodes-base.httpRequest",
+      "parameters": {
+        "method": "GET",
+        "url": "={{ $env.OVELHAINVEST_API_URL }}/daily_status",
+        "authentication": "none",
+        "responseFormat": "json"
+      },
+      "position": [450, 300]
+    },
+    {
+      "id": "trigger-snapshot",
+      "name": "POST /performance/snapshot",
+      "type": "n8n-nodes-base.httpRequest",
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.OVELHAINVEST_API_URL }}/performance/snapshot",
+        "authentication": "none",
+        "responseFormat": "json"
+      },
+      "position": [650, 300]
+    },
+    {
+      "id": "run-allocation",
+      "name": "POST /run_allocation",
+      "type": "n8n-nodes-base.httpRequest",
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.OVELHAINVEST_API_URL }}/run_allocation",
+        "authentication": "none",
+        "sendBody": true,
+        "contentType": "json",
+        "body": {
+          "user_id": "={{ $env.OVELHAINVEST_USER_ID }}",
+          "event_type": "daily_check",
+          "notes": "Automated daily check — n8n"
+        },
+        "responseFormat": "json"
+      },
+      "position": [850, 300]
+    },
+    {
+      "id": "check-approval-needed",
+      "name": "Approval Required?",
+      "type": "n8n-nodes-base.if",
+      "parameters": {
+        "conditions": {
+          "number": [{
+            "value1": "={{ $json.approval_required_count }}",
+            "operation": "larger",
+            "value2": 0
+          }]
+        }
+      },
+      "position": [1050, 300]
+    },
+    {
+      "id": "send-telegram-approval",
+      "name": "Telegram — Needs Approval",
+      "type": "n8n-nodes-base.telegram",
+      "parameters": {
+        "operation": "sendMessage",
+        "chatId": "={{ $env.TELEGRAM_CHAT_ID }}",
+        "text": "={{ '⚠️ *Daily Check Complete*\n\n' + $json.approval_required_count + ' trade(s) need approval\\.\n\nNet Worth: $' + $json.total_value_usd.toFixed(0) + '\nRegime: ' + $json.regime_state + '\n\nOpen the app to approve: ' + $env.APP_URL + '/signals' }}",
+        "additionalFields": {
+          "parse_mode": "MarkdownV2",
+          "reply_markup": {
+            "inline_keyboard": [[
+              { "text": "✅ Open Signals", "url": "={{ $env.APP_URL + '/signals' }}" }
+            ]]
+          }
+        }
+      },
+      "position": [1250, 200]
+    },
+    {
+      "id": "send-telegram-ok",
+      "name": "Telegram — All Clear",
+      "type": "n8n-nodes-base.telegram",
+      "parameters": {
+        "operation": "sendMessage",
+        "chatId": "={{ $env.TELEGRAM_CHAT_ID }}",
+        "text": "={{ '✅ *Daily Check — All Clear*\n\nNet Worth: $' + $json.total_value_usd.toFixed(0) + '\nRegime: ' + $json.regime_state + '\nYTD: ' + ($json.ytd_vs_benchmark != null ? (($json.ytd_vs_benchmark * 100).toFixed(1) + '% vs bench') : 'N/A') }}",
+        "additionalFields": { "parse_mode": "MarkdownV2" }
+      },
+      "position": [1250, 400]
+    }
+  ],
+  "connections": {
+    "Schedule Trigger": { "main": [[{ "node": "GET /daily_status", "type": "main", "index": 0 }]] },
+    "GET /daily_status": { "main": [[{ "node": "POST /performance/snapshot", "type": "main", "index": 0 }]] },
+    "POST /performance/snapshot": { "main": [[{ "node": "POST /run_allocation", "type": "main", "index": 0 }]] },
+    "POST /run_allocation": { "main": [[{ "node": "Approval Required?", "type": "main", "index": 0 }]] },
+    "Approval Required?": {
+      "main": [
+        [{ "node": "Telegram — Needs Approval", "type": "main", "index": 0 }],
+        [{ "node": "Telegram — All Clear", "type": "main", "index": 0 }]
+      ]
+    }
+  },
+  "settings": {
+    "saveManualExecutions": true,
+    "saveExecutionProgress": true,
+    "executionTimeout": 120
+  }
+}

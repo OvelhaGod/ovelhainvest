@@ -49,12 +49,14 @@ app.add_middleware(
 # ---------------------------------------------------------------------------
 # Routers
 # ---------------------------------------------------------------------------
-from app.api import allocation, performance, valuation
+from app.api import alerts, allocation, journal, performance, valuation
 app.include_router(allocation.router, prefix="", tags=["allocation"])
 app.include_router(valuation.router, prefix="", tags=["valuation"])
 app.include_router(performance.router, prefix="", tags=["performance"])
+app.include_router(alerts.router, prefix="", tags=["alerts"])
+app.include_router(journal.router, prefix="", tags=["journal"])
 # Future phases:
-# from app.api import backtest, simulation, tax, alerts, reports
+# from app.api import backtest, simulation, tax, reports
 
 # ---------------------------------------------------------------------------
 # Routes

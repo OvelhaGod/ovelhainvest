@@ -118,4 +118,39 @@ export const api = {
       `/performance/snapshot${userId ? `?user_id=${userId}` : ""}`,
       { method: "POST" }
     ),
+
+  // ── Journal (Phase 5) ─────────────────────────────────────────────────────
+
+  listJournal: (params?: { limit?: number; offset?: number; action_type?: string; user_id?: string }) => {
+    const qs = new URLSearchParams();
+    if (params?.user_id) qs.set("user_id", params.user_id);
+    if (params?.limit != null) qs.set("limit", String(params.limit));
+    if (params?.offset != null) qs.set("offset", String(params.offset));
+    if (params?.action_type) qs.set("action_type", params.action_type);
+    return request<Record<string, unknown>[]>(`/journal${qs.toString() ? `?${qs}` : ""}`);
+  },
+
+  createJournalEntry: (body: {
+    action_type: string;
+    reasoning?: string;
+    signal_run_id?: string;
+    asset_id?: string;
+    system_recommendation?: Record<string, unknown>;
+    actual_action?: Record<string, unknown>;
+  }, userId?: string) =>
+    request<Record<string, unknown>>(
+      `/journal${userId ? `?user_id=${userId}` : ""}`,
+      { method: "POST", body: JSON.stringify(body) }
+    ),
+
+  journalStats: (userId?: string) =>
+    request<Record<string, unknown>>(
+      `/journal/stats${userId ? `?user_id=${userId}` : ""}`
+    ),
+
+  patchJournalOutcome: (entryId: string, outcome_30d?: number, outcome_90d?: number) =>
+    request<Record<string, unknown>>(`/journal/${entryId}/outcome`, {
+      method: "PATCH",
+      body: JSON.stringify({ outcome_30d, outcome_90d }),
+    }),
 };

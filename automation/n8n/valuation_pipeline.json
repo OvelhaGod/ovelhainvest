@@ -1,0 +1,96 @@
+{
+  "name": "OvelhaInvest — Valuation Pipeline",
+  "description": "Runs every Sunday at 6AM ET: triggers full valuation update, notifies if new Tier 1/2 opportunities detected.",
+  "active": false,
+  "nodes": [
+    {
+      "id": "cron-trigger",
+      "name": "Schedule Trigger",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "parameters": {
+        "rule": {
+          "interval": [{ "field": "cronExpression", "expression": "0 11 * * 0" }]
+        }
+      },
+      "position": [250, 300]
+    },
+    {
+      "id": "run-valuation-update",
+      "name": "POST /valuation_update",
+      "type": "n8n-nodes-base.httpRequest",
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.OVELHAINVEST_API_URL }}/valuation_update",
+        "authentication": "none",
+        "sendBody": true,
+        "contentType": "json",
+        "body": {
+          "user_id": "={{ $env.OVELHAINVEST_USER_ID }}",
+          "dry_run": false
+        },
+        "responseFormat": "json"
+      },
+      "position": [450, 300]
+    },
+    {
+      "id": "check-opportunities",
+      "name": "Any Tier 1/2 Opportunities?",
+      "type": "n8n-nodes-base.if",
+      "parameters": {
+        "conditions": {
+          "number": [{
+            "value1": "={{ ($json.tier_opportunities_detected ?? 0) }}",
+            "operation": "larger",
+            "value2": 0
+          }]
+        }
+      },
+      "position": [650, 300]
+    },
+    {
+      "id": "send-opportunity-alert",
+      "name": "Telegram — Opportunity Alert",
+      "type": "n8n-nodes-base.telegram",
+      "parameters": {
+        "operation": "sendMessage",
+        "chatId": "={{ $env.TELEGRAM_CHAT_ID }}",
+        "text": "={{ '🚨 *Valuation Update — Opportunities Detected*\n\n' + $json.tier_opportunities_detected + ' asset(s) in buy zone\\.\n\n' + 'Updated: ' + $json.assets_updated + ' assets\n' + 'Open /assets for details\\.' }}",
+        "additionalFields": {
+          "parse_mode": "MarkdownV2",
+          "reply_markup": {
+            "inline_keyboard": [[
+              { "text": "📊 View Assets", "url": "={{ $env.APP_URL + '/assets' }}" }
+            ]]
+          }
+        }
+      },
+      "position": [850, 200]
+    },
+    {
+      "id": "send-valuation-complete",
+      "name": "Telegram — Valuation Complete",
+      "type": "n8n-nodes-base.telegram",
+      "parameters": {
+        "operation": "sendMessage",
+        "chatId": "={{ $env.TELEGRAM_CHAT_ID }}",
+        "text": "={{ '✅ *Weekly Valuation Update Complete*\n\n' + 'Updated: ' + $json.assets_updated + ' assets\n' + 'No new tier opportunities this week\\.' }}",
+        "additionalFields": { "parse_mode": "MarkdownV2" }
+      },
+      "position": [850, 400]
+    }
+  ],
+  "connections": {
+    "Schedule Trigger": { "main": [[{ "node": "POST /valuation_update", "type": "main", "index": 0 }]] },
+    "POST /valuation_update": { "main": [[{ "node": "Any Tier 1/2 Opportunities?", "type": "main", "index": 0 }]] },
+    "Any Tier 1/2 Opportunities?": {
+      "main": [
+        [{ "node": "Telegram — Opportunity Alert", "type": "main", "index": 0 }],
+        [{ "node": "Telegram — Valuation Complete", "type": "main", "index": 0 }]
+      ]
+    }
+  },
+  "settings": {
+    "saveManualExecutions": true,
+    "executionTimeout": 300
+  }
+}
