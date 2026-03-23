@@ -4,6 +4,9 @@
  */
 
 import type {
+  AdminStatus,
+  AlertHistoryItem,
+  AlertRule,
   AllocationRunResponse,
   AssetValuation,
   AttributionResponse,
@@ -153,4 +156,46 @@ export const api = {
       method: "PATCH",
       body: JSON.stringify({ outcome_30d, outcome_90d }),
     }),
+
+  // ── Alerts (Phase 6) ──────────────────────────────────────────────────────
+
+  listAlertHistory: (params?: { limit?: number; rule_type?: string; user_id?: string }) => {
+    const qs = new URLSearchParams();
+    if (params?.user_id) qs.set("user_id", params.user_id);
+    if (params?.limit != null) qs.set("limit", String(params.limit));
+    if (params?.rule_type) qs.set("rule_type", params.rule_type);
+    return request<AlertHistoryItem[]>(`/alerts/history${qs.toString() ? `?${qs}` : ""}`);
+  },
+
+  listAlertRules: (params?: { include_inactive?: boolean; user_id?: string }) => {
+    const qs = new URLSearchParams();
+    if (params?.user_id) qs.set("user_id", params.user_id);
+    if (params?.include_inactive) qs.set("include_inactive", "true");
+    return request<AlertRule[]>(`/alerts/rules${qs.toString() ? `?${qs}` : ""}`);
+  },
+
+  toggleAlertRule: (ruleId: string, updates?: Record<string, unknown>) =>
+    request<AlertRule>(`/alerts/rules/${ruleId}`, {
+      method: "PATCH",
+      body: updates ? JSON.stringify(updates) : undefined,
+    }),
+
+  testAlertRule: (ruleId: string, userId?: string) =>
+    request<{ sent: boolean; rule_name: string }>(
+      `/alerts/test/${ruleId}${userId ? `?user_id=${userId}` : ""}`,
+      { method: "POST" }
+    ),
+
+  // ── Admin (Phase 6) ───────────────────────────────────────────────────────
+
+  adminStatus: () => request<AdminStatus>("/admin/status"),
+
+  adminResume: (secret: string) =>
+    request<{ resumed: boolean; message: string }>(`/admin/resume?authorization=${secret}`, { method: "POST" }),
+
+  adminPause: (secret: string, reason?: string) =>
+    request<{ paused: boolean; message: string }>(
+      `/admin/pause?authorization=${secret}`,
+      { method: "POST", body: JSON.stringify({ reason }) }
+    ),
 };
