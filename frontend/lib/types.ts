@@ -146,13 +146,41 @@ export interface AssetValuation {
   momentum_score: number | null;
   quality_score: number | null;
   composite_score: number | null;
-  fair_value_estimate: number | null;
+  fair_value_estimate_dcf: number | null;
   margin_of_safety_pct: number | null;
   buy_target: number | null;
   hold_range_low: number | null;
   hold_range_high: number | null;
   sell_target: number | null;
-  moat_score: number | null;
+  moat_rating: string | null;
   rank_in_universe: number | null;
   tier: string | null;
+  passes_buy_gate: boolean;
+  dcf_assumptions: Record<string, unknown> | null;
+  // Asset metadata joined
+  moat_score: number | null;
+  sector: string | null;
+  region: string | null;
+  currency: string;
+  is_dcf_eligible: boolean;
+}
+
+export interface ValuationSummaryResponse {
+  as_of_date: string | null;
+  assets_scored: number;
+  positive_mos_count: number;
+  negative_mos_count: number;
+  opportunity_count: number;
+  top_by_composite: Partial<AssetValuation>[];
+  top_opportunities: Partial<AssetValuation>[];
+  margin_of_safety_distribution: Record<string, number>;
+}
+
+export interface ValuationUpdateResponse {
+  assets_updated: number;
+  top_opportunities: Partial<AssetValuation>[];
+  notable_changes: string[];
+  errors: string[];
+  economic_season: string;
+  run_timestamp: string;
 }

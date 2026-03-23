@@ -5,8 +5,11 @@
 
 import type {
   AllocationRunResponse,
+  AssetValuation,
   DailyStatusResponse,
   SignalsRun,
+  ValuationSummaryResponse,
+  ValuationUpdateResponse,
 } from "@/lib/types";
 
 const API_URL =
@@ -43,4 +46,32 @@ export const api = {
       method: "PATCH",
       body: JSON.stringify({ status }),
     }),
+
+  // ── Valuation (Phase 3) ──────────────────────────────────────────────────
+
+  valuationSummary: (userId?: string) =>
+    request<ValuationSummaryResponse>(
+      `/valuation_summary${userId ? `?user_id=${userId}` : ""}`
+    ),
+
+  valuationDetail: (symbol: string) =>
+    request<AssetValuation>(`/valuation/${symbol.toUpperCase()}`),
+
+  runValuationUpdate: (body?: { dry_run?: boolean; economic_season?: string }) =>
+    request<ValuationUpdateResponse>("/valuation_update", {
+      method: "POST",
+      body: JSON.stringify({ user_id: undefined, dry_run: false, ...body }),
+    }),
+
+  seedDevData: () =>
+    request<{ status: string; inserted: number; total: number; errors: string[] }>(
+      "/admin/seed",
+      { method: "POST" }
+    ),
+
+  // Latest valuations (uses valuation_summary for the table)
+  getLatestValuations: () =>
+    request<AssetValuation[]>("/valuation_summary").then(
+      (r) => r.top_by_composite as AssetValuation[]
+    ),
 };
