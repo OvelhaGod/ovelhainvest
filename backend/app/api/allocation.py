@@ -595,3 +595,104 @@ async def admin_pause(
 
     logger.info("Automation paused manually reason=%s", reason)
     return {"status": "paused", "reason": reason, "automation_paused": True}
+
+
+@router.get("/admin/status", tags=["admin"])
+def admin_status(
+    user_id: str = Query(default="00000000-0000-0000-0000-000000000001"),
+) -> dict:
+    """
+    System health dashboard — 10 fields.
+
+    Returns: automation_paused, pause_reason, last_daily_check,
+    last_valuation_update, last_alert_dispatched, pending_approvals,
+    telegram_connected, redis_connected, supabase_connected, anthropic_connected.
+    """
+    from app.db.supabase_client import check_supabase_connection
+    from app.db.redis_client import check_redis_connection, get_redis_client
+    from app.config import settings as _settings
+
+    # ── Automation pause state ──
+    paused = is_automation_paused()
+    pause_reason: str | None = None
+    try:
+        rc = get_redis_client()
+        if rc:
+            pause_reason = rc.get("automation_pause_reason")
+    except Exception:
+        pass
+
+    # ── Last daily check (most recent signals_run) ──
+    last_daily_check: str | None = None
+    last_valuation_update: str | None = None
+    pending_approvals = 0
+    last_alert_dispatched: str | None = None
+    try:
+        from app.db.supabase_client import get_supabase_client as _get_sb
+        sb = _get_sb()
+        resp = (
+            sb.table("signals_runs")
+            .select("run_timestamp, status, event_type")
+            .eq("user_id", user_id)
+            .order("run_timestamp", desc=True)
+            .limit(10)
+            .execute()
+        )
+        rows = resp.data or []
+        daily_rows = [r for r in rows if r.get("event_type") in ("daily_check", "opportunity")]
+        if daily_rows:
+            last_daily_check = daily_rows[0]["run_timestamp"]
+        pending_approvals = sum(1 for r in rows if r.get("status") == "needs_approval")
+
+        resp2 = (
+            sb.table("asset_valuations")
+            .select("created_at")
+            .order("created_at", desc=True)
+            .limit(1)
+            .execute()
+        )
+        if resp2.data:
+            last_valuation_update = resp2.data[0]["created_at"]
+
+        resp3 = (
+            sb.table("alert_history")
+            .select("triggered_at")
+            .order("triggered_at", desc=True)
+            .limit(1)
+            .execute()
+        )
+        if resp3.data:
+            last_alert_dispatched = resp3.data[0]["triggered_at"]
+    except Exception as exc:
+        logger.debug("admin_status DB queries failed: %s", exc)
+
+    # ── Connectivity checks ──
+    supabase_ok = check_supabase_connection()
+    redis_ok = check_redis_connection()
+
+    telegram_ok = False
+    if _settings.telegram_enabled and _settings.telegram_bot_token:
+        import httpx as _httpx
+        try:
+            r = _httpx.get(
+                f"https://api.telegram.org/bot{_settings.telegram_bot_token}/getMe",
+                timeout=5.0,
+            )
+            telegram_ok = r.status_code == 200 and r.json().get("ok", False)
+        except Exception:
+            pass
+
+    anthropic_ok = bool(_settings.anthropic_api_key)
+
+    return {
+        "automation_paused": paused,
+        "pause_reason": pause_reason,
+        "last_daily_check": last_daily_check,
+        "last_valuation_update": last_valuation_update,
+        "last_alert_dispatched": last_alert_dispatched,
+        "pending_approvals": pending_approvals,
+        "telegram_connected": telegram_ok,
+        "redis_connected": redis_ok,
+        "supabase_connected": supabase_ok,
+        "anthropic_connected": anthropic_ok,
+    }
