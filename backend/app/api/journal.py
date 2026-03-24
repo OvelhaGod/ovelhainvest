@@ -11,14 +11,24 @@ from __future__ import annotations
 
 import logging
 
-from fastapi import APIRouter, HTTPException, Query
+from fastapi import APIRouter, BackgroundTasks, HTTPException, Query
+from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
+
+import csv
+import io
 
 from app.db.repositories.journal import (
     create_journal_entry,
     get_journal_entries,
     get_override_accuracy_stats,
     update_outcome,
+)
+from app.services.journal_engine import (
+    backfill_journal_outcomes,
+    compute_journal_insight,
+    compute_override_accuracy,
+    detect_behavioral_patterns,
 )
 
 router = APIRouter()
@@ -119,3 +129,129 @@ async def patch_outcome(
     except Exception as exc:
         logger.error("patch_outcome failed entry=%s: %s", entry_id, exc)
         raise HTTPException(status_code=500, detail=str(exc))
+
+
+@router.get("/journal/patterns")
+async def journal_patterns(
+    user_id: str = Query(default="00000000-0000-0000-0000-000000000001"),
+) -> list[dict]:
+    """
+    Detect behavioral patterns in decision history.
+
+    Requires ≥10 journal entries. Returns list of pattern dicts with
+    pattern_type, description, severity, and supporting_data.
+    """
+    entries = get_journal_entries(user_id=user_id, limit=500)
+    patterns = detect_behavioral_patterns(entries)
+    return [
+        {
+            "pattern_type": p.pattern_type,
+            "description": p.description,
+            "severity": p.severity,
+            "supporting_data": p.supporting_data,
+        }
+        for p in patterns
+    ]
+
+
+@router.get("/journal/insight")
+async def journal_insight(
+    user_id: str = Query(default="00000000-0000-0000-0000-000000000001"),
+) -> dict:
+    """
+    Generate (or return cached) AI behavioral insight for the user's journal.
+
+    Uses Claude API. Result cached in Redis for 24 hours.
+    """
+    entries = get_journal_entries(user_id=user_id, limit=500)
+    accuracy = compute_override_accuracy(entries)
+    insight = compute_journal_insight(accuracy, user_id=user_id)
+    return {
+        "insight": insight,
+        "has_enough_data": accuracy.has_enough_data,
+        "followed_count": accuracy.followed_count,
+        "overrode_count": accuracy.overrode_count,
+        "system_outperformance_30d": accuracy.system_outperformance_delta_30d,
+    }
+
+
+@router.post("/journal/backfill", status_code=202)
+async def trigger_backfill(
+    background_tasks: BackgroundTasks,
+    user_id: str = Query(default="00000000-0000-0000-0000-000000000001"),
+) -> dict:
+    """
+    Trigger outcome backfill for journal entries missing 30d/90d outcomes.
+
+    Runs as a background task; returns immediately with count of entries queued.
+    Backfill uses asset_valuations table for historical price lookups.
+    """
+    # Fetch entries that need backfill
+    all_entries = get_journal_entries(user_id=user_id, limit=500)
+    pending = [
+        e for e in all_entries
+        if e.get("asset_id") and (e.get("outcome_30d") is None or e.get("outcome_90d") is None)
+    ]
+
+    async def _run_backfill() -> None:
+        try:
+            from app.db.supabase_client import get_supabase_client
+            client = get_supabase_client()
+            updates = backfill_journal_outcomes(
+                entries=pending,
+                current_prices={},  # uses DB lookups internally
+                db=client,
+            )
+            for upd in updates:
+                update_outcome(
+                    entry_id=upd.entry_id,
+                    outcome_30d=upd.outcome_30d,
+                    outcome_90d=upd.outcome_90d,
+                )
+            logger.info("Backfill complete: %d entries updated for user %s", len(updates), user_id)
+        except Exception as exc:
+            logger.error("Backfill failed for user %s: %s", user_id, exc)
+
+    background_tasks.add_task(_run_backfill)
+    return {
+        "queued": len(pending),
+        "message": f"{len(pending)} entries queued for outcome backfill",
+    }
+
+
+@router.get("/journal/export")
+async def export_journal(
+    user_id: str = Query(default="00000000-0000-0000-0000-000000000001"),
+    limit: int = Query(default=500, le=2000),
+) -> StreamingResponse:
+    """
+    Export decision journal as CSV download.
+
+    Returns CSV with columns: date, action_type, asset_id, reasoning,
+    outcome_30d, outcome_90d.
+    """
+    entries = get_journal_entries(user_id=user_id, limit=limit)
+
+    output = io.StringIO()
+    writer = csv.DictWriter(
+        output,
+        fieldnames=["event_date", "action_type", "asset_id", "reasoning", "outcome_30d", "outcome_90d"],
+        extrasaction="ignore",
+    )
+    writer.writeheader()
+    for e in entries:
+        writer.writerow({
+            "event_date": e.get("event_date", ""),
+            "action_type": e.get("action_type", ""),
+            "asset_id": e.get("asset_id", ""),
+            "reasoning": e.get("reasoning", ""),
+            "outcome_30d": e.get("outcome_30d", ""),
+            "outcome_90d": e.get("outcome_90d", ""),
+        })
+
+    output.seek(0)
+    return StreamingResponse(
+        iter([output.getvalue()]),
+        media_type="text/csv",
+        headers={"Content-Disposition": 'attachment; filename="journal_export.csv"'},
+    )
