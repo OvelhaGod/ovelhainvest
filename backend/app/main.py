@@ -62,8 +62,9 @@ origins = [
     "http://localhost:3000",
     "http://127.0.0.1:3000",
     "http://10.0.0.201:3000",
+    "http://10.0.0.201:3002",
     "https://invest.ovelha.us",
-    "https://api.invest.ovelha.us",
+    "https://investapi.ovelha.us",
 ]
 
 app.add_middleware(GZipMiddleware, minimum_size=1000)

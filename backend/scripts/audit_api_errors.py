@@ -5,7 +5,7 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-BASE = os.getenv("APP_BASE_URL", "https://invest.ovelha.us").replace("invest.ovelha.us", "invest.ovelha.us")
+BASE = os.getenv("APP_BASE_URL", "https://investapi.ovelha.us")
 USER_ID = os.getenv("DEFAULT_USER_ID", "")
 U = f"?user_id={USER_ID}" if USER_ID else ""
 
