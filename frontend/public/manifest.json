@@ -1,0 +1,19 @@
+{
+  "name": "OvelhaInvest",
+  "short_name": "OvelhaInvest",
+  "description": "Private wealth OS — portfolio, performance, projections",
+  "start_url": "/dashboard",
+  "display": "standalone",
+  "background_color": "#050508",
+  "theme_color": "#050508",
+  "orientation": "portrait-primary",
+  "icons": [
+    {"src": "/icons/icon-192.png", "sizes": "192x192", "type": "image/png"},
+    {"src": "/icons/icon-512.png", "sizes": "512x512", "type": "image/png"},
+    {"src": "/icons/icon-512-maskable.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable"}
+  ],
+  "screenshots": [
+    {"src": "/screenshots/dashboard.png", "sizes": "1280x720", "type": "image/png", "form_factor": "wide"}
+  ],
+  "categories": ["finance", "productivity"]
+}

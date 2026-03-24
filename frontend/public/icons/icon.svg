@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <rect width="512" height="512" rx="80" fill="#050508"/>
+  <rect x="0" y="440" width="512" height="72" rx="0" fill="#22c55e" opacity="0.8"/>
+  <text x="256" y="300" font-family="system-ui, sans-serif" font-size="220" font-weight="bold" text-anchor="middle" fill="#f8fafc">OI</text>
+  <rect x="0" y="440" width="512" height="8" fill="#22c55e"/>
+</svg>
