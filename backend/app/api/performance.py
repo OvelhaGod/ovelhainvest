@@ -46,6 +46,13 @@ from app.services import risk_engine as re
 logger = logging.getLogger(__name__)
 router = APIRouter()
 
+from app.config import get_default_user_id as _get_default_user_id
+
+
+def _resolve_user(user_id: str | None) -> str:
+    return user_id or _get_default_user_id()
+
+
 RATIO_THRESHOLDS = {
     "sharpe":  [(0.5, "Poor"), (1.0, "Fair"), (1.5, "Good"), (float("inf"), "Excellent")],
     "sortino": [(0.75, "Poor"), (1.5, "Fair"), (2.0, "Good"), (float("inf"), "Excellent")],
@@ -110,10 +117,11 @@ def _fetch_benchmark_returns(symbol: str, start_date: date, end_date: date) -> p
 
 @router.get("/performance/summary", response_model=PerformanceSummaryResponse)
 async def performance_summary(
-    user_id: str = Query(default="00000000-0000-0000-0000-000000000001"),
+    user_id: str = Query(default=None),
     period: str = Query(default="ytd"),
 ) -> PerformanceSummaryResponse:
     """Return portfolio performance metrics — all standard periods. Redis-cached 5 min."""
+    user_id = _resolve_user(user_id)
     cache_key = f"perf_summary:{user_id}:{period}"
     try:
         rc = get_redis_client()
@@ -230,7 +238,7 @@ async def performance_summary(
 
 @router.get("/performance/attribution", response_model=AttributionResponse)
 async def performance_attribution(
-    user_id: str = Query(default="00000000-0000-0000-0000-000000000001"),
+    user_id: str = Query(default=None),
     period_start: str | None = None,
     period_end: str | None = None,
 ) -> AttributionResponse:
@@ -273,7 +281,7 @@ async def performance_attribution(
 
 @router.get("/performance/benchmark", response_model=BenchmarkComparisonResponse)
 async def performance_vs_benchmark(
-    user_id: str = Query(default="00000000-0000-0000-0000-000000000001"),
+    user_id: str = Query(default=None),
     benchmark: str = Query(default="SPY"),
     period: str = Query(default="ytd"),
 ) -> BenchmarkComparisonResponse:
@@ -322,7 +330,7 @@ async def performance_vs_benchmark(
 
 @router.get("/performance/rolling", response_model=RollingReturnsResponse)
 async def performance_rolling(
-    user_id: str = Query(default="00000000-0000-0000-0000-000000000001"),
+    user_id: str = Query(default=None),
     windows: str = Query(default="1mo,3mo,1yr"),
 ) -> RollingReturnsResponse:
     """Return rolling return time series for the specified windows."""
@@ -355,7 +363,7 @@ async def performance_rolling(
 
 @router.get("/performance/risk", response_model=RiskSummaryResponse)
 async def performance_risk(
-    user_id: str = Query(default="00000000-0000-0000-0000-000000000001"),
+    user_id: str = Query(default=None),
 ) -> RiskSummaryResponse:
     """Return risk parity weights, correlation matrix, and VaR."""
     today = date.today()
@@ -425,7 +433,7 @@ async def performance_risk(
 
 @router.post("/performance/snapshot", response_model=SnapshotTriggerResponse)
 async def trigger_snapshot(
-    user_id: str = Query(default="00000000-0000-0000-0000-000000000001"),
+    user_id: str = Query(default=None),
 ) -> SnapshotTriggerResponse:
     """
     Manually trigger a portfolio snapshot for today.
@@ -433,6 +441,7 @@ async def trigger_snapshot(
     In production this is called by n8n daily. This endpoint allows manual triggering.
     The snapshot uses the latest known holdings and current market prices.
     """
+    user_id = _resolve_user(user_id)
     from app.db.repositories.snapshots import get_latest_snapshot as get_snap
     today = date.today()
 
@@ -475,7 +484,7 @@ async def trigger_snapshot(
 @router.get("/performance/fx_attribution")
 async def fx_attribution_endpoint(
     period: str = Query(default="ytd"),
-    user_id: str = Query(default="00000000-0000-0000-0000-000000000001"),
+    user_id: str = Query(default=None),
 ) -> dict:
     """
     FX attribution for the Brazil sleeve.
@@ -571,7 +580,7 @@ async def fx_attribution_endpoint(
 
 @router.get("/performance/correlation_history")
 async def correlation_history(
-    user_id: str = Query(default="00000000-0000-0000-0000-000000000001"),
+    user_id: str = Query(default=None),
     days: int = Query(default=365, ge=30, le=730),
 ) -> dict:
     """

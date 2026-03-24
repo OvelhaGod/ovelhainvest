@@ -53,8 +53,9 @@ DEFAULT_USER_ID_HEADER = "x-user-id"
 
 
 def _get_user_id(user_id: str = Query(default=None)) -> str:
-    """Extract user_id from query param. Single-user app — returns placeholder if missing."""
-    return user_id or "00000000-0000-0000-0000-000000000001"
+    """Extract user_id from query param. Single-user app — falls back to configured default."""
+    from app.config import get_default_user_id
+    return user_id or get_default_user_id()
 
 
 @router.post("/run_allocation", response_model=AllocationRunResponse)
@@ -389,6 +390,13 @@ def run_allocation(
             run_id, len(proposed_trades), approval_count, alerts_dispatched,
         )
 
+        # Keep-alive: write heartbeat to prevent Supabase free tier from pausing
+        try:
+            from app.services.alert_engine import write_keep_alive_ping
+            write_keep_alive_ping(db)
+        except Exception:
+            pass
+
         # ── Phase 8 — aggregate tax cost across sell trades ────────────────
         total_tax_cost = sum(
             t.tax_cost_usd for t in proposed_trades
@@ -643,7 +651,7 @@ async def admin_pause(
 
 @router.get("/admin/status", tags=["admin"])
 def admin_status(
-    user_id: str = Query(default="00000000-0000-0000-0000-000000000001"),
+    user_id: str = Query(default=None),
 ) -> dict:
     """
     System health dashboard — 10 fields.

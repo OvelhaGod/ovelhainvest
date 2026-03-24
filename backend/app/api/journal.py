@@ -51,7 +51,7 @@ class OutcomeUpdateRequest(BaseModel):
 
 @router.get("/journal")
 async def list_journal(
-    user_id: str = Query(default="00000000-0000-0000-0000-000000000001"),
+    user_id: str = Query(default=None),
     limit: int = Query(default=50, le=200),
     offset: int = Query(default=0, ge=0),
     action_type: str | None = Query(default=None),
@@ -68,7 +68,7 @@ async def list_journal(
 @router.post("/journal", status_code=201)
 async def create_entry(
     body: JournalEntryRequest,
-    user_id: str = Query(default="00000000-0000-0000-0000-000000000001"),
+    user_id: str = Query(default=None),
 ) -> dict:
     """Create a new decision journal entry."""
     valid_types = {"followed", "overrode", "deferred", "manual_trade"}
@@ -94,7 +94,7 @@ async def create_entry(
 
 @router.get("/journal/stats")
 async def journal_stats(
-    user_id: str = Query(default="00000000-0000-0000-0000-000000000001"),
+    user_id: str = Query(default=None),
 ) -> dict:
     """
     Return override accuracy statistics.
@@ -133,7 +133,7 @@ async def patch_outcome(
 
 @router.get("/journal/patterns")
 async def journal_patterns(
-    user_id: str = Query(default="00000000-0000-0000-0000-000000000001"),
+    user_id: str = Query(default=None),
 ) -> list[dict]:
     """
     Detect behavioral patterns in decision history.
@@ -156,7 +156,7 @@ async def journal_patterns(
 
 @router.get("/journal/insight")
 async def journal_insight(
-    user_id: str = Query(default="00000000-0000-0000-0000-000000000001"),
+    user_id: str = Query(default=None),
 ) -> dict:
     """
     Generate (or return cached) AI behavioral insight for the user's journal.
@@ -178,7 +178,7 @@ async def journal_insight(
 @router.post("/journal/backfill", status_code=202)
 async def trigger_backfill(
     background_tasks: BackgroundTasks,
-    user_id: str = Query(default="00000000-0000-0000-0000-000000000001"),
+    user_id: str = Query(default=None),
 ) -> dict:
     """
     Trigger outcome backfill for journal entries missing 30d/90d outcomes.
@@ -221,7 +221,7 @@ async def trigger_backfill(
 
 @router.get("/journal/export")
 async def export_journal(
-    user_id: str = Query(default="00000000-0000-0000-0000-000000000001"),
+    user_id: str = Query(default=None),
     limit: int = Query(default=500, le=2000),
 ) -> StreamingResponse:
     """
