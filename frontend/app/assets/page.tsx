@@ -601,7 +601,7 @@ export default function AssetsPage() {
       {/* Table */}
       <div className={`${glass} overflow-hidden`}>
         <div className="overflow-x-auto">
-          <table className="w-full">
+          <table className="w-full min-w-[640px]">
             <thead className="border-b border-white/[0.06]">
               <tr>
                 <SortTh col="rank_in_universe"     label="Rank" />

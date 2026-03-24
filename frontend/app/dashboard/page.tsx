@@ -234,7 +234,7 @@ export default function DashboardPage() {
       </div>
 
       {/* ── Top metrics row ── */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
         {/* Net Worth */}
         <div className={glassInner} style={{ borderColor: "rgba(16,185,129,0.2)", boxShadow: "0 0 20px rgba(16,185,129,0.05)" }}>
           <p className="text-xs text-white/40 uppercase tracking-widest mb-2">Net Worth</p>
@@ -317,7 +317,7 @@ export default function DashboardPage() {
       </div>
 
       {/* ── Middle row: Donut + Vaults ── */}
-      <div className="grid grid-cols-1 lg:grid-cols-5 gap-4">
+      <div className="grid grid-cols-1 xl:grid-cols-5 gap-4">
         {/* Allocation donut */}
         <div className={`${glassInner} lg:col-span-3`}>
           <p className="text-xs text-white/40 uppercase tracking-widest mb-4">Asset Allocation</p>

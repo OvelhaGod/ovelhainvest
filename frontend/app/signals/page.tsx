@@ -466,8 +466,9 @@ export default function SignalsPage() {
 
       {/* Main table card */}
       <div className={glass}>
+        <div className="overflow-x-auto">
         {/* Table header */}
-        <div className="grid grid-cols-12 gap-3 px-4 py-3 border-b border-white/[0.06]">
+        <div className="grid grid-cols-12 gap-3 px-4 py-3 border-b border-white/[0.06] min-w-[640px]">
           {["TIMESTAMP", "TYPE", "TRADES", "REGIME", "STATUS", "ACTION"].map((h, i) => (
             <div
               key={h}
@@ -482,18 +483,18 @@ export default function SignalsPage() {
 
         {/* Rows */}
         {loading ? (
-          <div className="p-4 space-y-2">
+          <div className="p-4 space-y-2 min-w-[640px]">
             {Array.from({ length: 5 }).map((_, i) => (
               <Skeleton key={i} className="h-12 rounded-xl" />
             ))}
           </div>
         ) : error ? (
-          <div className="p-4 rounded-xl border border-rose-500/20 bg-rose-500/10 mx-4 mt-4 text-rose-400 text-sm flex items-center justify-between">
+          <div className="p-4 rounded-xl border border-rose-500/20 bg-rose-500/10 mx-4 mt-4 text-rose-400 text-sm flex items-center justify-between min-w-[640px]">
             <span>⚠ {error}</span>
             <button onClick={loadRuns} className="text-rose-300 hover:text-rose-100 underline text-xs">Retry</button>
           </div>
         ) : filteredRuns.length === 0 ? (
-          <div className="py-16 text-center text-slate-500 text-sm">
+          <div className="py-16 text-center text-slate-500 text-sm min-w-[640px]">
             <p className="text-2xl mb-3">—</p>
             <p>No signals found.</p>
             <p className="text-xs text-white/10 mt-1">Run <code className="text-white/20">POST /run_allocation</code> to generate signals</p>
@@ -508,7 +509,7 @@ export default function SignalsPage() {
             return (
               <div
                 key={run.id}
-                className={`border-b border-white/[0.04] transition-all duration-200 ${
+                className={`border-b border-white/[0.04] transition-all duration-200 min-w-[640px] ${
                   isExpanded ? "bg-white/[0.02]" : "hover:bg-white/[0.015]"
                 }`}
               >
@@ -574,6 +575,7 @@ export default function SignalsPage() {
             );
           })
         )}
+        </div>{/* end overflow-x-auto */}
       </div>
     </div>
   );

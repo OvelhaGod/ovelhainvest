@@ -34,20 +34,19 @@ export function Sidebar() {
   const pathname = usePathname();
 
   return (
-    <aside className="w-52 flex-none border-r border-white/[0.06] flex flex-col hidden md:flex">
+    <aside className="hidden md:flex lg:w-52 w-16 flex-none border-r border-white/[0.06] flex-col transition-all">
       {/* Logo */}
-      <div className="px-4 py-5 border-b border-white/[0.06]">
-        <span className="text-emerald-400 font-bold tracking-tight text-sm">
-          🐑 OvelhaInvest
-        </span>
-        <p className="text-slate-500 text-xs mt-0.5">Wealth OS · v1.0</p>
+      <div className="px-3 lg:px-4 py-5 border-b border-white/[0.06] flex items-center gap-2 overflow-hidden">
+        <span className="text-emerald-400 font-bold tracking-tight text-sm shrink-0">🐑</span>
+        <span className="text-emerald-400 font-bold tracking-tight text-sm hidden lg:block truncate">OvelhaInvest</span>
+        <p className="text-slate-500 text-xs mt-0.5 hidden lg:block">Wealth OS · v1.0</p>
       </div>
 
       {/* Nav */}
-      <nav className="flex-1 px-2 py-4 space-y-4 overflow-y-auto">
+      <nav className="flex-1 px-1.5 lg:px-2 py-4 space-y-4 overflow-y-auto">
         {navItems.map(({ group, items }) => (
           <div key={group}>
-            <p className="px-3 mb-1 text-[10px] font-semibold uppercase tracking-widest text-slate-600">
+            <p className="px-3 mb-1 text-[10px] font-semibold uppercase tracking-widest text-slate-600 hidden lg:block">
               {group}
             </p>
             {items.map(({ href, label }) => {
@@ -57,13 +56,15 @@ export function Sidebar() {
                 <Link
                   key={href}
                   href={href}
-                  className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs transition-all ${
+                  title={label}
+                  className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs transition-all justify-center lg:justify-start ${
                     active
                       ? "bg-emerald-500/10 text-emerald-400 border border-emerald-500/20"
                       : "text-slate-400 hover:bg-white/[0.04] hover:text-slate-200 border border-transparent"
                   }`}
                 >
-                  {label}
+                  <span className="text-sm shrink-0">{label.charAt(0)}</span>
+                  <span className="hidden lg:block">{label}</span>
                 </Link>
               );
             })}
@@ -72,8 +73,8 @@ export function Sidebar() {
       </nav>
 
       {/* Footer */}
-      <div className="px-4 py-3 border-t border-white/[0.06]">
-        <p className="text-slate-600 text-xs">Phase 10 · PWA Ready</p>
+      <div className="px-3 lg:px-4 py-3 border-t border-white/[0.06]">
+        <p className="text-slate-600 text-xs hidden lg:block">Phase 10 · PWA Ready</p>
       </div>
     </aside>
   );

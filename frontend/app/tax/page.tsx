@@ -355,7 +355,7 @@ export default function TaxPage() {
 
         {/* Table */}
         <div className="overflow-x-auto">
-          <table className="w-full text-xs">
+          <table className="w-full min-w-[640px] text-xs">
             <thead>
               <tr style={{ borderBottom: "1px solid rgba(255,255,255,0.05)" }}>
                 {["Symbol", "Account", "Acquired", "Qty", "Cost/Unit", "Price", "Unrlz G/L", "Holding", "Est. Tax", "Wait LT?"].map((h) => (
