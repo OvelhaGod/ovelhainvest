@@ -83,6 +83,10 @@ export interface DailyStatusResponse {
   ytd_return_twr: number | null;
   max_drawdown_pct: number | null;
   portfolio_snapshot_date: string | null;
+  // Phase 4 performance fields
+  ytd_vs_benchmark: number | null;
+  sharpe_trailing_12mo: number | null;
+  max_drawdown_current: number | null;
 }
 
 // ── Alert types (Phase 6) ─────────────────────────────────────────────────────
