@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { Geist_Mono } from "next/font/google";
+import { JetBrains_Mono } from "next/font/google";
 import "./globals.css";
 import { Sidebar } from "@/components/layout/Sidebar";
 import { MobileNav } from "@/components/layout/MobileNav";
@@ -7,9 +7,10 @@ import { PWAInit } from "@/components/pwa/PWAInit";
 import { OfflineBanner } from "@/components/pwa/OfflineBanner";
 import { InstallPrompt } from "@/components/pwa/InstallPrompt";
 
-const geistMono = Geist_Mono({
+const jetbrainsMono = JetBrains_Mono({
   variable: "--font-geist-mono",
   subsets: ["latin"],
+  weight: ["400", "500", "700"],
 });
 
 export const metadata: Metadata = {
@@ -27,7 +28,7 @@ export default function RootLayout({
   children,
 }: Readonly<{ children: React.ReactNode }>) {
   return (
-    <html lang="en" className={`${geistMono.variable} h-full dark`}>
+    <html lang="en" className={`${jetbrainsMono.variable} h-full dark`}>
       <head>
         <meta name="theme-color" content="#050508" />
         <meta name="mobile-web-app-capable" content="yes" />

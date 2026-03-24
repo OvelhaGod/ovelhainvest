@@ -1,7 +1,47 @@
 @import "tailwindcss";
 
-/* ── shadcn/ui CSS variables (dark-first for Bloomberg terminal aesthetic) ── */
 :root {
+  /* Stitch design tokens */
+  --color-primary: #4edea3;
+  --color-primary-container: #10b981;
+  --color-secondary: #d0bcff;
+  --color-secondary-container: #571bc1;
+  --color-tertiary: #ffb95f;
+  --color-error: #ffb4ab;
+  --color-background: #050508;
+  --color-surface: #121315;
+  --color-surface-dim: #121315;
+  --color-surface-container-lowest: #0d0e0f;
+  --color-surface-container-low: #1b1c1d;
+  --color-surface-container: #1f2021;
+  --color-surface-container-high: #292a2b;
+  --color-surface-container-highest: #343536;
+  --color-surface-bright: #38393a;
+  --color-on-surface: #e3e2e3;
+  --color-on-surface-variant: #bbcabf;
+  --color-outline: #86948a;
+  --color-outline-variant: #3c4a42;
+
+  /* Semantic aliases */
+  --color-positive: #4edea3;
+  --color-positive-dim: #10b981;
+  --color-negative: #ffb4ab;
+  --color-warning: #ffb95f;
+  --color-ai: #d0bcff;
+  --color-text-primary: #e3e2e3;
+  --color-text-secondary: #bbcabf;
+  --color-text-muted: #86948a;
+  --color-border: rgba(255, 255, 255, 0.08);
+  --color-border-subtle: rgba(60, 74, 66, 0.6);
+
+  /* Shadows */
+  --shadow-card: 0 4px 24px rgba(0, 0, 0, 0.4);
+  --shadow-elevated: 0 8px 40px rgba(0, 0, 0, 0.6);
+  --glow-green: 0 0 20px rgba(78, 222, 163, 0.15);
+  --glow-violet: 0 0 20px rgba(208, 188, 255, 0.12);
+  --glow-amber: 0 0 20px rgba(255, 185, 95, 0.15);
+
+  /* shadcn/ui compat */
   --background: 222.2 84% 4.9%;
   --foreground: 210 40% 98%;
   --card: 222.2 84% 4.9%;
@@ -21,19 +61,35 @@
   --border: 217.2 32.6% 17.5%;
   --input: 217.2 32.6% 17.5%;
   --ring: 224.3 76.3% 48%;
-  --radius: 0.5rem;
-  --chart-1: 220 70% 50%;
-  --chart-2: 160 60% 45%;
-  --chart-3: 30 80% 55%;
-  --chart-4: 280 65% 60%;
-  --chart-5: 340 75% 55%;
+  --radius: 1rem;
+  --chart-1: 160 60% 60%;
+  --chart-2: 270 70% 75%;
+  --chart-3: 40 90% 65%;
+  --chart-4: 0 80% 85%;
+  --chart-5: 220 70% 60%;
 }
 
 @theme inline {
-  --color-background: hsl(var(--background));
-  --color-foreground: hsl(var(--foreground));
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+  --color-background: var(--color-background);
+  --color-foreground: var(--color-on-surface);
+  --font-sans: var(--font-geist-mono, "JetBrains Mono", monospace);
+  --font-mono: var(--font-geist-mono, "JetBrains Mono", monospace);
+
+  /* Stitch colors as Tailwind utilities */
+  --color-primary: var(--color-primary);
+  --color-primary-container: var(--color-primary-container);
+  --color-secondary: var(--color-secondary);
+  --color-tertiary: var(--color-tertiary);
+  --color-surface: var(--color-surface);
+  --color-surface-container: var(--color-surface-container);
+  --color-surface-container-high: var(--color-surface-container-high);
+  --color-on-surface: var(--color-on-surface);
+  --color-on-surface-variant: var(--color-on-surface-variant);
+  --color-outline: var(--color-outline);
+  --color-positive: var(--color-positive);
+  --color-negative: var(--color-negative);
+  --color-warning: var(--color-warning);
+  --color-error: var(--color-error);
 }
 
 html {
@@ -41,11 +97,67 @@ html {
 }
 
 body {
-  background: hsl(var(--background));
-  color: hsl(var(--foreground));
-  font-family: var(--font-geist-mono, "Courier New", monospace);
+  background-color: var(--color-background);
+  color: var(--color-on-surface);
+  font-family: "JetBrains Mono", "Fira Code", monospace;
   font-size: 0.875rem;
 }
 
-/* iOS safe area support */
+/* Glassmorphism base */
+.glass-card {
+  background: rgba(31, 32, 33, 0.6);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 1rem;
+}
+
+.glass-card-subtle {
+  background: rgba(31, 32, 33, 0.3);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid rgba(60, 74, 66, 0.6);
+  border-radius: 1rem;
+}
+
+/* Glow effects */
+.emerald-glow { box-shadow: 0 0 20px rgba(78, 222, 163, 0.12); }
+.violet-glow  { box-shadow: 0 0 20px rgba(208, 188, 255, 0.10); }
+.amber-glow   { box-shadow: 0 0 20px rgba(255, 185, 95, 0.15); }
+.red-glow     { box-shadow: 0 0 20px rgba(255, 180, 171, 0.12); }
+
+/* Text glow (for large numbers like Net Worth) */
+.text-glow { filter: drop-shadow(0 0 12px rgba(78, 222, 163, 0.4)); }
+.text-glow-red { filter: drop-shadow(0 0 12px rgba(255, 180, 171, 0.4)); }
+
+/* Radial page background glow */
+.page-glow-tl {
+  position: fixed; top: -10%; right: -10%;
+  width: 800px; height: 800px;
+  background: radial-gradient(ellipse, rgba(78, 222, 163, 0.05) 0%, transparent 70%);
+  pointer-events: none; z-index: -10; border-radius: 50%;
+}
+.page-glow-br {
+  position: fixed; bottom: -20%; left: -10%;
+  width: 600px; height: 600px;
+  background: radial-gradient(ellipse, rgba(208, 188, 255, 0.04) 0%, transparent 70%);
+  pointer-events: none; z-index: -10; border-radius: 50%;
+}
+
+/* Scrollbar */
+::-webkit-scrollbar { width: 4px; height: 4px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--color-outline-variant); border-radius: 2px; }
+
+/* iOS safe area */
 .pb-safe { padding-bottom: env(safe-area-inset-bottom, 0px); }
+
+/* Active nav glow indicator */
+.nav-active-glow::before {
+  content: '';
+  position: absolute; left: 0;
+  width: 2px; height: 24px;
+  background: var(--color-primary);
+  box-shadow: 0 0 10px var(--color-primary);
+  border-radius: 0 2px 2px 0;
+}

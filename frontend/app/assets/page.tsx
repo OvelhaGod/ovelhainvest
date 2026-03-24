@@ -14,10 +14,11 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { api } from "@/lib/api";
+import { OIErrorState } from "@/components/ui/oi";
 import type { AssetValuation } from "@/lib/types";
 
 // ── Design tokens ─────────────────────────────────────────────────────────────
-const glass = "rounded-2xl border border-white/[0.08] bg-white/[0.03] backdrop-blur-sm";
+const glass = "glass-card";
 
 const CLASS_COLORS: Record<string, string> = {
   US_equity:     "#6366f1",
@@ -251,12 +252,12 @@ function DetailDrawer({ asset, onClose }: { asset: AssetValuation; onClose: () =
             <div
               className={`rounded-xl p-3 border ${
                 asset.passes_buy_gate
-                  ? "bg-emerald-500/5 border-emerald-500/20"
+                  ? "bg-primary/5 border-primary/20"
                   : "bg-white/[0.02] border-white/[0.06]"
               }`}
             >
               <div className="flex items-center gap-2">
-                <span className={asset.passes_buy_gate ? "text-emerald-400" : "text-[#475569]"}>
+                <span className={asset.passes_buy_gate ? "text-primary" : "text-[#475569]"}>
                   {asset.passes_buy_gate ? "✓" : "○"}
                 </span>
                 <span className="text-xs text-[#94a3b8]">
@@ -592,9 +593,8 @@ export default function AssetsPage() {
 
       {/* Error */}
       {error && (
-        <div className="mb-4 rounded-xl border border-rose-500/20 bg-rose-500/10 px-4 py-3 text-rose-400 text-sm flex items-center justify-between">
-          <span>{error}</span>
-          <button onClick={load} className="text-rose-300 hover:text-rose-100 underline text-xs">Retry</button>
+        <div className="mb-4">
+          <OIErrorState message={error} onRetry={load} />
         </div>
       )}
 

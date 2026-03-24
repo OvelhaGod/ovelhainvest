@@ -17,10 +17,10 @@ const SLEEVE_SHORT: Record<string, string> = {
 };
 
 function getCellBg(val: number, isDiag: boolean): string {
-  if (isDiag) return "rgba(99,102,241,0.25)";
+  if (isDiag) return "rgba(208,188,255,0.15)"; // secondary/AI accent for diagonal
   const abs = Math.abs(val);
-  if (val > 0) return `rgba(239,68,68,${abs * 0.6})`;
-  return `rgba(34,197,94,${abs * 0.6})`;
+  if (val > 0) return `rgba(255,180,171,${abs * 0.6})`; // var(--color-error)
+  return `rgba(78,222,163,${abs * 0.6})`;              // var(--color-primary)
 }
 
 function getInterpretation(val: number, isDiag: boolean): string {
@@ -51,7 +51,7 @@ export const CorrelationHeatmap = React.memo(function CorrelationHeatmap({ matri
   return (
     <div className="relative">
       {highCorrPairs.length > 0 && (
-        <div className="mb-3 px-3 py-2 rounded-xl bg-amber-500/10 border border-amber-500/20 text-xs text-amber-400">
+        <div className="mb-3 px-3 py-2 rounded-xl bg-tertiary/10 border border-tertiary/20 text-xs text-tertiary">
           ⚠️ {highCorrPairs.length} high-correlation pair
           {highCorrPairs.length > 1 ? "s" : ""} detected:{" "}
           {highCorrPairs.join(", ")}
@@ -71,7 +71,7 @@ export const CorrelationHeatmap = React.memo(function CorrelationHeatmap({ matri
           {sleeves.map((s) => (
             <div
               key={s}
-              className="text-[10px] text-slate-500 font-mono text-center py-1 truncate"
+              className="text-[10px] text-outline font-mono text-center py-1 truncate"
             >
               {SLEEVE_SHORT[s] ?? s}
             </div>
@@ -82,7 +82,7 @@ export const CorrelationHeatmap = React.memo(function CorrelationHeatmap({ matri
             <>
               <div
                 key={`lbl-${row}`}
-                className="text-[10px] text-slate-400 font-mono flex items-center pr-2 truncate"
+                className="text-[10px] text-on-surface-variant font-mono flex items-center pr-2 truncate"
               >
                 {SLEEVE_SHORT[row] ?? row}
               </div>
@@ -108,7 +108,7 @@ export const CorrelationHeatmap = React.memo(function CorrelationHeatmap({ matri
                   >
                     <div
                       className="absolute inset-0 flex items-center justify-center text-[10px] font-mono font-bold"
-                      style={{ color: isDiag ? "#a78bfa" : "#f1f5f9" }}
+                      style={{ color: isDiag ? "var(--color-secondary, #d0bcff)" : "var(--color-on-surface, #e3e2e3)", fontFamily: "JetBrains Mono, monospace" }}
                     >
                       {val.toFixed(2)}
                     </div>
@@ -121,10 +121,10 @@ export const CorrelationHeatmap = React.memo(function CorrelationHeatmap({ matri
       </div>
 
       {/* Color scale legend */}
-      <div className="mt-3 flex items-center gap-2 text-[10px] text-slate-500">
+      <div className="mt-3 flex items-center gap-2 text-[10px] text-outline">
         <div
           style={{
-            background: "rgba(34,197,94,0.6)",
+            background: "rgba(78,222,163,0.6)",
             width: 16,
             height: 10,
             borderRadius: 2,
@@ -142,7 +142,7 @@ export const CorrelationHeatmap = React.memo(function CorrelationHeatmap({ matri
         <span>Zero</span>
         <div
           style={{
-            background: "rgba(239,68,68,0.6)",
+            background: "rgba(255,180,171,0.6)",
             width: 16,
             height: 10,
             borderRadius: 2,
@@ -157,12 +157,12 @@ export const CorrelationHeatmap = React.memo(function CorrelationHeatmap({ matri
           className="fixed z-50 rounded-xl border border-white/10 bg-[#0d0d14]/95 backdrop-blur-sm p-3 text-xs shadow-xl pointer-events-none"
           style={{ top: tooltip.y - 80, left: tooltip.x }}
         >
-          <div className="font-semibold text-slate-200 mb-1">
+          <div className="font-semibold text-on-surface mb-1" style={{ fontFamily: "JetBrains Mono, monospace" }}>
             {SLEEVE_SHORT[tooltip.a] ?? tooltip.a} ↔{" "}
             {SLEEVE_SHORT[tooltip.b] ?? tooltip.b}
           </div>
-          <div className="font-mono text-slate-300">{tooltip.val.toFixed(3)}</div>
-          <div className="text-slate-400 mt-1 max-w-[200px]">
+          <div className="font-mono text-on-surface" style={{ fontFamily: "JetBrains Mono, monospace" }}>{tooltip.val.toFixed(3)}</div>
+          <div className="text-on-surface-variant mt-1 max-w-[200px]" style={{ fontFamily: "JetBrains Mono, monospace" }}>
             {getInterpretation(tooltip.val, tooltip.a === tooltip.b)}
           </div>
         </div>
