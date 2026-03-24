@@ -34,7 +34,7 @@ interface RebalancePreview {
 }
 
 // ── Design tokens ─────────────────────────────────────────────────────────────
-const glass     = "rounded-2xl border border-white/[0.08] bg-white/[0.03] backdrop-blur-sm";
+const glass     = "glass-card";
 const glassInner = `${glass} p-5`;
 
 const SLEEVE_TARGETS: Record<string, { target: number; min: number; max: number; color: string }> = {
@@ -63,13 +63,13 @@ function JsonHighlight({ obj }: { obj: unknown }) {
     .replace(/&/g, "&amp;")
     .replace(/</g, "&lt;")
     .replace(/("(\\u[a-zA-Z0-9]{4}|\\[^u]|[^\\"])*"(\s*:)?|\b(true|false|null)\b|-?\d+(?:\.\d*)?(?:[eE][+-]?\d+)?)/g, (match) => {
-      let cls = "text-emerald-400"; // number
+      let cls = "text-primary"; // number
       if (/^"/.test(match)) {
-        cls = /:$/.test(match) ? "text-violet-400" : "text-amber-300"; // key vs string
+        cls = /:$/.test(match) ? "text-secondary" : "text-tertiary"; // key vs string
       } else if (/true|false/.test(match)) {
         cls = "text-blue-400";
       } else if (/null/.test(match)) {
-        cls = "text-rose-400";
+        cls = "text-error";
       }
       return `<span class="${cls}">${match}</span>`;
     });
@@ -253,7 +253,7 @@ export default function ConfigPage() {
                 <p className="text-xs font-mono text-violet-300 font-semibold">v1.0.0</p>
                 <p className="text-[10px] text-white/30">Active · {new Date().toLocaleDateString()}</p>
               </div>
-              <span className="text-[9px] px-1.5 py-0.5 rounded-full border border-emerald-500/30 text-emerald-400 bg-emerald-500/8">
+              <span className="text-[9px] px-1.5 py-0.5 rounded-full border border-primary/30 text-primary bg-primary/10">
                 ACTIVE
               </span>
             </div>
@@ -401,7 +401,7 @@ export default function ConfigPage() {
                           <div className="absolute top-0 w-px h-full bg-white/40" style={{ left: `${target * 100}%` }} />
                         </div>
                         <span className="col-span-1 text-right font-mono text-white/60">{(current * 100).toFixed(0)}%</span>
-                        <span className={`col-span-2 text-right font-mono text-xs ${Math.abs(drift) > 0.05 ? "text-amber-400" : "text-white/30"}`}>
+                        <span className={`col-span-2 text-right font-mono text-xs ${Math.abs(drift) > 0.05 ? "text-tertiary" : "text-white/30"}`}>
                           {drift > 0 ? "+" : ""}{(drift * 100).toFixed(1)}%
                         </span>
                       </div>
@@ -564,14 +564,14 @@ function AlertRuleRow({
           onClick={onToggle}
           className={`relative w-9 h-5 rounded-full border transition-all shrink-0 ${
             rule.is_active
-              ? "bg-emerald-500/20 border-emerald-500/40"
+              ? "bg-primary/20 border-primary/40"
               : "bg-white/[0.04] border-white/10"
           }`}
         >
           <span
             className={`absolute top-0.5 h-4 w-4 rounded-full border transition-all ${
               rule.is_active
-                ? "left-[18px] bg-emerald-400 border-emerald-300"
+                ? "left-[18px] bg-primary border-primary/80"
                 : "left-0.5 bg-white/20 border-white/10"
             }`}
           />

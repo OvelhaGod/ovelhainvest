@@ -8,7 +8,7 @@
 import { useEffect, useState } from "react";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
-const glass = "rounded-2xl border border-white/[0.08] bg-white/[0.04] backdrop-blur-sm";
+const glass = "glass-card";
 
 interface ReportRecord {
   id: string;
@@ -27,10 +27,10 @@ const MONTH_NAMES = [
 ];
 
 const STATUS_STYLES: Record<string, { text: string; bg: string; border: string }> = {
-  ready:      { text: "text-emerald-400", bg: "bg-emerald-500/10", border: "border-emerald-500/20" },
-  generating: { text: "text-amber-400",   bg: "bg-amber-500/10",   border: "border-amber-500/20"   },
-  pending:    { text: "text-slate-400",   bg: "bg-white/[0.04]",   border: "border-white/10"        },
-  error:      { text: "text-rose-400",    bg: "bg-rose-500/10",    border: "border-rose-500/20"     },
+  ready:      { text: "text-primary",  bg: "bg-primary/10",  border: "border-primary/20"  },
+  generating: { text: "text-tertiary", bg: "bg-tertiary/10", border: "border-tertiary/20" },
+  pending:    { text: "text-outline",  bg: "bg-white/[0.04]",border: "border-white/10"    },
+  error:      { text: "text-error",    bg: "bg-error/10",    border: "border-error/20"    },
 };
 
 export default function ReportsPage() {
@@ -116,23 +116,23 @@ export default function ReportsPage() {
   const years = Array.from({ length: 5 }, (_, i) => currentYear - i);
 
   return (
-    <div className="min-h-screen bg-[#050508] text-slate-100">
-      <div className="fixed top-[-10%] right-[-10%] w-[400px] h-[400px] bg-violet-500/5 blur-[100px] rounded-full pointer-events-none -z-10" />
+    <div className="min-h-screen bg-[#050508] text-on-surface">
+      <div className="fixed top-[-10%] right-[-10%] w-[400px] h-[400px] bg-secondary/5 blur-[100px] rounded-full pointer-events-none -z-10" />
 
       <div className="p-8 space-y-8">
         {/* Header */}
         <div className="flex items-end justify-between">
           <div>
-            <h1 className="text-4xl font-black tracking-tight text-slate-100 uppercase">
+            <h1 className="text-4xl font-black tracking-tight text-on-surface uppercase">
               Reports
             </h1>
-            <p className="text-slate-400 mt-1 text-sm">
+            <p className="text-on-surface-variant mt-1 text-sm">
               Generate and download monthly or annual PDF reports.
             </p>
           </div>
           <button
             onClick={() => setShowModal(true)}
-            className="px-5 py-2.5 rounded-xl bg-emerald-500 text-emerald-950 text-sm font-bold hover:bg-emerald-400 transition-all shadow-[0_0_12px_rgba(16,185,129,0.3)]"
+            className="px-5 py-2.5 rounded-xl bg-primary text-[#003824] text-sm font-bold hover:bg-primary/90 transition-all shadow-[0_0_12px_rgba(78,222,163,0.3)]"
           >
             + Generate Report
           </button>
@@ -140,8 +140,8 @@ export default function ReportsPage() {
 
         {genMsg && (
           <div className={`text-sm rounded-xl px-4 py-2 border ${
-            genMsg.includes("ready") ? "text-emerald-400 bg-emerald-500/10 border-emerald-500/20"
-            : genMsg.includes("failed") || genMsg.includes("error") ? "text-rose-400 bg-rose-500/10 border-rose-500/20"
+            genMsg.includes("ready") ? "text-primary bg-primary/10 border-primary/20"
+            : genMsg.includes("failed") || genMsg.includes("error") ? "text-error bg-error/10 border-error/20"
             : "text-slate-300 bg-white/[0.04] border-white/10"
           }`}>
             {genMsg}
@@ -149,9 +149,9 @@ export default function ReportsPage() {
         )}
 
         {loadError && (
-          <div className="rounded-xl border border-rose-500/20 bg-rose-500/10 px-4 py-3 text-rose-400 text-sm flex items-center justify-between">
+          <div className="rounded-xl border border-error/20 bg-error/10 px-4 py-3 text-error text-sm flex items-center justify-between">
             <span>{loadError}</span>
-            <button onClick={loadReports} className="text-rose-300 hover:text-rose-100 underline text-xs">Retry</button>
+            <button onClick={loadReports} className="text-error/70 hover:text-error underline text-xs">Retry</button>
           </div>
         )}
 
@@ -163,7 +163,7 @@ export default function ReportsPage() {
           <div className="overflow-x-auto">
             <table className="w-full text-left">
               <thead>
-                <tr className="text-[10px] uppercase tracking-widest text-slate-500 font-mono border-b border-white/5">
+                <tr className="text-[10px] uppercase tracking-widest text-outline font-mono border-b border-white/5">
                   <th className="px-6 py-4 font-normal">Period</th>
                   <th className="px-6 py-4 font-normal">Type</th>
                   <th className="px-6 py-4 font-normal">Status</th>
@@ -184,7 +184,7 @@ export default function ReportsPage() {
                 ))}
                 {!loading && reports.length === 0 && (
                   <tr>
-                    <td colSpan={6} className="px-6 py-12 text-center text-slate-500 text-sm">
+                    <td colSpan={6} className="px-6 py-12 text-center text-outline text-sm">
                       No reports yet. Click "Generate Report" to create your first PDF.
                     </td>
                   </tr>
@@ -200,15 +200,15 @@ export default function ReportsPage() {
                   });
                   return (
                     <tr key={r.id} className="hover:bg-white/[0.025] transition-colors">
-                      <td className="px-6 py-4 font-mono text-sm text-slate-200">{period}</td>
-                      <td className="px-6 py-4 text-sm text-slate-400 capitalize">{r.report_type}</td>
+                      <td className="px-6 py-4 font-mono text-sm text-on-surface">{period}</td>
+                      <td className="px-6 py-4 text-sm text-on-surface-variant capitalize">{r.report_type}</td>
                       <td className="px-6 py-4">
                         <span className={`px-2.5 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider border ${style.bg} ${style.text} ${style.border}`}>
                           {r.status}
                         </span>
                       </td>
-                      <td className="px-6 py-4 text-right font-mono text-sm text-slate-400">{sizeKb}</td>
-                      <td className="px-6 py-4 text-sm font-mono text-slate-400">{createdAt}</td>
+                      <td className="px-6 py-4 text-right font-mono text-sm text-on-surface-variant">{sizeKb}</td>
+                      <td className="px-6 py-4 text-sm font-mono text-on-surface-variant">{createdAt}</td>
                       <td className="px-6 py-4 text-right">
                         {r.status === "ready" && r.download_url ? (
                           <a
@@ -220,7 +220,7 @@ export default function ReportsPage() {
                             ↓ Download
                           </a>
                         ) : (
-                          <span className="text-xs text-slate-600">—</span>
+                          <span className="text-xs text-outline">—</span>
                         )}
                       </td>
                     </tr>
@@ -248,8 +248,8 @@ export default function ReportsPage() {
                     onClick={() => setGenType(t)}
                     className={`flex-1 py-2 rounded-xl border text-sm font-medium transition-all capitalize ${
                       genType === t
-                        ? "bg-emerald-500/10 border-emerald-500/30 text-emerald-400"
-                        : "bg-white/[0.03] border-white/10 text-slate-400 hover:bg-white/[0.06]"
+                        ? "bg-primary/10 border-primary/30 text-primary"
+                        : "bg-white/[0.03] border-white/10 text-on-surface-variant hover:bg-white/[0.06]"
                     }`}
                   >
                     {t}
@@ -264,7 +264,7 @@ export default function ReportsPage() {
               <select
                 value={genYear}
                 onChange={(e) => setGenYear(Number(e.target.value))}
-                className="w-full rounded-xl bg-white/[0.04] border border-white/10 text-slate-200 px-4 py-2.5 text-sm focus:outline-none focus:border-emerald-500/50"
+                className="w-full rounded-xl bg-white/[0.04] border border-white/10 text-on-surface px-4 py-2.5 text-sm focus:outline-none focus:border-primary/50"
               >
                 {years.map((y) => <option key={y} value={y}>{y}</option>)}
               </select>
@@ -277,7 +277,7 @@ export default function ReportsPage() {
                 <select
                   value={genMonth}
                   onChange={(e) => setGenMonth(Number(e.target.value))}
-                  className="w-full rounded-xl bg-white/[0.04] border border-white/10 text-slate-200 px-4 py-2.5 text-sm focus:outline-none focus:border-emerald-500/50"
+                  className="w-full rounded-xl bg-white/[0.04] border border-white/10 text-on-surface px-4 py-2.5 text-sm focus:outline-none focus:border-primary/50"
                 >
                   {MONTH_NAMES.slice(1).map((m, i) => (
                     <option key={i + 1} value={i + 1}>{m}</option>
@@ -297,7 +297,7 @@ export default function ReportsPage() {
               <button
                 onClick={handleGenerate}
                 disabled={generating}
-                className="flex-1 py-2.5 rounded-xl bg-emerald-500 text-emerald-950 text-sm font-bold hover:bg-emerald-400 transition-all disabled:opacity-50"
+                className="flex-1 py-2.5 rounded-xl bg-primary text-[#003824] text-sm font-bold hover:bg-primary/90 transition-all disabled:opacity-50"
               >
                 {generating ? "Generating…" : "Generate"}
               </button>
