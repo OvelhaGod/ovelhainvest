@@ -108,7 +108,7 @@ async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> {
 
 // ── Design helpers ────────────────────────────────────────────────────────────
 
-const glass = "rounded-2xl border border-white/[0.08] bg-white/[0.03] backdrop-blur-sm";
+const glass = "glass-card";
 
 function fmtUSD(n: number) {
   const abs = Math.abs(n);
@@ -295,9 +295,9 @@ export default function TaxPage() {
 
       {/* ── Lots Error ── */}
       {lotsError && (
-        <div className="rounded-xl border border-rose-500/20 bg-rose-500/10 px-4 py-3 text-rose-400 text-sm flex items-center justify-between">
+        <div className="rounded-xl border border-error/20 bg-error/10 px-4 py-3 text-error text-sm flex items-center justify-between">
           <span>{lotsError}</span>
-          <button onClick={() => fetchLots(lotMethod)} className="text-rose-300 hover:text-rose-100 underline text-xs">Retry</button>
+          <button onClick={() => fetchLots(lotMethod)} className="text-error/70 hover:text-error underline text-xs">Retry</button>
         </div>
       )}
 
@@ -313,12 +313,11 @@ export default function TaxPage() {
               <button
                 key={m}
                 onClick={() => setLotMethod(m)}
-                className="px-3 py-1 rounded-lg text-xs font-medium transition-all"
-                style={
+                className={`px-3 py-1 rounded-lg text-xs font-medium transition-all ${
                   lotMethod === m
-                    ? { background: "rgba(16,185,129,0.15)", color: "#34d399", border: "1px solid rgba(16,185,129,0.25)" }
-                    : { background: "transparent", color: "#475569", border: "1px solid rgba(255,255,255,0.06)" }
-                }
+                    ? "bg-primary/10 text-primary border border-primary/30"
+                    : "bg-transparent text-outline border border-white/[0.06]"
+                }`}
               >
                 {m.toUpperCase()}
               </button>
@@ -418,12 +417,11 @@ export default function TaxPage() {
                     <td className="py-2 px-3">
                       {lot.holding_period ? (
                         <span
-                          className="px-1.5 py-0.5 rounded-full text-[10px] font-semibold"
-                          style={
+                          className={`px-2.5 py-0.5 rounded-full text-[10px] font-mono font-semibold uppercase border ${
                             lot.holding_period === "long_term"
-                              ? { background: "rgba(16,185,129,0.12)", color: "#34d399", border: "1px solid rgba(16,185,129,0.2)" }
-                              : { background: "rgba(245,158,11,0.12)", color: "#fbbf24", border: "1px solid rgba(245,158,11,0.2)" }
-                          }
+                              ? "bg-primary/10 text-primary border-primary/20"
+                              : "bg-tertiary/10 text-tertiary border-tertiary/20"
+                          }`}
                         >
                           {lot.holding_period === "long_term" ? "LT" : `ST · ${lot.days_held}d`}
                         </span>
@@ -500,7 +498,7 @@ export default function TaxPage() {
       )}
 
       {/* ── Loss Harvest Candidates ── */}
-      <div className={glass}>
+      <div className={`${glass} border-l-2 border-tertiary`}>
         <div className="flex items-center justify-between p-4" style={{ borderBottom: "1px solid rgba(255,255,255,0.06)" }}>
           <div>
             <p className="text-sm font-semibold" style={{ color: "#f1f5f9" }}>Loss Harvest Candidates</p>
@@ -545,15 +543,15 @@ export default function TaxPage() {
                 <div className="flex items-center justify-between mb-2">
                   <div className="flex items-center gap-2">
                     <span className="font-mono font-bold text-sm" style={{ color: "#f1f5f9" }}>{c.symbol}</span>
-                    <span className="text-[10px] px-1.5 py-0.5 rounded-full" style={{ background: "rgba(239,68,68,0.12)", color: "#f87171", border: "1px solid rgba(239,68,68,0.2)" }}>
+                    <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-error/10 text-error border border-error/20">
                       {c.unrealized_loss_pct.toFixed(1)}% loss
                     </span>
                     {c.wash_sale_warning && (
-                      <span className="text-[10px] px-1.5 py-0.5 rounded-full" style={{ background: "rgba(245,158,11,0.12)", color: "#fbbf24", border: "1px solid rgba(245,158,11,0.2)" }}>
+                      <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-tertiary/10 text-tertiary border border-tertiary/20">
                         ⚠ Wash Sale Risk
                       </span>
                     )}
-                    <span className="text-[10px] px-1.5 py-0.5 rounded-full" style={{ background: c.holding_period === "long_term" ? "rgba(16,185,129,0.10)" : "rgba(245,158,11,0.10)", color: c.holding_period === "long_term" ? "#34d399" : "#fbbf24", border: "1px solid transparent" }}>
+                    <span className={`text-[10px] px-1.5 py-0.5 rounded-full border ${c.holding_period === "long_term" ? "bg-primary/10 text-primary border-primary/20" : "bg-tertiary/10 text-tertiary border-tertiary/20"}`}>
                       {c.holding_period === "long_term" ? "LT" : "ST"}
                     </span>
                   </div>

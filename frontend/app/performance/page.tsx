@@ -52,10 +52,10 @@ function colorPct(v: number | null | undefined): string {
 }
 
 const RATIO_COLORS: Record<string, string> = {
-  Excellent: "text-[#10b981] bg-[rgba(16,185,129,0.12)] border-[rgba(16,185,129,0.25)]",
-  Good: "text-[#34d399] bg-[rgba(52,211,153,0.12)] border-[rgba(52,211,153,0.25)]",
-  Fair: "text-[#f59e0b] bg-[rgba(245,158,11,0.12)] border-[rgba(245,158,11,0.25)]",
-  Poor: "text-[#ef4444] bg-[rgba(239,68,68,0.12)] border-[rgba(239,68,68,0.25)]",
+  Excellent: "text-primary bg-primary/10 border-primary/20",
+  Good: "text-primary bg-primary/10 border-primary/20",
+  Fair: "text-tertiary bg-tertiary/10 border-tertiary/20",
+  Poor: "text-error bg-error/10 border-error/20",
   "—": "text-[#475569] bg-[rgba(71,85,105,0.12)] border-[rgba(71,85,105,0.25)]",
 };
 
@@ -77,7 +77,7 @@ const PERIOD_LABELS: Record<string, string> = {
 
 function GlassCard({ children, className = "" }: { children: React.ReactNode; className?: string }) {
   return (
-    <div className={`rounded-2xl border border-white/[0.08] bg-white/[0.03] backdrop-blur-sm p-5 ${className}`}>
+    <div className={`glass-card p-5 ${className}`}>
       {children}
     </div>
   );
@@ -697,7 +697,7 @@ function RiskTab({
 
       {/* Risk Concentration Alert */}
       {dominantSleeve && (
-        <div className="px-4 py-3 rounded-xl bg-amber-500/10 border border-amber-500/20 text-sm text-amber-400">
+        <div className="px-4 py-3 rounded-xl bg-tertiary/10 border border-tertiary/20 text-sm text-tertiary">
           ⚠️ Risk concentration: <span className="font-semibold">{dominantSleeve.replace("_", " ")}</span> contributes over 50% of total portfolio risk in the risk-parity model. Consider reducing exposure or hedging.
         </div>
       )}
@@ -787,7 +787,7 @@ function RiskTab({
             <span
               className={`text-xs font-mono px-2 py-0.5 rounded-full border ${
                 highestPair.current_correlation > 0.85
-                  ? "text-amber-400 bg-amber-500/10 border-amber-500/25"
+                  ? "text-tertiary bg-tertiary/10 border-tertiary/20"
                   : "text-[#94a3b8] bg-white/[0.04] border-white/[0.08]"
               }`}
             >
@@ -932,10 +932,10 @@ export default function PerformancePage() {
           <button
             key={tab.id}
             onClick={() => setActiveTab(tab.id)}
-            className={`px-4 py-1.5 rounded-lg text-sm font-medium transition-all duration-150 ${
+            className={`px-4 py-1.5 rounded-full text-sm font-medium transition-all duration-150 ${
               activeTab === tab.id
-                ? "bg-[rgba(99,102,241,0.15)] text-[#a78bfa] border border-[rgba(99,102,241,0.3)] shadow-[0_0_12px_rgba(99,102,241,0.15)]"
-                : "text-[#475569] hover:text-[#94a3b8]"
+                ? "bg-primary/10 text-primary"
+                : "text-on-surface-variant hover:text-on-surface"
             }`}
           >
             {tab.label}
@@ -945,7 +945,7 @@ export default function PerformancePage() {
 
       {/* Content */}
       {error && (
-        <div className="rounded-xl border border-rose-500/20 bg-rose-500/10 px-4 py-3 text-rose-400 text-sm flex items-center justify-between">
+        <div className="rounded-xl border border-error/20 bg-error/10 px-4 py-3 text-error text-sm flex items-center justify-between">
           <span>{error} — Ensure the backend is running and /performance/snapshot has been called.</span>
           <button
             onClick={() => {
@@ -956,7 +956,7 @@ export default function PerformancePage() {
                 .catch((e) => setError(e.message))
                 .finally(() => setLoadingSummary(false));
             }}
-            className="text-rose-300 hover:text-rose-100 underline text-xs ml-4 shrink-0"
+            className="text-error/70 hover:text-error underline text-xs ml-4 shrink-0"
           >Retry</button>
         </div>
       )}

@@ -11,7 +11,7 @@ import { api } from "@/lib/api";
 import type { SignalsRun, ProposedTrade, SignalStatus } from "@/lib/types";
 
 // ── Design tokens ─────────────────────────────────────────────────────────────
-const glass = "rounded-2xl border border-white/[0.08] bg-white/[0.03] backdrop-blur-sm";
+const glass = "glass-card";
 const glassInner = `${glass} p-5`;
 
 const STATUS_CONFIG: Record<string, { label: string; color: string; bg: string; border: string }> = {
@@ -202,10 +202,10 @@ function AICommentaryPanel({ aiSummary }: { aiSummary: Record<string, unknown> |
       {/* Risks to watch */}
       {macro?.risks_to_watch && macro.risks_to_watch.length > 0 && (
         <div className="space-y-1">
-          <p className="text-[10px] text-amber-400/70 uppercase tracking-widest">Risks to Watch</p>
+          <p className="text-[10px] text-tertiary/70 uppercase tracking-widest">Risks to Watch</p>
           {macro.risks_to_watch.map((r, i) => (
             <div key={i} className="text-[10px] text-white/50 flex gap-2">
-              <span className="text-amber-400/50 shrink-0">⚠</span>
+              <span className="text-tertiary/50 shrink-0">⚠</span>
               <span>{r}</span>
             </div>
           ))}
@@ -216,7 +216,7 @@ function AICommentaryPanel({ aiSummary }: { aiSummary: Record<string, unknown> |
       {validation?.issues && validation.issues.length > 0 && (
         <div className="space-y-1">
           {validation.issues.map((issue, i) => (
-            <div key={i} className="text-[10px] text-rose-400/80 flex gap-2">
+            <div key={i} className="text-[10px] text-error/80 flex gap-2">
               <span className="shrink-0">✗</span>
               <span>{issue}</span>
             </div>
@@ -360,7 +360,7 @@ function ExpandedRow({ run, onStatusChange }: {
             ))}
           </div>
         ) : (
-          <span className="text-[10px] text-emerald-400/70 ml-auto">✓ Logged to journal</span>
+          <span className="text-[10px] text-primary/70 ml-auto">✓ Logged to journal</span>
         )}
       </div>
     </div>
@@ -489,12 +489,12 @@ export default function SignalsPage() {
             ))}
           </div>
         ) : error ? (
-          <div className="p-4 rounded-xl border border-rose-500/20 bg-rose-500/10 mx-4 mt-4 text-rose-400 text-sm flex items-center justify-between min-w-[640px]">
+          <div className="p-4 rounded-xl border border-error/20 bg-error/10 mx-4 mt-4 text-error text-sm flex items-center justify-between min-w-[640px]">
             <span>⚠ {error}</span>
-            <button onClick={loadRuns} className="text-rose-300 hover:text-rose-100 underline text-xs">Retry</button>
+            <button onClick={loadRuns} className="text-error/70 hover:text-error underline text-xs">Retry</button>
           </div>
         ) : filteredRuns.length === 0 ? (
-          <div className="py-16 text-center text-slate-500 text-sm min-w-[640px]">
+          <div className="py-16 text-center text-outline text-sm min-w-[640px]">
             <p className="text-2xl mb-3">—</p>
             <p>No signals found.</p>
             <p className="text-xs text-white/10 mt-1">Run <code className="text-white/20">POST /run_allocation</code> to generate signals</p>

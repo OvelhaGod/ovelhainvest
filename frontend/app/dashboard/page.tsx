@@ -9,6 +9,7 @@ import { useEffect, useState } from "react";
 import useSWR from "swr";
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip } from "recharts";
 import { api } from "@/lib/api";
+import { OIErrorState } from "@/components/ui/oi";
 import type { AdminStatus, AlertHistoryItem, DailyStatusResponse, SleeveWeight, ValuationSummaryResponse, VaultBalance } from "@/lib/types";
 
 // ── Design tokens (DESIGN.md) ─────────────────────────────────────────────────
@@ -56,7 +57,7 @@ const VAULT_CONFIG = {
 };
 
 // ── Glass card base style ─────────────────────────────────────────────────────
-const glass = "rounded-2xl border border-white/[0.08] bg-white/[0.03] backdrop-blur-sm";
+const glass = "glass-card";
 const glassInner = `${glass} p-5`;
 
 // ── Formatters ────────────────────────────────────────────────────────────────
@@ -81,8 +82,8 @@ function DonutTooltip({ active, payload }: { active?: boolean; payload?: { name:
   if (!active || !payload?.length) return null;
   return (
     <div className={`${glass} p-3 text-xs`}>
-      <div className="font-medium text-white/90">{payload[0].name}</div>
-      <div style={{ color: "#10b981" }} className="font-mono">{fmtPct(payload[0].value, false)}</div>
+      <div className="font-medium text-on-surface/90">{payload[0].name}</div>
+      <div className="text-primary font-mono">{fmtPct(payload[0].value, false)}</div>
     </div>
   );
 }
@@ -184,10 +185,10 @@ export default function DashboardPage() {
           style={{ background: "rgba(239,68,68,0.08)", borderColor: "rgba(239,68,68,0.3)" }}
         >
           <div className="flex items-center gap-3">
-            <span className="text-rose-400 text-base">⛔</span>
+            <span className="text-error text-base">⛔</span>
             <div>
-              <p className="text-sm font-semibold text-rose-400">Automation Paused</p>
-              <p className="text-xs text-rose-400/60">
+              <p className="text-sm font-semibold text-error">Automation Paused</p>
+              <p className="text-xs text-error/60">
                 {adminStatus?.pause_reason === "drawdown"
                   ? "Drawdown gate triggered (≥40%). Manual override required."
                   : adminStatus?.pause_reason
@@ -198,7 +199,7 @@ export default function DashboardPage() {
           </div>
           <a
             href="/config"
-            className="text-xs text-rose-400/70 hover:text-rose-400 border border-rose-500/30 rounded px-2 py-1 transition-colors"
+            className="text-xs text-error/70 hover:text-error border border-error/30 rounded px-2 py-1 transition-colors"
           >
             View Config →
           </a>
@@ -249,7 +250,7 @@ export default function DashboardPage() {
           ) : (
             <>
               {status?.today_pnl_usd != null ? (
-                <p className={`text-xs mt-1 font-mono ${status.today_pnl_usd >= 0 ? "text-emerald-400" : "text-rose-400"}`}>
+                <p className={`text-xs mt-1 font-mono ${status.today_pnl_usd >= 0 ? "text-primary" : "text-error"}`}>
                   {status.today_pnl_usd >= 0 ? "↑ " : "↓ "}
                   {fmtUSD(Math.abs(status.today_pnl_usd))} ({fmtPct(status.today_pnl_pct ?? 0)}) today
                 </p>
@@ -267,7 +268,7 @@ export default function DashboardPage() {
           {loading ? (
             <Skeleton className="h-9 w-24 mb-2" />
           ) : status?.ytd_return_twr != null ? (
-            <p className={`text-3xl font-bold font-mono ${status.ytd_return_twr >= 0 ? "text-emerald-400" : "text-rose-400"}`}>
+            <p className={`text-3xl font-bold font-mono ${status.ytd_return_twr >= 0 ? "text-primary" : "text-error"}`}>
               {fmtPct(status.ytd_return_twr)}
             </p>
           ) : (
@@ -282,7 +283,7 @@ export default function DashboardPage() {
           {loading ? (
             <Skeleton className="h-9 w-24 mb-2" />
           ) : status?.max_drawdown_pct != null ? (
-            <p className={`text-3xl font-bold font-mono ${Math.abs(status.max_drawdown_pct) > 0.25 ? "text-rose-400" : "text-amber-400"}`}>
+            <p className={`text-3xl font-bold font-mono ${Math.abs(status.max_drawdown_pct) > 0.25 ? "text-error" : "text-tertiary"}`}>
               {fmtPct(status.max_drawdown_pct)}
             </p>
           ) : (
@@ -301,12 +302,12 @@ export default function DashboardPage() {
           {loading ? (
             <Skeleton className="h-9 w-16 mb-2" />
           ) : (
-            <p className={`text-3xl font-bold font-mono ${(status?.pending_approvals ?? 0) > 0 ? "text-amber-400" : "text-white/30"}`}>
+            <p className={`text-3xl font-bold font-mono ${(status?.pending_approvals ?? 0) > 0 ? "text-tertiary" : "text-white/30"}`}>
               {status?.pending_approvals ?? 0}
             </p>
           )}
           {(status?.pending_approvals ?? 0) > 0 ? (
-            <a href="/signals" className="text-xs text-amber-400/70 hover:text-amber-400 mt-1 block transition-colors">
+            <a href="/signals" className="text-xs text-tertiary/70 hover:text-tertiary mt-1 block transition-colors">
               Review in Signals →
             </a>
           ) : (
@@ -414,7 +415,7 @@ export default function DashboardPage() {
             <div className="flex items-center justify-between mb-3">
               <p className="text-xs text-white/40 uppercase tracking-widest">Top Opportunities</p>
               {valSummary.opportunity_count > 0 && (
-                <span className="text-[10px] px-1.5 py-0.5 rounded-full border border-emerald-500/30 text-emerald-400 bg-emerald-500/8">
+                <span className="text-[10px] px-1.5 py-0.5 rounded-full border border-primary/30 text-primary bg-primary/8">
                   {valSummary.opportunity_count} active
                 </span>
               )}
@@ -431,7 +432,7 @@ export default function DashboardPage() {
                     <div className="flex items-center gap-2">
                       <span className="text-xs font-mono font-semibold text-white/90">{asset.symbol}</span>
                       {asset.tier && (
-                        <span className="text-[9px] px-1 py-0.5 rounded bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
+                        <span className="text-[9px] px-1 py-0.5 rounded bg-primary/10 text-primary border border-primary/20">
                           {asset.tier?.replace("_", " ")}
                         </span>
                       )}
@@ -503,10 +504,10 @@ export default function DashboardPage() {
                   })}
                 </div>
                 <div className="flex gap-3 mt-1.5 text-[9px] text-white/25">
-                  <span className="text-emerald-500/70">&gt;20% safe</span>
-                  <span className="text-amber-500/70">10-20%</span>
+                  <span className="text-primary/70">&gt;20% safe</span>
+                  <span className="text-tertiary/70">10-20%</span>
                   <span className="text-white/30">0-10%</span>
-                  <span className="text-rose-500/70">overvalued</span>
+                  <span className="text-error/70">overvalued</span>
                 </div>
               </div>
             )}
@@ -542,7 +543,7 @@ export default function DashboardPage() {
                     <span className="text-sm">{cfg.icon}</span>
                     <span className="text-xs text-white/70">{ruleName}</span>
                     {!alert.delivered && (
-                      <span className="text-[9px] px-1 py-0.5 rounded bg-amber-500/10 text-amber-400 border border-amber-500/20">
+                      <span className="text-[9px] px-1 py-0.5 rounded bg-tertiary/10 text-tertiary border border-tertiary/20">
                         undelivered
                       </span>
                     )}
@@ -649,18 +650,18 @@ export default function DashboardPage() {
             {/* Worst-Case Tax */}
             <div>
               <p className="text-[10px] text-white/30 mb-1">Worst-Case Tax</p>
-              <p className="text-lg font-bold font-mono text-amber-400">
+              <p className="text-lg font-bold font-mono text-tertiary">
                 {fmtUSD(taxSnapshot.worst_case_tax)}
               </p>
             </div>
             {/* Harvest Savings */}
             <div>
               <p className="text-[10px] text-white/30 mb-1">Harvest Savings</p>
-              <p className="text-lg font-bold font-mono text-emerald-400">
+              <p className="text-lg font-bold font-mono text-primary">
                 {taxSnapshot.harvest_savings > 0 ? fmtUSD(taxSnapshot.harvest_savings) : "—"}
               </p>
               {taxSnapshot.harvest_count > 0 && (
-                <p className="text-[10px] text-emerald-500/60 mt-0.5">
+                <p className="text-[10px] text-primary/60 mt-0.5">
                   {taxSnapshot.harvest_count} candidate{taxSnapshot.harvest_count !== 1 ? "s" : ""}
                 </p>
               )}
@@ -711,7 +712,7 @@ export default function DashboardPage() {
           <div className="grid grid-cols-3 gap-4">
             <div>
               <p className="text-[10px] text-white/30 mb-1">Followed System</p>
-              <p className="text-lg font-bold font-mono text-emerald-400">
+              <p className="text-lg font-bold font-mono text-primary">
                 {journalAccuracy.followed_count}
                 <span className="text-xs text-white/30 ml-1">decisions</span>
               </p>
@@ -724,7 +725,7 @@ export default function DashboardPage() {
             </div>
             <div>
               <p className="text-[10px] text-white/30 mb-1">Overrode System</p>
-              <p className="text-lg font-bold font-mono text-amber-400">
+              <p className="text-lg font-bold font-mono text-tertiary">
                 {journalAccuracy.overrode_count}
                 <span className="text-xs text-white/30 ml-1">overrides</span>
               </p>
@@ -758,10 +759,10 @@ export default function DashboardPage() {
 
       {/* ── Error banner ── */}
       {error && (
-        <div className="rounded-xl border border-rose-500/20 bg-rose-500/10 px-4 py-3 text-rose-400 text-sm flex items-center justify-between">
-          <span>⚠ API unavailable — {error}. Start the backend: <code className="text-rose-300 font-mono">uv run uvicorn app.main:app --reload</code></span>
-          <button onClick={() => refetchStatus()} className="text-rose-300 hover:text-rose-100 underline text-xs ml-4 shrink-0">Retry</button>
-        </div>
+        <OIErrorState
+          message={`API unavailable — ${error}. Start the backend: uv run uvicorn app.main:app --reload`}
+          onRetry={() => refetchStatus()}
+        />
       )}
     </div>
   );
@@ -805,7 +806,7 @@ function SleeveBar({ sw }: { sw: SleeveWeight }) {
         {(sw.current_weight * 100).toFixed(0)}%
       </span>
       <span
-        className={`col-span-2 text-right font-mono ${isBreached ? "text-amber-400" : "text-white/30"}`}
+        className={`col-span-2 text-right font-mono ${isBreached ? "text-tertiary" : "text-white/30"}`}
       >
         {sw.drift_pct > 0 ? "+" : ""}{sw.drift_pct.toFixed(1)}%
         {isBreached ? " ⚠" : ""}
@@ -835,7 +836,7 @@ function VaultCard({ vault }: { vault: VaultBalance }) {
           <span className="text-[10px] text-white/30 border border-white/10 rounded px-1.5 py-0.5">NON-INVESTABLE</span>
         )}
         {vault.approval_required && vault.is_investable && (
-          <span className="text-[10px] text-amber-400/70 border border-amber-400/20 rounded px-1.5 py-0.5">APPROVAL REQ.</span>
+          <span className="text-[10px] text-tertiary/70 border border-tertiary/20 rounded px-1.5 py-0.5">APPROVAL REQ.</span>
         )}
       </div>
 
