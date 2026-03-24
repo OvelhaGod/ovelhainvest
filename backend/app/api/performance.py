@@ -336,7 +336,8 @@ async def performance_rolling(
     """Return rolling return time series for the specified windows."""
     snapshots = get_snapshot_history(user_id, days=1100)
     if len(snapshots) < 22:
-        raise HTTPException(status_code=404, detail="Insufficient data for rolling analysis.")
+        window_labels = [w.strip() for w in windows.split(",")]
+        return RollingReturnsResponse(user_id=user_id, data_points=[], windows=window_labels)
 
     values = _snapshots_to_series(snapshots)
     window_labels = [w.strip() for w in windows.split(",")]
@@ -386,7 +387,16 @@ async def performance_risk(
     # No cached data — compute from snapshots
     snapshots = get_snapshot_history(user_id, days=365)
     if len(snapshots) < 30:
-        raise HTTPException(status_code=404, detail="Insufficient snapshot data for risk metrics.")
+        return RiskSummaryResponse(
+            user_id=user_id,
+            as_of_date=date.today(),
+            var_95=None, var_99=None,
+            diversification_ratio=None,
+            risk_parity_weights={},
+            actual_weights={},
+            correlation_matrix={},
+            high_correlation_pairs=[],
+        )
 
     values = _snapshots_to_series(snapshots)
     returns = _series_to_returns(values)
