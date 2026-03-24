@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import React, { useState } from "react";
 
 interface CorrelationHeatmapProps {
   matrix: Record<string, Record<string, number>>;
@@ -32,7 +32,7 @@ function getInterpretation(val: number, isDiag: boolean): string {
   return "✅ Negative — active diversification";
 }
 
-export function CorrelationHeatmap({ matrix, sleeves }: CorrelationHeatmapProps) {
+export const CorrelationHeatmap = React.memo(function CorrelationHeatmap({ matrix, sleeves }: CorrelationHeatmapProps) {
   const [tooltip, setTooltip] = useState<{
     a: string;
     b: string;
@@ -169,6 +169,6 @@ export function CorrelationHeatmap({ matrix, sleeves }: CorrelationHeatmapProps)
       )}
     </div>
   );
-}
+});
 
 export default CorrelationHeatmap;

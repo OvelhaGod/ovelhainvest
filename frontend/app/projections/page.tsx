@@ -6,7 +6,7 @@
  * CLAUDE.md Section 18 + Design System Section 35
  */
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   Area,
   AreaChart,
@@ -225,16 +225,20 @@ function MonteCarloTab() {
   };
 
   // Build chart data: one point per year with all percentile bands
-  const chartData = result
-    ? Array.from({ length: result.years + 1 }, (_, i) => ({
-        year: i,
-        p5: result.percentile_bands["p5"]?.[i] ?? 0,
-        p25: result.percentile_bands["p25"]?.[i] ?? 0,
-        p50: result.percentile_bands["p50"]?.[i] ?? 0,
-        p75: result.percentile_bands["p75"]?.[i] ?? 0,
-        p95: result.percentile_bands["p95"]?.[i] ?? 0,
-      }))
-    : [];
+  const chartData = useMemo(
+    () =>
+      result
+        ? Array.from({ length: result.years + 1 }, (_, i) => ({
+            year: i,
+            p5: result.percentile_bands["p5"]?.[i] ?? 0,
+            p25: result.percentile_bands["p25"]?.[i] ?? 0,
+            p50: result.percentile_bands["p50"]?.[i] ?? 0,
+            p75: result.percentile_bands["p75"]?.[i] ?? 0,
+            p95: result.percentile_bands["p95"]?.[i] ?? 0,
+          }))
+        : [],
+    [result]
+  );
 
   const swrPct = result ? result.summary.swr_survival_probability * 100 : 0;
 
@@ -561,12 +565,16 @@ function StressTestTab() {
 
   const active = results?.[selected];
 
-  const barData = active
-    ? Object.entries(active.sleeve_impacts).map(([sleeve, impact]) => ({
-        sleeve: sleeve.replace("_equity", "").replace("_", " "),
-        loss: (impact.loss_pct ?? 0) * 100,
-      }))
-    : [];
+  const barData = useMemo(
+    () =>
+      active
+        ? Object.entries(active.sleeve_impacts).map(([sleeve, impact]) => ({
+            sleeve: sleeve.replace("_equity", "").replace("_", " "),
+            loss: (impact.loss_pct ?? 0) * 100,
+          }))
+        : [],
+    [active]
+  );
 
   return (
     <div className="space-y-6">

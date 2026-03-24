@@ -6,7 +6,7 @@
  * CLAUDE.md Section 17 + Stitch glassmorphism design system.
  */
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   Bar,
   BarChart,
@@ -381,12 +381,16 @@ function AttributionTab({
     );
   }
 
-  const chartData = data.per_sleeve.map((s) => ({
-    name: s.sleeve.replace("_", " "),
-    allocation: parseFloat((s.allocation_effect * 100).toFixed(2)),
-    selection: parseFloat((s.selection_effect * 100).toFixed(2)),
-    interaction: parseFloat((s.interaction_effect * 100).toFixed(2)),
-  }));
+  const chartData = useMemo(
+    () =>
+      data.per_sleeve.map((s) => ({
+        name: s.sleeve.replace("_", " "),
+        allocation: parseFloat((s.allocation_effect * 100).toFixed(2)),
+        selection: parseFloat((s.selection_effect * 100).toFixed(2)),
+        interaction: parseFloat((s.interaction_effect * 100).toFixed(2)),
+      })),
+    [data.per_sleeve]
+  );
 
   return (
     <div className="space-y-4">
@@ -481,7 +485,7 @@ function RollingTab({ data }: { data: RollingReturnsResponse | null }) {
   };
 
   // Sample to last 60 points for display
-  const displayData = data.data_points.slice(-60);
+  const displayData = useMemo(() => data.data_points.slice(-60), [data.data_points]);
 
   return (
     <div className="space-y-4">
@@ -608,33 +612,52 @@ function RiskTab({
     );
   }
 
-  const sleeves = Object.keys(data.risk_parity_weights);
-  const comparisonData = sleeves.map((s) => ({
-    name: s.replace("_", " "),
-    actual: parseFloat(((data.actual_weights[s] || 0) * 100).toFixed(1)),
-    riskParity: parseFloat(((data.risk_parity_weights[s] || 0) * 100).toFixed(1)),
-  }));
+  const sleeves = useMemo(() => Object.keys(data.risk_parity_weights), [data.risk_parity_weights]);
+  const comparisonData = useMemo(
+    () =>
+      sleeves.map((s) => ({
+        name: s.replace("_", " "),
+        actual: parseFloat(((data.actual_weights[s] || 0) * 100).toFixed(1)),
+        riskParity: parseFloat(((data.risk_parity_weights[s] || 0) * 100).toFixed(1)),
+      })),
+    [sleeves, data.actual_weights, data.risk_parity_weights]
+  );
 
-  const corrSleeves = Object.keys(data.correlation_matrix);
+  const corrSleeves = useMemo(() => Object.keys(data.correlation_matrix), [data.correlation_matrix]);
 
   // Check for high-risk concentration: any sleeve with risk parity weight > 50%
-  const dominantSleeve = sleeves.find((s) => (data.risk_parity_weights[s] || 0) > 0.5);
+  const dominantSleeve = useMemo(
+    () => sleeves.find((s) => (data.risk_parity_weights[s] || 0) > 0.5),
+    [sleeves, data.risk_parity_weights]
+  );
 
   // Build donut data
-  const actualDonutData = sleeves
-    .filter((s) => (data.actual_weights[s] || 0) > 0)
-    .map((s) => ({ name: s, value: data.actual_weights[s] || 0 }));
+  const actualDonutData = useMemo(
+    () =>
+      sleeves
+        .filter((s) => (data.actual_weights[s] || 0) > 0)
+        .map((s) => ({ name: s, value: data.actual_weights[s] || 0 })),
+    [sleeves, data.actual_weights]
+  );
 
-  const rpDonutData = sleeves
-    .filter((s) => (data.risk_parity_weights[s] || 0) > 0)
-    .map((s) => ({ name: s, value: data.risk_parity_weights[s] || 0 }));
+  const rpDonutData = useMemo(
+    () =>
+      sleeves
+        .filter((s) => (data.risk_parity_weights[s] || 0) > 0)
+        .map((s) => ({ name: s, value: data.risk_parity_weights[s] || 0 })),
+    [sleeves, data.risk_parity_weights]
+  );
 
   // Risk vs Dollar comparison data
-  const riskDollarData = sleeves.map((s) => ({
-    name: s.replace("_", " "),
-    dollar: parseFloat(((data.actual_weights[s] || 0) * 100).toFixed(1)),
-    risk: parseFloat(((data.risk_parity_weights[s] || 0) * 100).toFixed(1)),
-  }));
+  const riskDollarData = useMemo(
+    () =>
+      sleeves.map((s) => ({
+        name: s.replace("_", " "),
+        dollar: parseFloat(((data.actual_weights[s] || 0) * 100).toFixed(1)),
+        risk: parseFloat(((data.risk_parity_weights[s] || 0) * 100).toFixed(1)),
+      })),
+    [sleeves, data.actual_weights, data.risk_parity_weights]
+  );
 
   // Highest-correlation pair from history
   const highestPair = correlationHistory?.highest_pair;

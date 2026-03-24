@@ -22,6 +22,7 @@ from fastapi import APIRouter, HTTPException, Query
 
 from app.db.repositories import performance as perf_repo
 from app.db.supabase_client import get_supabase_client
+from app.db.redis_client import get_redis_client
 from app.db.repositories.snapshots import (
     get_latest_snapshot,
     get_snapshot_history,
@@ -112,7 +113,17 @@ async def performance_summary(
     user_id: str = Query(default="00000000-0000-0000-0000-000000000001"),
     period: str = Query(default="ytd"),
 ) -> PerformanceSummaryResponse:
-    """Return portfolio performance metrics — all standard periods."""
+    """Return portfolio performance metrics — all standard periods. Redis-cached 5 min."""
+    cache_key = f"perf_summary:{user_id}:{period}"
+    try:
+        rc = get_redis_client()
+        cached = rc.get(cache_key)
+        if cached:
+            import json as _json
+            return PerformanceSummaryResponse.model_validate_json(cached)
+    except Exception as _cache_exc:
+        logger.debug("Redis cache miss (perf_summary): %s", _cache_exc)
+
     snapshots = get_snapshot_history(user_id, days=1100)  # 3yr
     if len(snapshots) < 2:
         raise HTTPException(
@@ -191,7 +202,7 @@ async def performance_summary(
     peak_val = float(values.max())
     current_dd = (latest_val - peak_val) / peak_val if peak_val > 0 else 0.0
 
-    return PerformanceSummaryResponse(
+    result = PerformanceSummaryResponse(
         user_id=user_id,
         as_of_date=today,
         period_returns=period_returns_list,
@@ -209,6 +220,12 @@ async def performance_summary(
         ),
         data_points=len(values),
     )
+    try:
+        rc = get_redis_client()
+        rc.set(cache_key, result.model_dump_json(), ex=300)  # 5-minute TTL
+    except Exception as _store_exc:
+        logger.debug("Redis cache store failed (perf_summary): %s", _store_exc)
+    return result
 
 
 @router.get("/performance/attribution", response_model=AttributionResponse)

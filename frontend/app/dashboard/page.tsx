@@ -5,7 +5,8 @@
  * Auto-refreshes every 60 seconds.
  */
 
-import { useCallback, useEffect, useState } from "react";
+import { useEffect, useState } from "react";
+import useSWR from "swr";
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip } from "recharts";
 import { api } from "@/lib/api";
 import type { AdminStatus, AlertHistoryItem, DailyStatusResponse, SleeveWeight, ValuationSummaryResponse, VaultBalance } from "@/lib/types";
@@ -88,7 +89,27 @@ function DonutTooltip({ active, payload }: { active?: boolean; payload?: { name:
 
 // ── Main component ────────────────────────────────────────────────────────────
 export default function DashboardPage() {
-  const [status, setStatus]               = useState<DailyStatusResponse | null>(null);
+  // SWR for /daily_status — auto-refreshes every 60 seconds
+  const {
+    data: status,
+    error: statusError,
+    isLoading,
+    mutate: refetchStatus,
+  } = useSWR<DailyStatusResponse>(
+    "/daily_status",
+    () => api.dailyStatus(),
+    { refreshInterval: 60_000 }
+  );
+
+  const loading = isLoading;
+  const error = statusError ? (statusError instanceof Error ? statusError.message : "Failed to load data") : null;
+  const [lastRefresh, setLastRefresh]     = useState<Date>(new Date());
+
+  // Track last-refresh time whenever new SWR data arrives
+  useEffect(() => {
+    if (status) setLastRefresh(new Date());
+  }, [status]);
+
   const [valSummary, setValSummary]       = useState<ValuationSummaryResponse | null>(null);
   const [alertHistory, setAlertHistory]   = useState<AlertHistoryItem[]>([]);
   const [adminStatus, setAdminStatus]     = useState<AdminStatus | null>(null);
@@ -108,22 +129,6 @@ export default function DashboardPage() {
     avg_overrode_30d: number | null;
     system_outperformance_30d: number | null;
   } | null>(null);
-  const [loading, setLoading]             = useState(true);
-  const [error, setError]                 = useState<string | null>(null);
-  const [lastRefresh, setLastRefresh]     = useState<Date>(new Date());
-
-  const fetchStatus = useCallback(async () => {
-    try {
-      const data = await api.dailyStatus();
-      setStatus(data);
-      setError(null);
-      setLastRefresh(new Date());
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to load data");
-    } finally {
-      setLoading(false);
-    }
-  }, []);
 
   // Parallel independent fetches — all gracefully degrade
   useEffect(() => {
@@ -157,12 +162,6 @@ export default function DashboardPage() {
       });
     });
   }, []);
-
-  useEffect(() => {
-    fetchStatus();
-    const interval = setInterval(fetchStatus, 60_000);
-    return () => clearInterval(interval);
-  }, [fetchStatus]);
 
   const regime = status ? (REGIME_CONFIG[status.regime_state] ?? REGIME_CONFIG.normal) : REGIME_CONFIG.normal;
 
@@ -761,7 +760,7 @@ export default function DashboardPage() {
       {error && (
         <div className="rounded-xl border border-rose-500/20 bg-rose-500/10 px-4 py-3 text-rose-400 text-sm flex items-center justify-between">
           <span>⚠ API unavailable — {error}. Start the backend: <code className="text-rose-300 font-mono">uv run uvicorn app.main:app --reload</code></span>
-          <button onClick={fetchStatus} className="text-rose-300 hover:text-rose-100 underline text-xs ml-4 shrink-0">Retry</button>
+          <button onClick={() => refetchStatus()} className="text-rose-300 hover:text-rose-100 underline text-xs ml-4 shrink-0">Retry</button>
         </div>
       )}
     </div>
