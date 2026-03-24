@@ -585,5 +585,4 @@ def log_decision(
         asset_id=asset_id,
         system_recommendation=system_recommendation,
         actual_action=actual_action,
-        db=db,
     )
