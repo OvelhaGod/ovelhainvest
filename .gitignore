@@ -29,3 +29,6 @@ Thumbs.db
 # Playwright MCP artifacts
 .playwright-mcp/
 *.png
+
+# n8n configured workflows (contain API keys)
+automation/n8n/*_configured.json

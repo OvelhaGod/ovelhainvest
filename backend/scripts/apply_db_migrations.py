@@ -43,10 +43,14 @@ def run():
         print(f"Applying {path}...")
         with open(path, encoding="utf-8") as f:
             sql = f.read()
-        stmts = [
-            s.strip() for s in sql.split(";")
-            if s.strip() and not s.strip().startswith("--")
-        ]
+        import re as _re
+        stmts = []
+        for s in sql.split(";"):
+            s = s.strip()
+            # Strip leading comment lines, keep the actual SQL
+            s = _re.sub(r"^(--[^\n]*\n)+", "", s, flags=_re.MULTILINE).strip()
+            if s and not s.startswith("--"):
+                stmts.append(s)
         ok = err = 0
         for stmt in stmts:
             try:
