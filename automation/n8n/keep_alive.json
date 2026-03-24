@@ -1,0 +1,185 @@
+{
+  "name": "OvelhaInvest — Keep Alive",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "weeks",
+              "triggerAtDay": [2, 5],
+              "triggerAtHour": 10,
+              "triggerAtMinute": 0
+            }
+          ]
+        }
+      },
+      "id": "schedule-trigger",
+      "name": "Schedule Trigger",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [240, 300]
+    },
+    {
+      "parameters": {
+        "url": "={{ $vars.OVELHAINVEST_API_URL }}/health",
+        "options": {
+          "timeout": 30000
+        }
+      },
+      "id": "ping-api",
+      "name": "Ping OvelhaInvest API",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [460, 300],
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "url": "={{ $vars.SUPABASE_URL }}/rest/v1/keep_alive_log",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "apikey",
+              "value": "={{ $vars.SUPABASE_SERVICE_KEY }}"
+            },
+            {
+              "name": "Authorization",
+              "value": "=Bearer {{ $vars.SUPABASE_SERVICE_KEY }}"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            },
+            {
+              "name": "Prefer",
+              "value": "return=minimal"
+            }
+          ]
+        },
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": []
+        },
+        "specifyBody": "json",
+        "jsonBody": "={\"source\": \"n8n-homelab\", \"pinged_at\": \"{{ $now.toISO() }}\"}",
+        "options": {
+          "timeout": 15000
+        }
+      },
+      "id": "ping-supabase",
+      "name": "Ping Supabase",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [680, 300],
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "id": "api-health-check",
+              "leftValue": "={{ $('Ping OvelhaInvest API').item.json.status }}",
+              "rightValue": "ok",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "check-health",
+      "name": "API Healthy?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [900, 300]
+    },
+    {
+      "parameters": {
+        "url": "=https://api.telegram.org/bot{{ $vars.TELEGRAM_BOT_TOKEN }}/sendMessage",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\"chat_id\": \"{{ $vars.TELEGRAM_CHAT_ID }}\", \"text\": \"\\u26a0\\ufe0f OvelhaInvest API offline during keep-alive check\\n\\nCheck: https://ovelhainvest.ovelha.us/health\\nTime: {{ $now.toISO() }}\"}",
+        "options": {}
+      },
+      "id": "telegram-alert",
+      "name": "Telegram Alert (API Down)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1120, 420]
+    }
+  ],
+  "connections": {
+    "Schedule Trigger": {
+      "main": [
+        [
+          {
+            "node": "Ping OvelhaInvest API",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Ping OvelhaInvest API": {
+      "main": [
+        [
+          {
+            "node": "Ping Supabase",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Ping Supabase": {
+      "main": [
+        [
+          {
+            "node": "API Healthy?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "API Healthy?": {
+      "main": [
+        [],
+        [
+          {
+            "node": "Telegram Alert (API Down)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "staticData": null,
+  "meta": {
+    "templateId": "ovelhainvest-keep-alive",
+    "instanceId": "ovelhainvest"
+  },
+  "tags": [
+    {
+      "name": "OvelhaInvest"
+    },
+    {
+      "name": "Infrastructure"
+    }
+  ]
+}
