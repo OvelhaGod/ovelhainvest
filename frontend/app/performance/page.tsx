@@ -878,7 +878,7 @@ export default function PerformancePage() {
       ])
         .then(([attr, fx]) => {
           setAttribution(attr);
-          setFxAttribution(fx as FxAttributionData);
+          setFxAttribution(fx as unknown as FxAttributionData);
         })
         .catch(() => {
           setAttribution(null);
@@ -901,7 +901,7 @@ export default function PerformancePage() {
       ])
         .then(([r, corrHist]) => {
           setRisk(r);
-          setCorrelationHistory(corrHist as CorrelationHistoryData);
+          setCorrelationHistory(corrHist as unknown as CorrelationHistoryData);
         })
         .catch(() => {
           setRisk(null);

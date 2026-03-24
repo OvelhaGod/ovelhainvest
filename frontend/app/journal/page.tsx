@@ -105,10 +105,10 @@ export default function JournalPage() {
         api.journalPatterns(),
         api.journalInsight(),
       ]);
-      if (entriesRes.status === "fulfilled") setEntries(entriesRes.value as JournalEntry[]);
-      if (statsRes.status === "fulfilled")   setStats(statsRes.value as JournalStats);
-      if (patternsRes.status === "fulfilled") setPatterns(patternsRes.value as BehavioralPattern[]);
-      if (insightRes.status === "fulfilled")  setInsight(insightRes.value as JournalInsight);
+      if (entriesRes.status === "fulfilled") setEntries(entriesRes.value as unknown as JournalEntry[]);
+      if (statsRes.status === "fulfilled")   setStats(statsRes.value as unknown as JournalStats);
+      if (patternsRes.status === "fulfilled") setPatterns(patternsRes.value as unknown as BehavioralPattern[]);
+      if (insightRes.status === "fulfilled")  setInsight(insightRes.value as unknown as JournalInsight);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Failed to load journal");
     } finally {
