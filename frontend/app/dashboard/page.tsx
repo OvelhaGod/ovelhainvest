@@ -507,7 +507,7 @@ export default function DashboardPage() {
                   <span className="text-emerald-500/70">&gt;20% safe</span>
                   <span className="text-amber-500/70">10-20%</span>
                   <span className="text-white/30">0-10%</span>
-                  <span className="text-red-500/70">overvalued</span>
+                  <span className="text-rose-500/70">overvalued</span>
                 </div>
               </div>
             )}
@@ -759,10 +759,9 @@ export default function DashboardPage() {
 
       {/* ── Error banner ── */}
       {error && (
-        <div className={`${glass} p-4 border-rose-500/30 bg-rose-500/5`}>
-          <p className="text-sm text-rose-400">
-            ⚠ API unavailable — {error}. Start the backend: <code className="text-rose-300">uv run uvicorn app.main:app --reload</code>
-          </p>
+        <div className="rounded-xl border border-rose-500/20 bg-rose-500/10 px-4 py-3 text-rose-400 text-sm flex items-center justify-between">
+          <span>⚠ API unavailable — {error}. Start the backend: <code className="text-rose-300 font-mono">uv run uvicorn app.main:app --reload</code></span>
+          <button onClick={fetchStatus} className="text-rose-300 hover:text-rose-100 underline text-xs ml-4 shrink-0">Retry</button>
         </div>
       )}
     </div>

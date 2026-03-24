@@ -592,8 +592,9 @@ export default function AssetsPage() {
 
       {/* Error */}
       {error && (
-        <div className="mb-4 p-3 rounded-xl bg-red-500/10 border border-red-500/20 text-sm text-red-400">
-          {error}
+        <div className="mb-4 rounded-xl border border-rose-500/20 bg-rose-500/10 px-4 py-3 text-rose-400 text-sm flex items-center justify-between">
+          <span>{error}</span>
+          <button onClick={load} className="text-rose-300 hover:text-rose-100 underline text-xs">Retry</button>
         </div>
       )}
 

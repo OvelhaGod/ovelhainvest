@@ -488,12 +488,14 @@ export default function SignalsPage() {
             ))}
           </div>
         ) : error ? (
-          <div className="p-8 text-center">
-            <p className="text-sm text-rose-400">⚠ {error}</p>
+          <div className="p-4 rounded-xl border border-rose-500/20 bg-rose-500/10 mx-4 mt-4 text-rose-400 text-sm flex items-center justify-between">
+            <span>⚠ {error}</span>
+            <button onClick={loadRuns} className="text-rose-300 hover:text-rose-100 underline text-xs">Retry</button>
           </div>
         ) : filteredRuns.length === 0 ? (
-          <div className="p-12 text-center">
-            <p className="text-sm text-white/20">No signals found</p>
+          <div className="py-16 text-center text-slate-500 text-sm">
+            <p className="text-2xl mb-3">—</p>
+            <p>No signals found.</p>
             <p className="text-xs text-white/10 mt-1">Run <code className="text-white/20">POST /run_allocation</code> to generate signals</p>
           </div>
         ) : (

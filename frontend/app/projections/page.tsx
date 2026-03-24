@@ -297,8 +297,9 @@ function MonteCarloTab() {
       </GlassCard>
 
       {error && (
-        <div className="rounded-xl px-4 py-3 text-sm" style={{ background: "rgba(239,68,68,0.1)", border: "1px solid rgba(239,68,68,0.2)", color: "#f87171" }}>
-          {error}
+        <div className="rounded-xl border border-rose-500/20 bg-rose-500/10 px-4 py-3 text-rose-400 text-sm flex items-center justify-between">
+          <span>{error}</span>
+          <button onClick={run} className="text-rose-300 hover:text-rose-100 underline text-xs">Retry</button>
         </div>
       )}
 
@@ -450,8 +451,9 @@ function ContributionTab() {
       </GlassCard>
 
       {error && (
-        <div className="rounded-xl px-4 py-3 text-sm" style={{ background: "rgba(239,68,68,0.1)", border: "1px solid rgba(239,68,68,0.2)", color: "#f87171" }}>
-          {error}
+        <div className="rounded-xl border border-rose-500/20 bg-rose-500/10 px-4 py-3 text-rose-400 text-sm flex items-center justify-between">
+          <span>{error}</span>
+          <button onClick={run} className="text-rose-300 hover:text-rose-100 underline text-xs">Retry</button>
         </div>
       )}
 
@@ -569,9 +571,9 @@ function StressTestTab() {
   return (
     <div className="space-y-6">
       {error && (
-        <div className="rounded-xl px-4 py-3 text-sm" style={{ background: "rgba(239,68,68,0.1)", border: "1px solid rgba(239,68,68,0.2)", color: "#f87171" }}>
-          {error}
-          <button onClick={runAll} className="ml-3 underline">Retry</button>
+        <div className="rounded-xl border border-rose-500/20 bg-rose-500/10 px-4 py-3 text-rose-400 text-sm flex items-center justify-between">
+          <span>{error}</span>
+          <button onClick={runAll} className="text-rose-300 hover:text-rose-100 underline text-xs">Retry</button>
         </div>
       )}
 
@@ -653,7 +655,7 @@ function StressTestTab() {
                       <p className="text-xs mb-1" style={{ color: "#94a3b8" }}>Your Portfolio</p>
                       <div className="flex items-center gap-3">
                         <div className="flex-1 h-3 rounded-full" style={{ background: "rgba(255,255,255,0.08)" }}>
-                          <div className="h-full rounded-full bg-red-500" style={{ width: `${Math.min(Math.abs(active.risk_parity_comparison.your_loss_pct) * 100, 100)}%` }} />
+                          <div className="h-full rounded-full bg-rose-500" style={{ width: `${Math.min(Math.abs(active.risk_parity_comparison.your_loss_pct) * 100, 100)}%` }} />
                         </div>
                         <span className="text-sm font-mono w-14 text-right" style={{ color: "#ef4444" }}>
                           {(active.risk_parity_comparison.your_loss_pct * 100).toFixed(1)}%
@@ -757,8 +759,9 @@ function RetirementTab() {
       </GlassCard>
 
       {error && (
-        <div className="rounded-xl px-4 py-3 text-sm" style={{ background: "rgba(239,68,68,0.1)", border: "1px solid rgba(239,68,68,0.2)", color: "#f87171" }}>
-          {error}
+        <div className="rounded-xl border border-rose-500/20 bg-rose-500/10 px-4 py-3 text-rose-400 text-sm flex items-center justify-between">
+          <span>{error}</span>
+          <button onClick={run} className="text-rose-300 hover:text-rose-100 underline text-xs">Retry</button>
         </div>
       )}
 

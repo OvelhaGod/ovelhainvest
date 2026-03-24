@@ -922,8 +922,19 @@ export default function PerformancePage() {
 
       {/* Content */}
       {error && (
-        <div className="rounded-xl border border-[rgba(239,68,68,0.2)] bg-[rgba(239,68,68,0.06)] p-4 text-sm text-[#ef4444]">
-          {error} — Ensure the backend is running and /performance/snapshot has been called.
+        <div className="rounded-xl border border-rose-500/20 bg-rose-500/10 px-4 py-3 text-rose-400 text-sm flex items-center justify-between">
+          <span>{error} — Ensure the backend is running and /performance/snapshot has been called.</span>
+          <button
+            onClick={() => {
+              setError(null);
+              setLoadingSummary(true);
+              Promise.all([api.performanceSummary(), api.performanceBenchmark("SPY", "ytd")])
+                .then(([s, b]) => { setSummary(s); setBenchmark(b); })
+                .catch((e) => setError(e.message))
+                .finally(() => setLoadingSummary(false));
+            }}
+            className="text-rose-300 hover:text-rose-100 underline text-xs ml-4 shrink-0"
+          >Retry</button>
         </div>
       )}
 

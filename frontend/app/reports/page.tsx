@@ -36,6 +36,7 @@ const STATUS_STYLES: Record<string, { text: string; bg: string; border: string }
 export default function ReportsPage() {
   const [reports, setReports]         = useState<ReportRecord[]>([]);
   const [loading, setLoading]         = useState(true);
+  const [loadError, setLoadError]     = useState<string | null>(null);
   const [generating, setGenerating]   = useState(false);
   const [showModal, setShowModal]     = useState(false);
   const [genType, setGenType]         = useState<"monthly" | "annual">("monthly");
@@ -45,11 +46,13 @@ export default function ReportsPage() {
   const [pollId, setPollId]           = useState<string | null>(null);
 
   const loadReports = async () => {
+    setLoadError(null);
     try {
       const res = await fetch(`${API_URL}/reports/list`);
       if (res.ok) setReports(await res.json());
-    } catch {
-      /* silent */
+      else throw new Error(`API ${res.status}: /reports/list`);
+    } catch (e) {
+      setLoadError(e instanceof Error ? e.message : "Failed to load reports");
     } finally {
       setLoading(false);
     }
@@ -145,6 +148,13 @@ export default function ReportsPage() {
           </div>
         )}
 
+        {loadError && (
+          <div className="rounded-xl border border-rose-500/20 bg-rose-500/10 px-4 py-3 text-rose-400 text-sm flex items-center justify-between">
+            <span>{loadError}</span>
+            <button onClick={loadReports} className="text-rose-300 hover:text-rose-100 underline text-xs">Retry</button>
+          </div>
+        )}
+
         {/* Reports List */}
         <div className={glass}>
           <div className="p-6 border-b border-white/5">
@@ -198,7 +208,7 @@ export default function ReportsPage() {
                         </span>
                       </td>
                       <td className="px-6 py-4 text-right font-mono text-sm text-slate-400">{sizeKb}</td>
-                      <td className="px-6 py-4 text-sm text-slate-400">{createdAt}</td>
+                      <td className="px-6 py-4 text-sm font-mono text-slate-400">{createdAt}</td>
                       <td className="px-6 py-4 text-right">
                         {r.status === "ready" && r.download_url ? (
                           <a
