@@ -133,7 +133,7 @@ export default function JournalPage() {
 
   const handleExport = () => {
     window.open(
-      `${process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000"}/journal/export`,
+      `${process.env.NEXT_PUBLIC_API_URL ?? "https://investapi.ovelha.us"}/journal/export`,
       "_blank"
     );
   };

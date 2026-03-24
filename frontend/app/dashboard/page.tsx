@@ -7,7 +7,7 @@
 
 import { useEffect, useState } from "react";
 import useSWR from "swr";
-import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip } from "recharts";
+import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip, AreaChart, Area, XAxis, YAxis } from "recharts";
 import { api } from "@/lib/api";
 import { OIErrorState } from "@/components/ui/oi";
 import type { AdminStatus, AlertHistoryItem, DailyStatusResponse, SleeveWeight, ValuationSummaryResponse, VaultBalance } from "@/lib/types";
@@ -48,6 +48,15 @@ const ALERT_TYPE_CONFIG: Record<string, { icon: string; color: string }> = {
   fx_move:      { icon: "💱", color: "#f59e0b" },
   correlation:  { icon: "🔗", color: "#f43f5e" },
   deposit:      { icon: "💰", color: "#10b981" },
+};
+
+// Factor weights per Dalio economic season (from CLAUDE.md Section 26)
+const FACTOR_WEIGHTS_BY_SEASON: Record<string, { value: number; momentum: number; quality: number }> = {
+  rising_growth_low_inflation:       { value: 0.25, momentum: 0.45, quality: 0.30 },
+  falling_growth_low_inflation:      { value: 0.40, momentum: 0.15, quality: 0.45 },
+  rising_inflation:                  { value: 0.50, momentum: 0.20, quality: 0.30 },
+  falling_inflation_growth_recovery: { value: 0.35, momentum: 0.35, quality: 0.30 },
+  normal:                            { value: 0.40, momentum: 0.30, quality: 0.30 },
 };
 
 const VAULT_CONFIG = {
@@ -173,6 +182,13 @@ export default function DashboardPage() {
     color: SLEEVE_COLORS[sw.sleeve] ?? "#64748b",
   }));
 
+  const donutTargetData = (status?.sleeve_weights ?? []).map((sw) => ({
+    name: SLEEVE_LABELS[sw.sleeve] ?? sw.sleeve,
+    value: sw.target_weight,
+    sleeve: sw.sleeve,
+    color: SLEEVE_COLORS[sw.sleeve] ?? "#64748b",
+  }));
+
   const isPaused = adminStatus?.automation_paused ?? (status?.regime_state === "paused");
 
   return (
@@ -292,26 +308,38 @@ export default function DashboardPage() {
           <p className="text-xs text-white/30 mt-1">View full analysis →</p>
         </a>
 
-        {/* Pending Approvals */}
-        <div className={glassInner} style={
-          (status?.pending_approvals ?? 0) > 0
-            ? { borderColor: "rgba(245,158,11,0.3)", boxShadow: "0 0 20px rgba(245,158,11,0.06)" }
-            : {}
-        }>
-          <p className="text-xs text-white/40 uppercase tracking-widest mb-2">Pending Approvals</p>
+        {/* Sharpe Ratio (trailing 12mo) */}
+        <div className={glassInner}>
+          <p className="text-xs text-white/40 uppercase tracking-widest mb-2">Sharpe (12mo)</p>
           {loading ? (
-            <Skeleton className="h-9 w-16 mb-2" />
+            <Skeleton className="h-9 w-24 mb-2" />
+          ) : status?.sharpe_trailing_12mo != null ? (
+            <>
+              <p className={`text-3xl font-bold font-mono ${
+                status.sharpe_trailing_12mo >= 1.0 ? "text-primary"
+                  : status.sharpe_trailing_12mo >= 0.5 ? "text-tertiary"
+                  : "text-error"
+              }`}>
+                {status.sharpe_trailing_12mo.toFixed(2)}
+              </p>
+              <p className="text-xs mt-1 text-white/30">
+                {status.sharpe_trailing_12mo >= 1.0 ? "Excellent" : status.sharpe_trailing_12mo >= 0.5 ? "Good" : "Poor"}
+                {status.ytd_vs_benchmark != null && (
+                  <span className={`ml-2 font-mono ${status.ytd_vs_benchmark >= 0 ? "text-primary" : "text-error"}`}>
+                    {status.ytd_vs_benchmark >= 0 ? "+" : ""}{(status.ytd_vs_benchmark * 100).toFixed(1)}% vs bench
+                  </span>
+                )}
+              </p>
+            </>
           ) : (
-            <p className={`text-3xl font-bold font-mono ${(status?.pending_approvals ?? 0) > 0 ? "text-tertiary" : "text-white/30"}`}>
-              {status?.pending_approvals ?? 0}
-            </p>
-          )}
-          {(status?.pending_approvals ?? 0) > 0 ? (
-            <a href="/signals" className="text-xs text-tertiary/70 hover:text-tertiary mt-1 block transition-colors">
-              Review in Signals →
-            </a>
-          ) : (
-            <p className="text-xs text-white/30 mt-1">All clear</p>
+            <>
+              <p className="text-3xl font-bold text-white/20 font-mono">—</p>
+              <p className="text-xs text-white/30 mt-1">
+                {(status?.pending_approvals ?? 0) > 0
+                  ? <a href="/signals" className="text-tertiary/70 hover:text-tertiary transition-colors">{status?.pending_approvals} approval{status?.pending_approvals !== 1 ? "s" : ""} pending →</a>
+                  : "Needs 12mo of snapshots"}
+              </p>
+            </>
           )}
         </div>
       </div>
@@ -333,11 +361,27 @@ export default function DashboardPage() {
               <div className="w-48 h-48 shrink-0">
                 <ResponsiveContainer width="100%" height="100%">
                   <PieChart>
+                    {/* Inner ghost ring = target weights */}
+                    <Pie
+                      data={donutTargetData}
+                      cx="50%"
+                      cy="50%"
+                      innerRadius={42}
+                      outerRadius={52}
+                      paddingAngle={2}
+                      dataKey="value"
+                      strokeWidth={0}
+                    >
+                      {donutTargetData.map((entry) => (
+                        <Cell key={entry.sleeve} fill={entry.color} opacity={0.25} />
+                      ))}
+                    </Pie>
+                    {/* Outer ring = actual weights */}
                     <Pie
                       data={donutData}
                       cx="50%"
                       cy="50%"
-                      innerRadius={55}
+                      innerRadius={58}
                       outerRadius={88}
                       paddingAngle={2}
                       dataKey="value"
@@ -372,19 +416,42 @@ export default function DashboardPage() {
 
       {/* ── Bottom row: Regime + FX ── */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-        {/* Economic Season */}
+        {/* Economic Season + Factor Weights */}
         <div className={glassInner}>
           <p className="text-xs text-white/40 uppercase tracking-widest mb-3">Economic Season</p>
           {loading ? (
             <Skeleton className="h-8 w-48" />
           ) : (
-            <div className="flex items-center gap-3">
-              <span className="text-lg">{seasonIcon(status?.economic_season ?? "normal")}</span>
-              <div>
-                <p className="text-sm font-medium text-white/90">{seasonLabel(status?.economic_season ?? "normal")}</p>
-                <p className="text-xs text-white/30 mt-0.5">Dalio 4-season classifier</p>
+            <>
+              <div className="flex items-center gap-3 mb-3">
+                <span className="text-lg">{seasonIcon(status?.economic_season ?? "normal")}</span>
+                <div>
+                  <p className="text-sm font-medium text-white/90">{seasonLabel(status?.economic_season ?? "normal")}</p>
+                  <p className="text-xs text-white/30 mt-0.5">Dalio 4-season classifier</p>
+                </div>
               </div>
-            </div>
+              {/* Factor tilt weights for this season */}
+              {(() => {
+                const fw = FACTOR_WEIGHTS_BY_SEASON[status?.economic_season ?? "normal"] ?? FACTOR_WEIGHTS_BY_SEASON.normal;
+                return (
+                  <div className="space-y-1">
+                    {[
+                      { label: "Value",    value: fw.value,    color: "#3b82f6" },
+                      { label: "Momentum", value: fw.momentum, color: "#8b5cf6" },
+                      { label: "Quality",  value: fw.quality,  color: "#10b981" },
+                    ].map(({ label, value, color }) => (
+                      <div key={label} className="flex items-center gap-2 text-xs">
+                        <span className="w-14 text-white/40">{label}</span>
+                        <div className="flex-1 h-1 rounded-full bg-white/[0.06]">
+                          <div className="h-full rounded-full" style={{ width: `${value * 100}%`, background: color, opacity: 0.7 }} />
+                        </div>
+                        <span className="w-8 text-right font-mono text-white/50">{(value * 100).toFixed(0)}%</span>
+                      </div>
+                    ))}
+                  </div>
+                );
+              })()}
+            </>
           )}
         </div>
 
@@ -556,18 +623,18 @@ export default function DashboardPage() {
         </div>
       )}
 
-      {/* ── Monte Carlo Preview card ── */}
-      {mcPreview && (
-        <div
-          className={glassInner}
-          style={{ borderColor: "rgba(99,102,241,0.2)", boxShadow: "0 0 20px rgba(99,102,241,0.06)" }}
-        >
-          <div className="flex items-center justify-between mb-3">
-            <p className="text-xs text-white/40 uppercase tracking-widest">20-Year Projection Preview</p>
-            <a href="/projections" className="text-[10px] text-violet-400/70 hover:text-violet-400 transition-colors">
-              Run full simulation →
-            </a>
-          </div>
+      {/* ── Monte Carlo Preview card ── (always visible) */}
+      <div
+        className={glassInner}
+        style={{ borderColor: "rgba(99,102,241,0.2)", boxShadow: "0 0 20px rgba(99,102,241,0.06)" }}
+      >
+        <div className="flex items-center justify-between mb-3">
+          <p className="text-xs text-white/40 uppercase tracking-widest">20-Year Projection Preview</p>
+          <a href="/projections" className="text-[10px] text-violet-400/70 hover:text-violet-400 transition-colors">
+            Run full simulation →
+          </a>
+        </div>
+        {mcPreview ? (
           <div className="grid grid-cols-3 gap-4">
             <div>
               <p className="text-[10px] text-white/30 mb-1">Median at 10yr</p>
@@ -611,8 +678,17 @@ export default function DashboardPage() {
               </div>
             </div>
           </div>
-        </div>
-      )}
+        ) : (
+          <div className="grid grid-cols-3 gap-4">
+            {[0, 1, 2].map((i) => (
+              <div key={i}>
+                <Skeleton className="h-3 w-20 mb-2" />
+                <Skeleton className="h-7 w-24" />
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
 
       {/* ── Tax Snapshot card ── */}
       {taxSnapshot && (

@@ -466,6 +466,7 @@ export default function AssetsPage() {
   const [filterTier, setFilterTier]     = useState<string>("");
   const [filterMoat, setFilterMoat]     = useState<string>("");
   const [minMoS, setMinMoS]             = useState<number>(-50);
+  const [search, setSearch]             = useState<string>("");
 
   // Sort
   const [sortKey, setSortKey]   = useState<SortKey>("rank_in_universe");
@@ -499,6 +500,7 @@ export default function AssetsPage() {
       if (filterTier && a.tier !== filterTier) return false;
       if (filterMoat && a.moat_rating !== filterMoat) return false;
       if ((a.margin_of_safety_pct ?? -1) * 100 < minMoS) return false;
+      if (search && !a.symbol.toLowerCase().includes(search.toLowerCase()) && !(a.name ?? "").toLowerCase().includes(search.toLowerCase())) return false;
       return true;
     })
     .sort((a, b) => {
@@ -539,6 +541,15 @@ export default function AssetsPage() {
 
       {/* Filter bar */}
       <div className={`${glass} p-4 mb-5 flex flex-wrap gap-3 items-center`}>
+        {/* Search */}
+        <input
+          type="text"
+          placeholder="Search symbol or name..."
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          className="bg-white/[0.04] border border-white/[0.08] rounded-lg px-3 py-1.5 text-xs text-[#94a3b8] focus:outline-none focus:border-indigo-500/40 w-44"
+        />
+
         {/* Asset class */}
         <select
           value={filterClass}

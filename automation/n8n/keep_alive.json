@@ -109,7 +109,7 @@
         "url": "=https://api.telegram.org/bot{{ $vars.TELEGRAM_BOT_TOKEN }}/sendMessage",
         "sendBody": true,
         "specifyBody": "json",
-        "jsonBody": "={\"chat_id\": \"{{ $vars.TELEGRAM_CHAT_ID }}\", \"text\": \"\\u26a0\\ufe0f OvelhaInvest API offline during keep-alive check\\n\\nCheck: https://ovelhainvest.ovelha.us/health\\nTime: {{ $now.toISO() }}\"}",
+        "jsonBody": "={\"chat_id\": \"{{ $vars.TELEGRAM_CHAT_ID }}\", \"text\": \"\\u26a0\\ufe0f OvelhaInvest API offline during keep-alive check\\n\\nCheck: https://investapi.ovelha.us/health\\nTime: {{ $now.toISO() }}\"}",
         "options": {}
       },
       "id": "telegram-alert",

@@ -187,7 +187,7 @@ export default function ConfigPage() {
     setRebalLoading(true);
     setRebalError(null);
     try {
-      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000"}/simulation/rebalance_preview`, {
+      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL ?? "https://investapi.ovelha.us"}/simulation/rebalance_preview`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({}),
