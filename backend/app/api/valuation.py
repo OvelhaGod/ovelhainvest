@@ -323,7 +323,18 @@ def valuation_summary(
     Return high-level valuation summary: top opportunities + MoS distribution.
 
     Used by the dashboard's 'Top Opportunities' and 'Overvalued Positions' cards.
+    Redis-cached for 15 minutes.
     """
+    cache_key = f"val_summary:{user_id}"
+    try:
+        from app.db.redis_client import get_redis_client as _get_rc
+        _rc = _get_rc()
+        _cached = _rc.get(cache_key)
+        if _cached:
+            return ValuationSummaryResponse.model_validate_json(_cached)
+    except Exception as _ce:
+        logger.debug("Redis cache miss (val_summary): %s", _ce)
+
     from app.db.repositories.valuations import (
         get_latest_valuations,
         get_opportunity_candidates,
@@ -389,7 +400,7 @@ def valuation_summary(
             "fair_value_estimate_dcf": row.get("fair_value_estimate_dcf"),
         }
 
-    return ValuationSummaryResponse(
+    val_result = ValuationSummaryResponse(
         as_of_date=stats.get("last_updated"),
         assets_scored=stats.get("assets_scored", 0),
         positive_mos_count=stats.get("positive_mos", 0),
@@ -399,6 +410,12 @@ def valuation_summary(
         top_opportunities=[_slim(r) for r in opps[:5]],
         margin_of_safety_distribution=mos_dist,
     )
+    try:
+        from app.db.redis_client import get_redis_client as _get_rc2
+        _get_rc2().set(cache_key, val_result.model_dump_json(), ex=900)  # 15-minute TTL
+    except Exception as _se:
+        logger.debug("Redis cache store failed (val_summary): %s", _se)
+    return val_result
 
 
 # ── GET /valuation/{symbol} ───────────────────────────────────────────────────

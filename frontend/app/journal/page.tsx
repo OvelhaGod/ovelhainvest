@@ -186,8 +186,9 @@ export default function JournalPage() {
         )}
 
         {error && (
-          <div className="text-sm text-rose-400 bg-rose-500/10 border border-rose-500/20 rounded-xl px-4 py-2">
-            {error}
+          <div className="rounded-xl border border-rose-500/20 bg-rose-500/10 px-4 py-3 text-rose-400 text-sm flex items-center justify-between">
+            <span>{error}</span>
+            <button onClick={load} className="text-rose-300 hover:text-rose-100 underline text-xs">Retry</button>
           </div>
         )}
 

@@ -2511,7 +2511,7 @@ Alert: items without a matched transaction in last period (possible missed payme
 | 7 | Simulation + Projections — Monte Carlo, stress tests, contribution optimizer | Phase 6 complete |
 | 8 | Tax Engine — lot tracking, HIFO/FIFO, Brazil DARF | Phase 7 complete |
 | 9 | Decision Journal + Reports — override tracking, PDF export | Phase 8 complete |
-| 10 | PWA + Polish — offline, push, FX attribution, risk parity view | Phase 9 complete |
+| 10 | PWA + Polish — offline, push, FX attribution, risk parity view | ✅ Done |
 | **11** | **Personal Finance OS — transactions, budget, cashflow, net worth, recurring** | **Phase 10 complete** |
 | 12 | Integration Layer — budget feeds Monte Carlo, cashflow feeds vault optimizer | Phase 11 complete |
 | 13 | Advanced Analytics — spending pattern ML, savings optimization suggestions | Phase 12 complete |

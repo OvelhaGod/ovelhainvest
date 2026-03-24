@@ -5,7 +5,8 @@
  * Auto-refreshes every 60 seconds.
  */
 
-import { useCallback, useEffect, useState } from "react";
+import { useEffect, useState } from "react";
+import useSWR from "swr";
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip } from "recharts";
 import { api } from "@/lib/api";
 import type { AdminStatus, AlertHistoryItem, DailyStatusResponse, SleeveWeight, ValuationSummaryResponse, VaultBalance } from "@/lib/types";
@@ -88,7 +89,27 @@ function DonutTooltip({ active, payload }: { active?: boolean; payload?: { name:
 
 // ── Main component ────────────────────────────────────────────────────────────
 export default function DashboardPage() {
-  const [status, setStatus]               = useState<DailyStatusResponse | null>(null);
+  // SWR for /daily_status — auto-refreshes every 60 seconds
+  const {
+    data: status,
+    error: statusError,
+    isLoading,
+    mutate: refetchStatus,
+  } = useSWR<DailyStatusResponse>(
+    "/daily_status",
+    () => api.dailyStatus(),
+    { refreshInterval: 60_000 }
+  );
+
+  const loading = isLoading;
+  const error = statusError ? (statusError instanceof Error ? statusError.message : "Failed to load data") : null;
+  const [lastRefresh, setLastRefresh]     = useState<Date>(new Date());
+
+  // Track last-refresh time whenever new SWR data arrives
+  useEffect(() => {
+    if (status) setLastRefresh(new Date());
+  }, [status]);
+
   const [valSummary, setValSummary]       = useState<ValuationSummaryResponse | null>(null);
   const [alertHistory, setAlertHistory]   = useState<AlertHistoryItem[]>([]);
   const [adminStatus, setAdminStatus]     = useState<AdminStatus | null>(null);
@@ -108,22 +129,6 @@ export default function DashboardPage() {
     avg_overrode_30d: number | null;
     system_outperformance_30d: number | null;
   } | null>(null);
-  const [loading, setLoading]             = useState(true);
-  const [error, setError]                 = useState<string | null>(null);
-  const [lastRefresh, setLastRefresh]     = useState<Date>(new Date());
-
-  const fetchStatus = useCallback(async () => {
-    try {
-      const data = await api.dailyStatus();
-      setStatus(data);
-      setError(null);
-      setLastRefresh(new Date());
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to load data");
-    } finally {
-      setLoading(false);
-    }
-  }, []);
 
   // Parallel independent fetches — all gracefully degrade
   useEffect(() => {
@@ -157,12 +162,6 @@ export default function DashboardPage() {
       });
     });
   }, []);
-
-  useEffect(() => {
-    fetchStatus();
-    const interval = setInterval(fetchStatus, 60_000);
-    return () => clearInterval(interval);
-  }, [fetchStatus]);
 
   const regime = status ? (REGIME_CONFIG[status.regime_state] ?? REGIME_CONFIG.normal) : REGIME_CONFIG.normal;
 
@@ -234,7 +233,7 @@ export default function DashboardPage() {
       </div>
 
       {/* ── Top metrics row ── */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
         {/* Net Worth */}
         <div className={glassInner} style={{ borderColor: "rgba(16,185,129,0.2)", boxShadow: "0 0 20px rgba(16,185,129,0.05)" }}>
           <p className="text-xs text-white/40 uppercase tracking-widest mb-2">Net Worth</p>
@@ -317,7 +316,7 @@ export default function DashboardPage() {
       </div>
 
       {/* ── Middle row: Donut + Vaults ── */}
-      <div className="grid grid-cols-1 lg:grid-cols-5 gap-4">
+      <div className="grid grid-cols-1 xl:grid-cols-5 gap-4">
         {/* Allocation donut */}
         <div className={`${glassInner} lg:col-span-3`}>
           <p className="text-xs text-white/40 uppercase tracking-widest mb-4">Asset Allocation</p>
@@ -507,7 +506,7 @@ export default function DashboardPage() {
                   <span className="text-emerald-500/70">&gt;20% safe</span>
                   <span className="text-amber-500/70">10-20%</span>
                   <span className="text-white/30">0-10%</span>
-                  <span className="text-red-500/70">overvalued</span>
+                  <span className="text-rose-500/70">overvalued</span>
                 </div>
               </div>
             )}
@@ -759,10 +758,9 @@ export default function DashboardPage() {
 
       {/* ── Error banner ── */}
       {error && (
-        <div className={`${glass} p-4 border-rose-500/30 bg-rose-500/5`}>
-          <p className="text-sm text-rose-400">
-            ⚠ API unavailable — {error}. Start the backend: <code className="text-rose-300">uv run uvicorn app.main:app --reload</code>
-          </p>
+        <div className="rounded-xl border border-rose-500/20 bg-rose-500/10 px-4 py-3 text-rose-400 text-sm flex items-center justify-between">
+          <span>⚠ API unavailable — {error}. Start the backend: <code className="text-rose-300 font-mono">uv run uvicorn app.main:app --reload</code></span>
+          <button onClick={() => refetchStatus()} className="text-rose-300 hover:text-rose-100 underline text-xs ml-4 shrink-0">Retry</button>
         </div>
       )}
     </div>

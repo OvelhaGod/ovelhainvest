@@ -7,11 +7,12 @@ GET  /daily_status   — current portfolio status, no write
 
 from __future__ import annotations
 
+import hashlib
 import logging
 import uuid
 from datetime import datetime, timezone
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query, Request, Response
 
 from app.db.repositories import accounts as accounts_repo
 from app.db.repositories import holdings as holdings_repo
@@ -434,7 +435,7 @@ def run_allocation(
 
 
 @router.get("/daily_status", response_model=DailyStatusResponse)
-def daily_status(user_id: str = Depends(_get_user_id)) -> DailyStatusResponse:
+def daily_status(request: Request, response: Response, user_id: str = Depends(_get_user_id)) -> DailyStatusResponse | Response:
     """
     Return current portfolio status without triggering a new signals run.
 
@@ -533,7 +534,7 @@ def daily_status(user_id: str = Depends(_get_user_id)) -> DailyStatusResponse:
         except Exception as _pe_exc:
             logger.debug("Phase 4 perf metrics failed (non-critical): %s", _pe_exc)
 
-        return DailyStatusResponse(
+        result = DailyStatusResponse(
             total_value_usd=round(total_value_usd, 2),
             total_value_brl=round(normalize_to_brl(total_value_usd, usd_brl_rate), 2),
             usd_brl_rate=round(usd_brl_rate, 4),
@@ -552,6 +553,15 @@ def daily_status(user_id: str = Depends(_get_user_id)) -> DailyStatusResponse:
             sharpe_trailing_12mo=sharpe_12mo,
             max_drawdown_current=max_dd_current,
         )
+
+        # ETag support — skip recomputing the full response if nothing changed
+        content = result.model_dump_json()
+        etag = f'"{hashlib.md5(content.encode()).hexdigest()}"'
+        if_none_match = request.headers.get("if-none-match")
+        if if_none_match == etag:
+            return Response(status_code=304)
+        response.headers["ETag"] = etag
+        return result
 
     except HTTPException:
         raise

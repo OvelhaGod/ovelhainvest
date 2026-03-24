@@ -116,6 +116,18 @@ export const api = {
       `/performance/risk${userId ? `?user_id=${userId}` : ""}`
     ),
 
+  performanceFxAttribution: (period = "ytd", userId?: string) => {
+    const params = new URLSearchParams({ period });
+    if (userId) params.set("user_id", userId);
+    return request<Record<string, unknown>>(`/performance/fx_attribution?${params}`);
+  },
+
+  performanceCorrelationHistory: (days = 365, userId?: string) => {
+    const params = new URLSearchParams({ days: String(days) });
+    if (userId) params.set("user_id", userId);
+    return request<Record<string, unknown>>(`/performance/correlation_history?${params}`);
+  },
+
   triggerSnapshot: (userId?: string) =>
     request<{ status: string; snapshot_date: string; message: string }>(
       `/performance/snapshot${userId ? `?user_id=${userId}` : ""}`,

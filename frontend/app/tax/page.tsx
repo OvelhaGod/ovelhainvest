@@ -142,6 +142,7 @@ export default function TaxPage() {
   const [estimate, setEstimate]           = useState<TaxEstimate | null>(null);
   const [candidates, setCandidates]       = useState<HarvestCandidate[] | null>(null);
   const [loadingLots, setLoadingLots]     = useState(true);
+  const [lotsError, setLotsError]         = useState<string | null>(null);
   const [loadingCandidates, setLoadingCandidates] = useState(false);
   const [lotMethod, setLotMethod]         = useState<"hifo" | "fifo" | "spec_id">("hifo");
   const [hpFilter, setHpFilter]           = useState<"all" | "short_term" | "long_term">("all");
@@ -149,10 +150,13 @@ export default function TaxPage() {
 
   const fetchLots = useCallback(async (method: string) => {
     setLoadingLots(true);
+    setLotsError(null);
     try {
       const data = await apiFetch<LotsResponse>(`/tax/lots?lot_method=${method}`);
       setLots(data);
-    } catch { /* graceful */ }
+    } catch (e) {
+      setLotsError(e instanceof Error ? e.message : "Failed to load tax lots");
+    }
     finally { setLoadingLots(false); }
   }, []);
 
@@ -289,6 +293,14 @@ export default function TaxPage() {
         ))}
       </div>
 
+      {/* ── Lots Error ── */}
+      {lotsError && (
+        <div className="rounded-xl border border-rose-500/20 bg-rose-500/10 px-4 py-3 text-rose-400 text-sm flex items-center justify-between">
+          <span>{lotsError}</span>
+          <button onClick={() => fetchLots(lotMethod)} className="text-rose-300 hover:text-rose-100 underline text-xs">Retry</button>
+        </div>
+      )}
+
       {/* ── Tax Lots Table ── */}
       <div className={glass}>
         {/* Filter row */}
@@ -343,7 +355,7 @@ export default function TaxPage() {
 
         {/* Table */}
         <div className="overflow-x-auto">
-          <table className="w-full text-xs">
+          <table className="w-full min-w-[640px] text-xs">
             <thead>
               <tr style={{ borderBottom: "1px solid rgba(255,255,255,0.05)" }}>
                 {["Symbol", "Account", "Acquired", "Qty", "Cost/Unit", "Price", "Unrlz G/L", "Holding", "Est. Tax", "Wait LT?"].map((h) => (
