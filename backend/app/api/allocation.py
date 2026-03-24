@@ -523,9 +523,17 @@ def daily_status(request: Request, response: Response, user_id: str = Depends(_g
         ytd_vs_benchmark: float | None = None
         sharpe_12mo: float | None = None
         max_dd_current: float | None = None
+        today_pnl_usd: float | None = None
+        today_pnl_pct: float | None = None
 
         try:
             recent_snaps = get_snapshot_history(user_id, days=365)
+            if len(recent_snaps) >= 2:
+                prev_val = float(recent_snaps[-2]["total_value_usd"])
+                curr_val = float(recent_snaps[-1]["total_value_usd"])
+                if prev_val > 0:
+                    today_pnl_usd = round(curr_val - prev_val, 2)
+                    today_pnl_pct = round((curr_val - prev_val) / prev_val, 4)
             if len(recent_snaps) >= 20:
                 snap_values = _pd.Series(
                     [float(s["total_value_usd"]) for s in recent_snaps],
@@ -552,8 +560,8 @@ def daily_status(request: Request, response: Response, user_id: str = Depends(_g
             economic_season=economic_season,
             pending_approvals=len(pending),
             last_run_timestamp=last_run_ts,
-            today_pnl_usd=None,
-            today_pnl_pct=None,
+            today_pnl_usd=today_pnl_usd,
+            today_pnl_pct=today_pnl_pct,
             ytd_return_twr=float(ytd_twr) if ytd_twr else None,
             max_drawdown_pct=float(max_dd) if max_dd else None,
             portfolio_snapshot_date=snap_date,

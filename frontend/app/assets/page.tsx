@@ -465,7 +465,7 @@ export default function AssetsPage() {
   const [filterClass, setFilterClass]   = useState<string>("");
   const [filterTier, setFilterTier]     = useState<string>("");
   const [filterMoat, setFilterMoat]     = useState<string>("");
-  const [minMoS, setMinMoS]             = useState<number>(-50);
+  const [minMoS, setMinMoS]             = useState<number>(-100);
   const [search, setSearch]             = useState<string>("");
 
   // Sort
@@ -585,12 +585,12 @@ export default function AssetsPage() {
           <span className="text-xs text-[#475569] whitespace-nowrap">Min MoS:</span>
           <input
             type="range"
-            min={-50} max={30} step={5}
+            min={-100} max={30} step={5}
             value={minMoS}
             onChange={(e) => setMinMoS(Number(e.target.value))}
             className="w-24 accent-indigo-500"
           />
-          <span className="text-xs font-mono text-[#94a3b8] w-10">{minMoS}%</span>
+          <span className="text-xs font-mono text-[#94a3b8] w-20">{minMoS === -100 ? "All Assets" : `${minMoS}%`}</span>
         </div>
 
         {/* Refresh */}

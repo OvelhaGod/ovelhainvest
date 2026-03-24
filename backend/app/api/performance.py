@@ -285,47 +285,63 @@ async def performance_vs_benchmark(
     benchmark: str = Query(default="SPY"),
     period: str = Query(default="ytd"),
 ) -> BenchmarkComparisonResponse:
-    """Return portfolio vs benchmark comparison."""
-    snapshots = get_snapshot_history(user_id, days=1100)
-    if len(snapshots) < 2:
-        raise HTTPException(status_code=404, detail="Insufficient snapshot data.")
+    """Return portfolio vs benchmark comparison. Returns empty response (not error) when insufficient data."""
+    try:
+        snapshots = get_snapshot_history(user_id, days=1100)
+        if len(snapshots) < 2:
+            return BenchmarkComparisonResponse(
+                benchmark_symbol=benchmark.upper(),
+                period=period,
+                portfolio_return=None,
+                benchmark_return=None,
+                active_return=None,
+            )
 
-    values = _snapshots_to_series(snapshots)
-    returns = _series_to_returns(values)
+        values = _snapshots_to_series(snapshots)
+        returns = _series_to_returns(values)
 
-    start_dt = _period_start_date(period)
-    today = date.today()
+        start_dt = _period_start_date(period)
+        today = date.today()
 
-    period_vals = values[values.index >= pd.Timestamp(start_dt)]
-    period_returns = _series_to_returns(period_vals) if len(period_vals) > 1 else returns
+        period_vals = values[values.index >= pd.Timestamp(start_dt)]
+        period_returns = _series_to_returns(period_vals) if len(period_vals) > 1 else returns
 
-    bench_returns = _fetch_benchmark_returns(benchmark.upper(), start_dt, today)
+        bench_returns = _fetch_benchmark_returns(benchmark.upper(), start_dt, today)
 
-    portfolio_return = float((1 + period_returns).prod() - 1) if not period_returns.empty else None
-    bench_return = float((1 + bench_returns).prod() - 1) if not bench_returns.empty else None
-    active_ret = (portfolio_return - bench_return) if (portfolio_return is not None and bench_return is not None) else None
+        portfolio_return = float((1 + period_returns).prod() - 1) if not period_returns.empty else None
+        bench_return = float((1 + bench_returns).prod() - 1) if not bench_returns.empty else None
+        active_ret = (portfolio_return - bench_return) if (portfolio_return is not None and bench_return is not None) else None
 
-    beta = None
-    corr = None
-    ir = None
-    if not bench_returns.empty and not period_returns.empty:
-        aligned_p, aligned_b = period_returns.align(bench_returns, join="inner")
-        if len(aligned_p) > 10:
-            beta = pe.compute_beta(aligned_p, aligned_b)
-            corr = float(aligned_p.corr(aligned_b))
-            active_series = aligned_p - aligned_b
-            ir = pe.compute_information_ratio(active_series)
+        beta = None
+        corr = None
+        ir = None
+        if not bench_returns.empty and not period_returns.empty:
+            aligned_p, aligned_b = period_returns.align(bench_returns, join="inner")
+            if len(aligned_p) > 10:
+                beta = pe.compute_beta(aligned_p, aligned_b)
+                corr = float(aligned_p.corr(aligned_b))
+                active_series = aligned_p - aligned_b
+                ir = pe.compute_information_ratio(active_series)
 
-    return BenchmarkComparisonResponse(
-        benchmark_symbol=benchmark.upper(),
-        period=period,
-        portfolio_return=round(portfolio_return, 4) if portfolio_return is not None else None,
-        benchmark_return=round(bench_return, 4) if bench_return is not None else None,
-        active_return=round(active_ret, 4) if active_ret is not None else None,
-        beta=round(beta, 3) if beta is not None else None,
-        correlation=round(corr, 3) if corr is not None else None,
-        information_ratio=round(ir, 3) if ir is not None else None,
-    )
+        return BenchmarkComparisonResponse(
+            benchmark_symbol=benchmark.upper(),
+            period=period,
+            portfolio_return=round(portfolio_return, 4) if portfolio_return is not None else None,
+            benchmark_return=round(bench_return, 4) if bench_return is not None else None,
+            active_return=round(active_ret, 4) if active_ret is not None else None,
+            beta=round(beta, 3) if beta is not None else None,
+            correlation=round(corr, 3) if corr is not None else None,
+            information_ratio=round(ir, 3) if ir is not None else None,
+        )
+    except Exception as exc:
+        logger.warning("performance_vs_benchmark failed gracefully: %s", exc)
+        return BenchmarkComparisonResponse(
+            benchmark_symbol=benchmark.upper(),
+            period=period,
+            portfolio_return=None,
+            benchmark_return=None,
+            active_return=None,
+        )
 
 
 @router.get("/performance/rolling", response_model=RollingReturnsResponse)

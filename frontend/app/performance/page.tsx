@@ -864,7 +864,7 @@ export default function PerformancePage() {
 
   useEffect(() => {
     setLoadingSummary(true);
-    Promise.all([api.performanceSummary(), api.performanceBenchmark("SPY", benchPeriod)])
+    Promise.all([api.performanceSummary(benchPeriod), api.performanceBenchmark("SPY", benchPeriod)])
       .then(([s, b]) => {
         setSummary(s);
         setBenchmark(b);

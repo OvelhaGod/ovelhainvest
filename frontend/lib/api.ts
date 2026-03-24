@@ -85,10 +85,11 @@ export const api = {
 
   // ── Performance (Phase 4) ─────────────────────────────────────────────────
 
-  performanceSummary: (userId?: string) =>
-    request<PerformanceSummaryResponse>(
-      `/performance/summary${userId ? `?user_id=${userId}` : ""}`
-    ),
+  performanceSummary: (period = "ytd", userId?: string) => {
+    const params = new URLSearchParams({ period });
+    if (userId) params.set("user_id", userId);
+    return request<PerformanceSummaryResponse>(`/performance/summary?${params}`);
+  },
 
   performanceAttribution: (periodStart?: string, periodEnd?: string, userId?: string) => {
     const params = new URLSearchParams();
@@ -258,6 +259,21 @@ export const api = {
       harvest_savings: { potential_savings_usd: number; top_candidates: unknown[] };
       net_estimated_tax: number;
     }>(`/tax/estimate${qs ? "?" + qs : ""}`);
+  },
+
+  // ── Research (BUG 3) ──────────────────────────────────────────────────────
+
+  newsFeed: (params?: { user_id?: string; limit?: number }) => {
+    const qs = new URLSearchParams();
+    if (params?.user_id) qs.set("user_id", params.user_id);
+    if (params?.limit != null) qs.set("limit", String(params.limit));
+    return request<Record<string, unknown>[]>(`/news/feed${qs.toString() ? `?${qs}` : ""}`);
+  },
+
+  earningsCalendar: (params?: { user_id?: string }) => {
+    const qs = new URLSearchParams();
+    if (params?.user_id) qs.set("user_id", params.user_id);
+    return request<Record<string, unknown>[]>(`/news/earnings_calendar${qs.toString() ? `?${qs}` : ""}`);
   },
 
   taxBrazilDarf: (params?: { user_id?: string; year?: number; month?: number }) => {
