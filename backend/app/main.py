@@ -61,6 +61,9 @@ app = FastAPI(
 origins = [
     "http://localhost:3000",
     "http://127.0.0.1:3000",
+    "http://10.0.0.201:3000",
+    "https://invest.ovelha.us",
+    "https://api.invest.ovelha.us",
 ]
 
 app.add_middleware(GZipMiddleware, minimum_size=1000)
@@ -75,7 +78,7 @@ app.add_middleware(
 # ---------------------------------------------------------------------------
 # Routers
 # ---------------------------------------------------------------------------
-from app.api import alerts, allocation, journal, performance, simulation, tax, valuation
+from app.api import alerts, allocation, journal, performance, reports, simulation, tax, valuation
 app.include_router(allocation.router, prefix="", tags=["allocation"])
 app.include_router(valuation.router, prefix="", tags=["valuation"])
 app.include_router(performance.router, prefix="", tags=["performance"])
@@ -83,6 +86,7 @@ app.include_router(alerts.router, prefix="", tags=["alerts"])
 app.include_router(journal.router, prefix="", tags=["journal"])
 app.include_router(simulation.router, prefix="", tags=["simulation"])
 app.include_router(tax.router, prefix="", tags=["tax"])
+app.include_router(reports.router, prefix="", tags=["reports"])
 
 # ---------------------------------------------------------------------------
 # Routes
