@@ -21,7 +21,7 @@ import type {
 } from "@/lib/types";
 
 const API_URL =
-  process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
+  process.env.NEXT_PUBLIC_API_URL ?? "https://investapi.ovelha.us";
 
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
   const res = await fetch(`${API_URL}${path}`, {
