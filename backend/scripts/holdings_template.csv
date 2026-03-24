@@ -1,0 +1,20 @@
+account_name,symbol,quantity,avg_cost_basis
+Thiago 401k,VTI,0,0
+Thiago 401k,VXUS,0,0
+Thiago 401k,BND,0,0
+Spouse 401k,VTI,0,0
+Spouse 401k,BND,0,0
+Thiago Roth IRA,VTI,0,0
+Thiago Roth IRA,VXUS,0,0
+Thiago Roth IRA,GOOG,0,0
+Thiago Roth IRA,AMZN,0,0
+M1 Taxable,VTI,0,0
+M1 Taxable,VXUS,0,0
+M1 Taxable,NVDA,0,0
+M1 Taxable,MSFT,0,0
+M1 Taxable,AAPL,0,0
+Binance US,BTC,0,0
+Binance US,ETH,0,0
+Clear Corretora,PETR4,0,0
+Clear Corretora,VALE3,0,0
+Clear Corretora,ITUB4,0,0
