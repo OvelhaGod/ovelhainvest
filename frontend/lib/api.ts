@@ -157,6 +157,22 @@ export const api = {
       body: JSON.stringify({ outcome_30d, outcome_90d }),
     }),
 
+  journalPatterns: (userId?: string) =>
+    request<Record<string, unknown>[]>(
+      `/journal/patterns${userId ? `?user_id=${userId}` : ""}`
+    ),
+
+  journalInsight: (userId?: string) =>
+    request<Record<string, unknown>>(
+      `/journal/insight${userId ? `?user_id=${userId}` : ""}`
+    ),
+
+  triggerJournalBackfill: (userId?: string) =>
+    request<{ queued: number; message: string }>(
+      `/journal/backfill${userId ? `?user_id=${userId}` : ""}`,
+      { method: "POST" }
+    ),
+
   // ── Alerts (Phase 6) ──────────────────────────────────────────────────────
 
   listAlertHistory: (params?: { limit?: number; rule_type?: string; user_id?: string }) => {
