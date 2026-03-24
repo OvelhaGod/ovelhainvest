@@ -47,9 +47,9 @@ if all_required_ok:
 else:
     print("Fill in missing vars in backend/.env, then re-run this script.\n")
     print("Reference:")
-    print("  SUPABASE_SERVICE_KEY : Supabase dashboard → Settings → API → service_role key")
+    print("  SUPABASE_SERVICE_KEY : Supabase dashboard : Supabase dashboard, Settings, API, service_role key")
     print("  ANTHROPIC_API_KEY    : https://console.anthropic.com/settings/keys")
-    print("  TELEGRAM_BOT_TOKEN   : @BotFather → /newbot")
+    print("  TELEGRAM_BOT_TOKEN   : @BotFather : /newbot")
     print("  TELEGRAM_CHAT_ID     : curl 'https://api.telegram.org/bot<TOKEN>/getUpdates'")
-    print("  REDIS_URL            : https://console.upstash.com → Redis → copy URL\n")
+    print("  REDIS_URL            : https://console.upstash.com : Redis : copy URL\n")
     sys.exit(1)
