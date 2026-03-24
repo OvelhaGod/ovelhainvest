@@ -840,8 +840,12 @@ function RiskTab({
 
 type Tab = "summary" | "attribution" | "rolling" | "risk";
 
+const BENCH_PERIODS = ["1mo", "3mo", "6mo", "ytd", "1yr", "3yr"] as const;
+type BenchPeriod = typeof BENCH_PERIODS[number];
+
 export default function PerformancePage() {
   const [activeTab, setActiveTab] = useState<Tab>("summary");
+  const [benchPeriod, setBenchPeriod] = useState<BenchPeriod>("ytd");
 
   const [summary, setSummary] = useState<PerformanceSummaryResponse | null>(null);
   const [attribution, setAttribution] = useState<AttributionResponse | null>(null);
@@ -860,14 +864,14 @@ export default function PerformancePage() {
 
   useEffect(() => {
     setLoadingSummary(true);
-    Promise.all([api.performanceSummary(), api.performanceBenchmark("SPY", "ytd")])
+    Promise.all([api.performanceSummary(), api.performanceBenchmark("SPY", benchPeriod)])
       .then(([s, b]) => {
         setSummary(s);
         setBenchmark(b);
       })
       .catch((e) => setError(e.message))
       .finally(() => setLoadingSummary(false));
-  }, []);
+  }, [benchPeriod]);
 
   useEffect(() => {
     if (activeTab === "attribution" && !attribution) {
@@ -924,6 +928,26 @@ export default function PerformancePage() {
       <div>
         <h1 className="text-xl font-semibold text-[#f1f5f9]">Performance Analytics</h1>
         <p className="text-xs text-[#475569] mt-0.5">TWR · Sharpe · Attribution · Risk Parity</p>
+      </div>
+
+      {/* Period selector (for benchmark comparison) */}
+      <div className="flex items-center gap-2">
+        <span className="text-xs text-[#475569]">Benchmark period:</span>
+        <div className="flex gap-1 p-1 rounded-lg bg-white/[0.03] border border-white/[0.06]">
+          {BENCH_PERIODS.map((p) => (
+            <button
+              key={p}
+              onClick={() => setBenchPeriod(p)}
+              className={`px-2.5 py-1 rounded-md text-xs font-medium transition-all ${
+                benchPeriod === p
+                  ? "bg-indigo-500/20 text-indigo-300 border border-indigo-500/30"
+                  : "text-[#475569] hover:text-[#94a3b8]"
+              }`}
+            >
+              {PERIOD_LABELS[p] ?? p}
+            </button>
+          ))}
+        </div>
       </div>
 
       {/* Tab bar */}
