@@ -1103,3 +1103,21 @@ async def register_telegram_webhook(base_url: str) -> bool:
     except Exception as exc:
         logger.error("Telegram setWebhook error: %s", exc)
         return False
+
+
+# ── Keep-Alive ─────────────────────────────────────────────────────────────────
+
+def write_keep_alive_ping(db, source: str = "run_allocation") -> None:
+    """
+    Write a keep-alive record after every successful /run_allocation.
+    Prevents Supabase free tier from pausing due to inactivity.
+    Fails silently — never blocks the main pipeline.
+    """
+    try:
+        db.table("keep_alive_log").insert({
+            "source": source,
+            "pinged_at": datetime.now(timezone.utc).isoformat(),
+        }).execute()
+        logger.debug("keep_alive_log written (source=%s)", source)
+    except Exception as exc:
+        logger.debug("keep_alive_ping skipped (table may not exist yet): %s", exc)

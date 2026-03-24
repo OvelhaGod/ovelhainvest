@@ -90,20 +90,35 @@ app.include_router(tax.router, prefix="", tags=["tax"])
 
 @app.get("/health", tags=["system"])
 def health_check() -> dict:
-    """Liveness + dependency check endpoint."""
+    """Liveness + dependency check — returns live connectivity status for all services."""
+    from datetime import datetime, timezone
     supabase_ok = check_supabase_connection()
+
+    redis_status = "unconfigured"
+    try:
+        from app.db.redis_client import get_redis_client
+        r = get_redis_client()
+        if r:
+            r.ping()
+            redis_status = "connected"
+    except Exception as e:
+        redis_status = f"error: {str(e)[:40]}"
+
+    overall = "ok" if supabase_ok else "degraded"
     return {
-        "status": "ok",
+        "status": overall,
         "supabase": "connected" if supabase_ok else "unreachable",
-        "version": "6.0.0",
+        "redis": redis_status,
+        "version": "1.2.0",
         "env": settings.app_env,
+        "timestamp": datetime.now(timezone.utc).isoformat(),
     }
 
 
 @app.get("/version", tags=["system"])
 def version() -> dict:
     """Return API version info."""
-    return {"version": "6.0.0", "phase": "6", "env": settings.app_env}
+    return {"version": "1.2.0", "phase": "6", "env": settings.app_env}
 
 
 @app.get("/", tags=["system"])

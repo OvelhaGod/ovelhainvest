@@ -389,6 +389,13 @@ def run_allocation(
             run_id, len(proposed_trades), approval_count, alerts_dispatched,
         )
 
+        # Keep-alive: write heartbeat to prevent Supabase free tier from pausing
+        try:
+            from app.services.alert_engine import write_keep_alive_ping
+            write_keep_alive_ping(db)
+        except Exception:
+            pass
+
         # ── Phase 8 — aggregate tax cost across sell trades ────────────────
         total_tax_cost = sum(
             t.tax_cost_usd for t in proposed_trades
