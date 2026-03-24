@@ -1,5 +1,7 @@
 """Application configuration — reads from .env via pydantic-settings."""
 
+from functools import lru_cache
+
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -12,11 +14,11 @@ class Settings(BaseSettings):
     )
 
     # Supabase
-    supabase_url: str
-    supabase_service_key: str
+    supabase_url: str = ""
+    supabase_service_key: str = ""
 
     # Anthropic
-    anthropic_api_key: str
+    anthropic_api_key: str = ""
 
     # Market data
     market_data_provider: str = "yfinance"
@@ -38,6 +40,9 @@ class Settings(BaseSettings):
     # Telegram webhook
     telegram_webhook_secret: str = ""  # X-Telegram-Bot-Api-Secret-Token header value
 
+    # Default user (set after creating Thiago's user record)
+    default_user_id: str = ""
+
     @property
     def is_production(self) -> bool:
         return self.app_env == "production"
@@ -50,5 +55,19 @@ class Settings(BaseSettings):
     def telegram_enabled(self) -> bool:
         return bool(self.telegram_bot_token and self.telegram_chat_id)
 
+    @property
+    def supabase_configured(self) -> bool:
+        return bool(self.supabase_url and self.supabase_service_key)
 
-settings = Settings()
+    @property
+    def ai_configured(self) -> bool:
+        return bool(self.anthropic_api_key)
+
+
+@lru_cache
+def get_settings() -> Settings:
+    return Settings()
+
+
+# Module-level singleton for backwards compat
+settings = get_settings()
