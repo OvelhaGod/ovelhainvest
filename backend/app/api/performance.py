@@ -21,6 +21,7 @@ import yfinance as yf
 from fastapi import APIRouter, HTTPException, Query
 
 from app.db.repositories import performance as perf_repo
+from app.db.supabase_client import get_supabase_client
 from app.db.repositories.snapshots import (
     get_latest_snapshot,
     get_snapshot_history,
@@ -452,3 +453,208 @@ async def trigger_snapshot(
     except Exception as exc:
         logger.error("Snapshot creation failed: %s", exc)
         raise HTTPException(status_code=500, detail=str(exc))
+
+
+@router.get("/performance/fx_attribution")
+async def fx_attribution_endpoint(
+    period: str = Query(default="ytd"),
+    user_id: str = Query(default="00000000-0000-0000-0000-000000000001"),
+) -> dict:
+    """
+    FX attribution for the Brazil sleeve.
+
+    Returns Brazil sleeve return in BRL vs USD, and pure currency effect.
+    Also returns historical USD/BRL rate for the period (for charting).
+    """
+    from app.services.fx_engine import (
+        compute_fx_attribution_over_period,
+        get_usd_brl_history,
+    )
+    from datetime import date as _date, timedelta
+
+    # Determine period dates
+    today = _date.today()
+    period_map = {
+        "1mo":  today - timedelta(days=30),
+        "3mo":  today - timedelta(days=90),
+        "6mo":  today - timedelta(days=180),
+        "ytd":  _date(today.year, 1, 1),
+        "1yr":  today - timedelta(days=365),
+    }
+    period_start = period_map.get(period, _date(today.year, 1, 1))
+
+    # Fetch portfolio snapshots with sleeve data
+    try:
+        client = get_supabase_client()
+        resp = (
+            client.table("portfolio_snapshots")
+            .select("snapshot_date, sleeve_weights, total_value_usd, usd_brl_rate")
+            .eq("user_id", user_id)
+            .gte("snapshot_date", period_start.isoformat())
+            .lte("snapshot_date", today.isoformat())
+            .order("snapshot_date")
+            .execute()
+        )
+        snapshots = resp.data or []
+    except Exception as exc:
+        logger.error("fx_attribution: snapshot fetch failed: %s", exc)
+        snapshots = []
+
+    # Build brazil holdings history from snapshots
+    brazil_history = []
+    for snap in snapshots:
+        weights = snap.get("sleeve_weights") or {}
+        total = float(snap.get("total_value_usd", 0))
+        fx_rate = float(snap.get("usd_brl_rate") or 5.70)
+        brazil_weight_usd = 0.0
+
+        if isinstance(weights, list):
+            for w in weights:
+                if isinstance(w, dict) and w.get("sleeve") == "brazil_equity":
+                    brazil_weight_usd = float(w.get("current_weight", 0)) * total
+        elif isinstance(weights, dict):
+            brazil_weight_usd = weights.get("brazil_equity", 0) * total
+
+        if brazil_weight_usd > 0:
+            brazil_history.append({
+                "date": snap["snapshot_date"],
+                "value_usd": brazil_weight_usd,
+                "value_brl": brazil_weight_usd * fx_rate,
+            })
+
+    attribution = compute_fx_attribution_over_period(
+        brazil_history, period_start, today
+    )
+
+    # Get rate history for chart
+    rate_history = get_usd_brl_history(days=(today - period_start).days + 5)
+    rate_history = [r for r in rate_history if r["date"] >= period_start.isoformat()]
+
+    if attribution is None:
+        return {
+            "period": period,
+            "has_data": False,
+            "message": "Insufficient Brazil sleeve history for this period",
+            "rate_history": rate_history,
+        }
+
+    return {
+        "period": period,
+        "has_data": True,
+        "brazil_return_brl": attribution.brazil_return_brl,
+        "brazil_return_usd": attribution.brazil_return_usd,
+        "fx_contribution": attribution.fx_contribution,
+        "usd_brl_start": attribution.usd_brl_start,
+        "usd_brl_end": attribution.usd_brl_end,
+        "usd_brl_change_pct": attribution.usd_brl_change_pct,
+        "interpretation": attribution.interpretation,
+        "rate_history": rate_history,
+    }
+
+
+@router.get("/performance/correlation_history")
+async def correlation_history(
+    user_id: str = Query(default="00000000-0000-0000-0000-000000000001"),
+    days: int = Query(default=365, ge=30, le=730),
+) -> dict:
+    """
+    Rolling 90-day correlations for all sleeve pairs over the last N days.
+
+    Returns:
+        {
+          "pairs": [{"sleeves": [a, b], "history": [{"date": str, "correlation": float}]}],
+          "highest_pair": {"sleeves": [a, b], "current_correlation": float},
+        }
+    """
+    from datetime import date as _date, timedelta
+    from itertools import combinations
+
+    today = _date.today()
+    start = today - timedelta(days=days)
+
+    try:
+        client = get_supabase_client()
+        resp = (
+            client.table("portfolio_snapshots")
+            .select("snapshot_date, sleeve_weights")
+            .eq("user_id", user_id)
+            .gte("snapshot_date", start.isoformat())
+            .order("snapshot_date")
+            .execute()
+        )
+        snapshots = resp.data or []
+    except Exception as exc:
+        logger.error("correlation_history: fetch failed: %s", exc)
+        return {"pairs": [], "highest_pair": None}
+
+    if len(snapshots) < 10:
+        return {"pairs": [], "highest_pair": None}
+
+    # Build per-sleeve return series
+    sleeve_names = ["us_equity", "intl_equity", "bonds", "brazil_equity", "crypto", "cash"]
+    sleeve_returns: dict[str, list[float]] = {s: [] for s in sleeve_names}
+    dates: list[str] = []
+
+    for i in range(1, len(snapshots)):
+        prev_w = snapshots[i - 1].get("sleeve_weights") or {}
+        curr_w = snapshots[i].get("sleeve_weights") or {}
+
+        if isinstance(prev_w, list):
+            prev_w = {w["sleeve"]: w.get("current_weight", 0) for w in prev_w if isinstance(w, dict)}
+        if isinstance(curr_w, list):
+            curr_w = {w["sleeve"]: w.get("current_weight", 0) for w in curr_w if isinstance(w, dict)}
+
+        dates.append(snapshots[i]["snapshot_date"])
+        for s in sleeve_names:
+            prev = float(prev_w.get(s, 0) or 0)
+            curr = float(curr_w.get(s, 0) or 0)
+            ret = (curr / prev - 1) if prev > 0 else 0.0
+            sleeve_returns[s].append(ret)
+
+    # Compute rolling 90-day correlations for all pairs
+    window = min(90, len(dates))
+    pairs_data = []
+    highest_pair: dict | None = None
+    highest_corr = -2.0
+
+    for s_a, s_b in combinations(sleeve_names, 2):
+        arr_a = sleeve_returns[s_a]
+        arr_b = sleeve_returns[s_b]
+
+        if not arr_a or len(arr_a) < 10:
+            continue
+
+        history = []
+        for i in range(window - 1, len(dates)):
+            sub_a = arr_a[max(0, i - window + 1): i + 1]
+            sub_b = arr_b[max(0, i - window + 1): i + 1]
+
+            if len(sub_a) < 5:
+                continue
+
+            a_arr = np.array(sub_a)
+            b_arr = np.array(sub_b)
+            std_a = float(np.std(a_arr))
+            std_b = float(np.std(b_arr))
+
+            if std_a < 1e-10 or std_b < 1e-10:
+                corr = 0.0
+            else:
+                corr = float(np.corrcoef(a_arr, b_arr)[0, 1])
+                corr = max(-1.0, min(1.0, corr))
+
+            history.append({"date": dates[i], "correlation": round(corr, 4)})
+
+        current_corr = history[-1]["correlation"] if history else 0.0
+
+        if current_corr > highest_corr:
+            highest_corr = current_corr
+            highest_pair = {"sleeves": [s_a, s_b], "current_correlation": current_corr}
+
+        pairs_data.append({
+            "sleeves": [s_a, s_b],
+            "current_correlation": current_corr,
+            "history": history[-52:],  # last 52 data points (~1 year of weekly data)
+        })
+
+    return {"pairs": pairs_data, "highest_pair": highest_pair}

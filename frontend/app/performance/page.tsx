@@ -15,6 +15,8 @@ import {
   Legend,
   Line,
   LineChart,
+  Pie,
+  PieChart,
   ReferenceLine,
   ResponsiveContainer,
   Tooltip,
@@ -22,6 +24,7 @@ import {
   YAxis,
 } from "recharts";
 import { api } from "@/lib/api";
+import { CorrelationHeatmap } from "@/components/charts/CorrelationHeatmap";
 import type {
   AttributionResponse,
   BenchmarkComparisonResponse,
@@ -236,14 +239,145 @@ function SummaryTab({ data, benchmark }: { data: PerformanceSummaryResponse; ben
 
 // ── Attribution Tab ────────────────────────────────────────────────────────
 
-function AttributionTab({ data }: { data: AttributionResponse | null }) {
+interface FxAttributionData {
+  has_data: boolean;
+  message?: string;
+  brazil_return_brl?: number;
+  brazil_return_usd?: number;
+  fx_contribution?: number;
+  usd_brl_start?: number;
+  usd_brl_end?: number;
+  usd_brl_change_pct?: number;
+  interpretation?: string;
+  rate_history?: Array<{ date: string; rate: number }>;
+}
+
+function FxAttributionCard({ data }: { data: FxAttributionData | null }) {
+  if (!data) return null;
+
+  if (!data.has_data) {
+    return (
+      <GlassCard className="border-l-2 border-l-[#10b981]/40">
+        <div className="flex items-center gap-2 mb-2">
+          <span className="text-base">🇧🇷</span>
+          <h3 className="text-sm font-semibold text-[#f1f5f9]">Brazil Sleeve — Currency Effect</h3>
+        </div>
+        <p className="text-xs text-[#475569]">{data.message ?? "No Brazil sleeve data for this period."}</p>
+        {data.rate_history && data.rate_history.length > 0 && (
+          <div className="mt-3">
+            <p className="text-xs text-[#475569] mb-2">USD/BRL Rate</p>
+            <ResponsiveContainer width="100%" height={80}>
+              <LineChart data={data.rate_history}>
+                <Line type="monotone" dataKey="rate" stroke="#10b981" strokeWidth={1.5} dot={false} />
+                <XAxis dataKey="date" hide />
+                <YAxis domain={["auto", "auto"]} hide />
+                <Tooltip
+                  contentStyle={{ background: "#0d0d14", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 8, fontSize: 11 }}
+                  labelStyle={{ color: "#f1f5f9" }}
+                  formatter={(val: number) => [val.toFixed(4), "USD/BRL"]}
+                />
+              </LineChart>
+            </ResponsiveContainer>
+          </div>
+        )}
+      </GlassCard>
+    );
+  }
+
+  const fxIsNegative = (data.fx_contribution ?? 0) < 0;
+
+  return (
+    <GlassCard className={`border-l-2 ${fxIsNegative ? "border-l-[#ef4444]/40" : "border-l-[#10b981]/40"}`}>
+      <div className="flex items-center gap-2 mb-3">
+        <span className="text-base">🇧🇷</span>
+        <h3 className="text-sm font-semibold text-[#f1f5f9]">Brazil Sleeve — Currency Effect</h3>
+      </div>
+
+      <div className="grid grid-cols-4 gap-3 mb-3">
+        <div>
+          <p className="text-[10px] text-[#475569] uppercase tracking-wider">Return in BRL</p>
+          <p className={`text-lg font-bold font-mono mt-0.5 ${colorPct(data.brazil_return_brl)}`}>
+            {pct(data.brazil_return_brl)}
+          </p>
+          <p className="text-[10px] text-[#475569]">Local currency</p>
+        </div>
+        <div>
+          <p className="text-[10px] text-[#475569] uppercase tracking-wider">Return in USD</p>
+          <p className={`text-lg font-bold font-mono mt-0.5 ${colorPct(data.brazil_return_usd)}`}>
+            {pct(data.brazil_return_usd)}
+          </p>
+          <p className="text-[10px] text-[#475569]">After FX</p>
+        </div>
+        <div>
+          <p className="text-[10px] text-[#475569] uppercase tracking-wider">BRL Change</p>
+          <p className={`text-lg font-bold font-mono mt-0.5 ${colorPct(-(data.usd_brl_change_pct ?? 0))}`}>
+            {/* BRL strengthens when USD/BRL falls */}
+            {pct(-(data.usd_brl_change_pct ?? 0))}
+          </p>
+          <p className="text-[10px] text-[#475569]">
+            {(data.usd_brl_start ?? 0).toFixed(2)} → {(data.usd_brl_end ?? 0).toFixed(2)}
+          </p>
+        </div>
+        <div>
+          <p className="text-[10px] text-[#475569] uppercase tracking-wider">Net FX Effect</p>
+          <p className={`text-lg font-bold font-mono mt-0.5 ${colorPct(data.fx_contribution)}`}>
+            {pct(data.fx_contribution)}
+          </p>
+          <p className="text-[10px] text-[#475569]">
+            {fxIsNegative ? "Drag on returns" : "Boost to returns"}
+          </p>
+        </div>
+      </div>
+
+      {data.interpretation && (
+        <p className="text-xs text-[#94a3b8] mb-3 italic">{data.interpretation}</p>
+      )}
+
+      {data.rate_history && data.rate_history.length > 0 && (
+        <div>
+          <p className="text-[10px] text-[#475569] uppercase tracking-wider mb-2">USD/BRL Rate History</p>
+          <ResponsiveContainer width="100%" height={80}>
+            <LineChart data={data.rate_history}>
+              <Line type="monotone" dataKey="rate" stroke="#10b981" strokeWidth={1.5} dot={false} />
+              <XAxis
+                dataKey="date"
+                tick={{ fill: "#475569", fontSize: 9 }}
+                axisLine={false}
+                tickLine={false}
+                tickFormatter={(v: string) => v.slice(5)}
+                interval={Math.floor(data.rate_history!.length / 4)}
+              />
+              <YAxis domain={["auto", "auto"]} tick={{ fill: "#475569", fontSize: 9 }} axisLine={false} tickLine={false} width={40} tickFormatter={(v: number) => v.toFixed(2)} />
+              <Tooltip
+                contentStyle={{ background: "#0d0d14", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 8, fontSize: 11 }}
+                labelStyle={{ color: "#f1f5f9" }}
+                formatter={(val: number) => [val.toFixed(4), "USD/BRL"]}
+              />
+            </LineChart>
+          </ResponsiveContainer>
+        </div>
+      )}
+    </GlassCard>
+  );
+}
+
+function AttributionTab({
+  data,
+  fxAttribution,
+}: {
+  data: AttributionResponse | null;
+  fxAttribution: FxAttributionData | null;
+}) {
   if (!data || data.per_sleeve.length === 0) {
     return (
-      <GlassCard>
-        <p className="text-sm text-[#475569] text-center py-8">
-          No attribution data yet — run the daily snapshot to populate.
-        </p>
-      </GlassCard>
+      <div className="space-y-4">
+        <GlassCard>
+          <p className="text-sm text-[#475569] text-center py-8">
+            No attribution data yet — run the daily snapshot to populate.
+          </p>
+        </GlassCard>
+        <FxAttributionCard data={fxAttribution} />
+      </div>
     );
   }
 
@@ -320,6 +454,9 @@ function AttributionTab({ data }: { data: AttributionResponse | null }) {
           </tbody>
         </table>
       </GlassCard>
+
+      {/* FX Attribution card — Brazil sleeve currency effect */}
+      <FxAttributionCard data={fxAttribution} />
     </div>
   );
 }
@@ -402,7 +539,67 @@ function RollingTab({ data }: { data: RollingReturnsResponse | null }) {
 
 // ── Risk Tab ───────────────────────────────────────────────────────────────
 
-function RiskTab({ data }: { data: RiskSummaryResponse | null }) {
+interface CorrelationHistoryData {
+  pairs: Array<{
+    sleeves: [string, string];
+    current_correlation: number;
+    history: Array<{ date: string; correlation: number }>;
+  }>;
+  highest_pair: { sleeves: [string, string]; current_correlation: number } | null;
+}
+
+const DONUT_COLORS = ["#6366f1", "#8b5cf6", "#3b82f6", "#10b981", "#f59e0b", "#475569"];
+
+function DonutChart({
+  data,
+  title,
+}: {
+  data: Array<{ name: string; value: number }>;
+  title: string;
+}) {
+  return (
+    <div>
+      <p className="text-xs text-[#475569] uppercase tracking-wider mb-2 text-center">{title}</p>
+      <ResponsiveContainer width="100%" height={160}>
+        <PieChart>
+          <Pie
+            data={data}
+            cx="50%"
+            cy="50%"
+            innerRadius={42}
+            outerRadius={65}
+            paddingAngle={2}
+            dataKey="value"
+          >
+            {data.map((_entry, index) => (
+              <Cell key={index} fill={DONUT_COLORS[index % DONUT_COLORS.length]} opacity={0.85} />
+            ))}
+          </Pie>
+          <Tooltip
+            contentStyle={{ background: "#0d0d14", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 8, fontSize: 11 }}
+            formatter={(val: number, name: string) => [`${(val * 100).toFixed(1)}%`, name]}
+          />
+        </PieChart>
+      </ResponsiveContainer>
+      <div className="flex flex-wrap gap-x-3 gap-y-1 justify-center mt-1">
+        {data.map((entry, i) => (
+          <div key={entry.name} className="flex items-center gap-1">
+            <div className="w-2 h-2 rounded-full" style={{ backgroundColor: DONUT_COLORS[i % DONUT_COLORS.length] }} />
+            <span className="text-[9px] text-[#475569]">{entry.name.replace("_", " ")}</span>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function RiskTab({
+  data,
+  correlationHistory,
+}: {
+  data: RiskSummaryResponse | null;
+  correlationHistory: CorrelationHistoryData | null;
+}) {
   if (!data) {
     return (
       <GlassCard>
@@ -419,6 +616,35 @@ function RiskTab({ data }: { data: RiskSummaryResponse | null }) {
   }));
 
   const corrSleeves = Object.keys(data.correlation_matrix);
+
+  // Check for high-risk concentration: any sleeve with risk parity weight > 50%
+  const dominantSleeve = sleeves.find((s) => (data.risk_parity_weights[s] || 0) > 0.5);
+
+  // Build donut data
+  const actualDonutData = sleeves
+    .filter((s) => (data.actual_weights[s] || 0) > 0)
+    .map((s) => ({ name: s, value: data.actual_weights[s] || 0 }));
+
+  const rpDonutData = sleeves
+    .filter((s) => (data.risk_parity_weights[s] || 0) > 0)
+    .map((s) => ({ name: s, value: data.risk_parity_weights[s] || 0 }));
+
+  // Risk vs Dollar comparison data
+  const riskDollarData = sleeves.map((s) => ({
+    name: s.replace("_", " "),
+    dollar: parseFloat(((data.actual_weights[s] || 0) * 100).toFixed(1)),
+    risk: parseFloat(((data.risk_parity_weights[s] || 0) * 100).toFixed(1)),
+  }));
+
+  // Highest-correlation pair from history
+  const highestPair = correlationHistory?.highest_pair;
+  const highestPairHistory = highestPair
+    ? correlationHistory?.pairs.find(
+        (p) =>
+          (p.sleeves[0] === highestPair.sleeves[0] && p.sleeves[1] === highestPair.sleeves[1]) ||
+          (p.sleeves[0] === highestPair.sleeves[1] && p.sleeves[1] === highestPair.sleeves[0])
+      )
+    : null;
 
   return (
     <div className="space-y-4">
@@ -446,7 +672,57 @@ function RiskTab({ data }: { data: RiskSummaryResponse | null }) {
         </GlassCard>
       </div>
 
-      {/* Risk parity vs actual */}
+      {/* Risk Concentration Alert */}
+      {dominantSleeve && (
+        <div className="px-4 py-3 rounded-xl bg-amber-500/10 border border-amber-500/20 text-sm text-amber-400">
+          ⚠️ Risk concentration: <span className="font-semibold">{dominantSleeve.replace("_", " ")}</span> contributes over 50% of total portfolio risk in the risk-parity model. Consider reducing exposure or hedging.
+        </div>
+      )}
+
+      {/* Dalio All-Weather: two donuts side-by-side */}
+      {(actualDonutData.length > 0 || rpDonutData.length > 0) && (
+        <GlassCard>
+          <h2 className="text-sm font-semibold text-[#f1f5f9] mb-1">
+            Dalio All-Weather Comparison
+          </h2>
+          <p className="text-xs text-[#475569] mb-4">
+            Left: your current dollar allocation — Right: risk-parity equivalent (equal risk contribution per sleeve)
+          </p>
+          <div className="grid grid-cols-2 gap-4">
+            <DonutChart data={actualDonutData} title="Current Dollar Weights" />
+            <DonutChart data={rpDonutData} title="Risk Parity Weights" />
+          </div>
+        </GlassCard>
+      )}
+
+      {/* Risk vs Dollar grouped bar chart */}
+      {riskDollarData.length > 0 && (
+        <GlassCard>
+          <h2 className="text-sm font-semibold text-[#f1f5f9] mb-4">
+            Dollar Allocation vs Risk Contribution
+          </h2>
+          <p className="text-xs text-[#475569] mb-3">
+            Dollar allocation (blue) vs risk parity weight (violet) — large gaps indicate sleeves that dominate risk disproportionately to their dollar size.
+          </p>
+          <ResponsiveContainer width="100%" height={220}>
+            <BarChart data={riskDollarData} layout="vertical" margin={{ left: 20, right: 20 }}>
+              <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.06)" horizontal={false} />
+              <XAxis type="number" tickFormatter={(v) => `${v}%`} tick={{ fill: "#475569", fontSize: 11 }} axisLine={false} tickLine={false} />
+              <YAxis type="category" dataKey="name" tick={{ fill: "#94a3b8", fontSize: 11 }} axisLine={false} tickLine={false} width={90} />
+              <Tooltip
+                contentStyle={{ background: "#0d0d14", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 8 }}
+                labelStyle={{ color: "#f1f5f9" }}
+                formatter={(val: number) => [`${val}%`]}
+              />
+              <Legend iconSize={8} wrapperStyle={{ color: "#94a3b8", fontSize: 11 }} />
+              <Bar dataKey="dollar" name="Dollar Alloc" fill="#3b82f6" radius={[0, 3, 3, 0]} />
+              <Bar dataKey="risk" name="Risk Weight" fill="rgba(239,68,68,0.6)" radius={[0, 3, 3, 0]} />
+            </BarChart>
+          </ResponsiveContainer>
+        </GlassCard>
+      )}
+
+      {/* Actual vs risk parity (original chart preserved) */}
       {comparisonData.length > 0 && (
         <GlassCard>
           <h2 className="text-sm font-semibold text-[#f1f5f9] mb-4">
@@ -470,50 +746,67 @@ function RiskTab({ data }: { data: RiskSummaryResponse | null }) {
         </GlassCard>
       )}
 
-      {/* Correlation matrix */}
+      {/* Correlation Heatmap */}
       {corrSleeves.length > 0 && (
         <GlassCard>
           <h2 className="text-sm font-semibold text-[#f1f5f9] mb-4">Correlation Matrix (90-day)</h2>
-          <div className="overflow-x-auto">
-            <table className="text-xs w-full">
-              <thead>
-                <tr>
-                  <th className="text-left py-1 px-2 text-[#475569] w-24" />
-                  {corrSleeves.map((s) => (
-                    <th key={s} className="py-1 px-2 text-[#475569] text-center font-normal">
-                      {s.slice(0, 4)}
-                    </th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody>
-                {corrSleeves.map((row) => (
-                  <tr key={row}>
-                    <td className="py-1 px-2 text-[#94a3b8] font-medium">{row.replace("_", " ")}</td>
-                    {corrSleeves.map((col) => {
-                      const val = data.correlation_matrix[row]?.[col] ?? 0;
-                      const intensity = Math.abs(val);
-                      const isDiag = row === col;
-                      const bg = isDiag
-                        ? "rgba(99,102,241,0.2)"
-                        : val > 0
-                        ? `rgba(16,185,129,${intensity * 0.4})`
-                        : `rgba(239,68,68,${intensity * 0.4})`;
-                      return (
-                        <td
-                          key={col}
-                          className="py-1 px-2 text-center font-mono rounded"
-                          style={{ backgroundColor: bg, color: isDiag ? "#a78bfa" : "#f1f5f9" }}
-                        >
-                          {val.toFixed(2)}
-                        </td>
-                      );
-                    })}
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+          <CorrelationHeatmap matrix={data.correlation_matrix} sleeves={corrSleeves} />
+        </GlassCard>
+      )}
+
+      {/* Rolling correlation for highest-corr pair */}
+      {highestPair && highestPairHistory && highestPairHistory.history.length > 0 && (
+        <GlassCard>
+          <div className="flex items-center gap-2 mb-1">
+            <h2 className="text-sm font-semibold text-[#f1f5f9]">
+              Highest Correlation Pair: {highestPair.sleeves[0].replace("_", " ")} ↔ {highestPair.sleeves[1].replace("_", " ")}
+            </h2>
+            <span
+              className={`text-xs font-mono px-2 py-0.5 rounded-full border ${
+                highestPair.current_correlation > 0.85
+                  ? "text-amber-400 bg-amber-500/10 border-amber-500/25"
+                  : "text-[#94a3b8] bg-white/[0.04] border-white/[0.08]"
+              }`}
+            >
+              {highestPair.current_correlation.toFixed(3)}
+            </span>
           </div>
+          <p className="text-xs text-[#475569] mb-3">Rolling 90-day correlation — higher means less diversification benefit</p>
+          <ResponsiveContainer width="100%" height={140}>
+            <LineChart data={highestPairHistory.history.slice(-52)} margin={{ left: 10, right: 10, top: 5, bottom: 5 }}>
+              <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.06)" vertical={false} />
+              <XAxis
+                dataKey="date"
+                tick={{ fill: "#475569", fontSize: 10 }}
+                axisLine={false}
+                tickLine={false}
+                tickFormatter={(v: string) => v.slice(5)}
+                interval={Math.floor(highestPairHistory.history.length / 5)}
+              />
+              <YAxis
+                domain={[-1, 1]}
+                tick={{ fill: "#475569", fontSize: 10 }}
+                axisLine={false}
+                tickLine={false}
+                tickFormatter={(v: number) => v.toFixed(1)}
+              />
+              <Tooltip
+                contentStyle={{ background: "#0d0d14", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 8 }}
+                labelStyle={{ color: "#f1f5f9", fontSize: 11 }}
+                formatter={(val: number) => [val.toFixed(3), "Correlation"]}
+              />
+              <ReferenceLine y={0.85} stroke="rgba(245,158,11,0.5)" strokeDasharray="4 2" label={{ value: "⚠️ 0.85", fill: "#f59e0b", fontSize: 9 }} />
+              <ReferenceLine y={0} stroke="rgba(255,255,255,0.15)" />
+              <Line
+                type="monotone"
+                dataKey="correlation"
+                stroke="#6366f1"
+                strokeWidth={2}
+                dot={false}
+                name="Correlation"
+              />
+            </LineChart>
+          </ResponsiveContainer>
         </GlassCard>
       )}
     </div>
@@ -532,6 +825,8 @@ export default function PerformancePage() {
   const [benchmark, setBenchmark] = useState<BenchmarkComparisonResponse | null>(null);
   const [rolling, setRolling] = useState<RollingReturnsResponse | null>(null);
   const [risk, setRisk] = useState<RiskSummaryResponse | null>(null);
+  const [fxAttribution, setFxAttribution] = useState<FxAttributionData | null>(null);
+  const [correlationHistory, setCorrelationHistory] = useState<CorrelationHistoryData | null>(null);
 
   const [loadingSummary, setLoadingSummary] = useState(true);
   const [loadingAttribution, setLoadingAttribution] = useState(false);
@@ -554,9 +849,18 @@ export default function PerformancePage() {
   useEffect(() => {
     if (activeTab === "attribution" && !attribution) {
       setLoadingAttribution(true);
-      api.performanceAttribution()
-        .then(setAttribution)
-        .catch(() => setAttribution(null))
+      Promise.all([
+        api.performanceAttribution(),
+        api.performanceFxAttribution("ytd"),
+      ])
+        .then(([attr, fx]) => {
+          setAttribution(attr);
+          setFxAttribution(fx as FxAttributionData);
+        })
+        .catch(() => {
+          setAttribution(null);
+          setFxAttribution(null);
+        })
         .finally(() => setLoadingAttribution(false));
     }
     if (activeTab === "rolling" && !rolling) {
@@ -568,9 +872,18 @@ export default function PerformancePage() {
     }
     if (activeTab === "risk" && !risk) {
       setLoadingRisk(true);
-      api.performanceRisk()
-        .then(setRisk)
-        .catch(() => setRisk(null))
+      Promise.all([
+        api.performanceRisk(),
+        api.performanceCorrelationHistory(365),
+      ])
+        .then(([r, corrHist]) => {
+          setRisk(r);
+          setCorrelationHistory(corrHist as CorrelationHistoryData);
+        })
+        .catch(() => {
+          setRisk(null);
+          setCorrelationHistory(null);
+        })
         .finally(() => setLoadingRisk(false));
     }
   }, [activeTab]);
@@ -638,7 +951,7 @@ export default function PerformancePage() {
         loadingAttribution ? (
           <div className="h-64 rounded-2xl bg-white/[0.03] animate-pulse" />
         ) : (
-          <AttributionTab data={attribution} />
+          <AttributionTab data={attribution} fxAttribution={fxAttribution} />
         )
       )}
 
@@ -654,7 +967,7 @@ export default function PerformancePage() {
         loadingRisk ? (
           <div className="h-64 rounded-2xl bg-white/[0.03] animate-pulse" />
         ) : (
-          <RiskTab data={risk} />
+          <RiskTab data={risk} correlationHistory={correlationHistory} />
         )
       )}
     </div>

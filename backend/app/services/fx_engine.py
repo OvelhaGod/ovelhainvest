@@ -167,6 +167,159 @@ def get_live_usd_brl_rate() -> float:
     return fetch_usd_brl_rate()
 
 
+# ── FX Attribution ────────────────────────────────────────────────────────────
+
+from dataclasses import dataclass
+from datetime import date as _date
+
+
+@dataclass
+class FXAttribution:
+    period_start: _date
+    period_end: _date
+    brazil_return_brl: float       # Brazil sleeve return in BRL
+    brazil_return_usd: float       # Brazil sleeve return in USD
+    fx_contribution: float         # pure currency effect = usd - brl
+    usd_brl_start: float
+    usd_brl_end: float
+    usd_brl_change_pct: float
+    interpretation: str
+
+
+def compute_fx_attribution_over_period(
+    brazil_holdings_history: list[dict],
+    period_start: _date,
+    period_end: _date,
+) -> "FXAttribution | None":
+    """
+    Compute FX attribution for the Brazil sleeve over a period.
+
+    For each day: local_return = (value_brl_t / value_brl_t-1) - 1
+                  usd_return = (value_usd_t / value_usd_t-1) - 1
+                  fx_effect_day = usd_return - local_return
+    Total FX contribution = cumulative product of (1 + fx_effect_day) - 1
+
+    Args:
+        brazil_holdings_history: List of {date: str, value_brl: float, value_usd: float}
+        period_start: Start of period.
+        period_end: End of period.
+
+    Returns:
+        FXAttribution dataclass or None if insufficient data.
+    """
+    if not brazil_holdings_history or len(brazil_holdings_history) < 2:
+        return None
+
+    # Filter to period
+    records = [
+        r for r in brazil_holdings_history
+        if period_start <= _date.fromisoformat(str(r["date"])[:10]) <= period_end
+    ]
+    records.sort(key=lambda r: r["date"])
+
+    if len(records) < 2:
+        return None
+
+    # Compute daily cumulative returns
+    brl_factor = 1.0
+    usd_factor = 1.0
+    fx_factor = 1.0
+
+    for i in range(1, len(records)):
+        prev = records[i - 1]
+        curr = records[i]
+
+        if prev["value_brl"] and prev["value_brl"] > 0:
+            r_brl = (curr["value_brl"] / prev["value_brl"]) - 1
+        else:
+            r_brl = 0.0
+
+        if prev["value_usd"] and prev["value_usd"] > 0:
+            r_usd = (curr["value_usd"] / prev["value_usd"]) - 1
+        else:
+            r_usd = 0.0
+
+        fx_effect = r_usd - r_brl
+        brl_factor *= (1 + r_brl)
+        usd_factor *= (1 + r_usd)
+        fx_factor *= (1 + fx_effect)
+
+    brazil_return_brl = brl_factor - 1.0
+    brazil_return_usd = usd_factor - 1.0
+    fx_contribution = fx_factor - 1.0
+
+    # Infer FX rates from first/last record
+    first = records[0]
+    last = records[-1]
+    usd_brl_start = (
+        first["value_brl"] / first["value_usd"]
+        if first.get("value_usd") and first["value_usd"] > 0 else 5.70
+    )
+    usd_brl_end = (
+        last["value_brl"] / last["value_usd"]
+        if last.get("value_usd") and last["value_usd"] > 0 else 5.70
+    )
+    usd_brl_change_pct = (usd_brl_end / usd_brl_start) - 1.0 if usd_brl_start > 0 else 0.0
+
+    # Interpretation
+    if usd_brl_change_pct > 0.02:
+        direction = f"weakened {usd_brl_change_pct*100:.1f}%"
+        drag = "reducing"
+    elif usd_brl_change_pct < -0.02:
+        direction = f"strengthened {abs(usd_brl_change_pct)*100:.1f}%"
+        drag = "boosting"
+    else:
+        direction = "was roughly flat"
+        drag = "with minimal impact on"
+
+    interpretation = (
+        f"BRL {direction} vs USD, "
+        f"{drag} your USD returns by "
+        f"{fx_contribution*100:+.1f}%"
+    )
+
+    return FXAttribution(
+        period_start=period_start,
+        period_end=period_end,
+        brazil_return_brl=round(brazil_return_brl, 6),
+        brazil_return_usd=round(brazil_return_usd, 6),
+        fx_contribution=round(fx_contribution, 6),
+        usd_brl_start=round(usd_brl_start, 4),
+        usd_brl_end=round(usd_brl_end, 4),
+        usd_brl_change_pct=round(usd_brl_change_pct, 6),
+        interpretation=interpretation,
+    )
+
+
+def get_usd_brl_history(days: int = 365) -> list[dict]:
+    """
+    Fetch historical USD/BRL rate from yfinance.
+
+    Args:
+        days: Number of calendar days of history to fetch.
+
+    Returns:
+        List of {date: str, rate: float} dicts sorted by date.
+    """
+    from datetime import datetime, timedelta
+
+    end = datetime.now()
+    start = end - timedelta(days=days)
+
+    try:
+        ticker = yf.Ticker(FX_SYMBOL)
+        hist = ticker.history(start=start.strftime("%Y-%m-%d"), end=end.strftime("%Y-%m-%d"))
+        if hist.empty:
+            return []
+        return [
+            {"date": str(idx.date()), "rate": round(float(row["Close"]), 4)}
+            for idx, row in hist.iterrows()
+        ]
+    except Exception as exc:
+        logger.error("get_usd_brl_history failed: %s", exc)
+        return []
+
+
 def check_fx_alert(
     rate_history: pd.Series,
     window_days: int = 30,
