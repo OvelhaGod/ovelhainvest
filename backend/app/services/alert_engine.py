@@ -932,6 +932,156 @@ async def handle_telegram_callback(
         return {"error": str(exc)}
 
 
+def _esc_md(text: str) -> str:
+    """Escape MarkdownV2 special characters for Telegram."""
+    return re.sub(r"([_*\[\]()~`>#+=|{}.!\\-])", r"\\\1", str(text))
+
+
+async def send_journal_daily_line(
+    journal_stats: dict[str, Any],
+    chat_id: str,
+    bot_token: str,
+) -> bool:
+    """
+    Append a journal accuracy line to the daily digest message.
+
+    Sends a standalone mini-message summarising decision tracking.
+    Called from run_allocation flow after the main digest.
+
+    Args:
+        journal_stats: Output of GET /journal/stats (followed/overrode counts + outcomes).
+        chat_id: Telegram chat ID.
+        bot_token: Telegram bot token.
+
+    Returns:
+        True if sent successfully.
+    """
+    followed = journal_stats.get("followed_count", 0)
+    overrode = journal_stats.get("overrode_count", 0)
+    total    = followed + overrode
+
+    if total == 0:
+        return True  # nothing to report yet
+
+    delta30 = journal_stats.get("system_outperformance_30d")
+    f30     = journal_stats.get("avg_outcome_followed_30d")
+    o30     = journal_stats.get("avg_outcome_overrode_30d")
+
+    def _pct(v: float | None) -> str:
+        if v is None:
+            return "n/a"
+        return f"{'+' if v >= 0 else ''}{v*100:.1f}%"
+
+    lines = [
+        "📓 *Decision Journal*",
+        "",
+        f"Decisions tracked: *{_esc_md(str(total))}*  \\({followed} followed / {overrode} overrode\\)",
+    ]
+    if f30 is not None or o30 is not None:
+        lines.append(f"30d avg: followed *{_esc_md(_pct(f30))}* / overrode *{_esc_md(_pct(o30))}*")
+    if delta30 is not None:
+        edge_sign = "+" if delta30 >= 0 else ""
+        lines.append(
+            f"System edge: *{_esc_md(edge_sign + f'{delta30*100:.1f}%')}* vs overrides"
+        )
+
+    message = "\n".join(lines)
+    return await send_telegram_alert(message=message, chat_id=chat_id, bot_token=bot_token)
+
+
+async def send_journal_milestone_alert(
+    milestone: str,
+    detail: str,
+    chat_id: str,
+    bot_token: str,
+) -> bool:
+    """
+    Send a one-off Telegram alert when a journal milestone is reached.
+
+    Milestones: first_decision, 10_decisions, 25_decisions, 50_decisions,
+                system_beating_user, user_beating_system.
+
+    Args:
+        milestone: Milestone key string.
+        detail: Human-readable detail line (already escaped by caller if needed).
+        chat_id: Telegram chat ID.
+        bot_token: Telegram bot token.
+
+    Returns:
+        True if sent successfully.
+    """
+    milestone_emojis = {
+        "first_decision": "🎉",
+        "10_decisions":   "🔟",
+        "25_decisions":   "📊",
+        "50_decisions":   "🏆",
+        "system_beating_user": "🤖",
+        "user_beating_system": "🧠",
+    }
+    emoji = milestone_emojis.get(milestone, "📓")
+    message = (
+        f"{emoji} *Journal Milestone*\n\n"
+        f"{_esc_md(detail)}\n\n"
+        f"_View full analysis at /journal_"
+    )
+    return await send_telegram_alert(message=message, chat_id=chat_id, bot_token=bot_token)
+
+
+async def check_and_send_journal_milestones(
+    user_id: str,
+    chat_id: str,
+    bot_token: str,
+) -> None:
+    """
+    Check for unannounced journal milestones and send Telegram alerts.
+
+    Uses Redis to track which milestones have been announced.
+    Silently skips if Redis or Supabase unavailable.
+    """
+    from app.db.repositories.journal import get_override_accuracy_stats
+
+    try:
+        stats = get_override_accuracy_stats(user_id)
+        total = stats.get("total_decisions", 0)
+        f30   = stats.get("avg_outcome_followed_30d")
+        o30   = stats.get("avg_outcome_overrode_30d")
+    except Exception as exc:
+        logger.debug("check_and_send_journal_milestones: stats failed: %s", exc)
+        return
+
+    milestone_checks = [
+        ("first_decision",   total >= 1,   "You've logged your first investment decision\\!"),
+        ("10_decisions",     total >= 10,  f"You've tracked 10 investment decisions\\. Patterns are starting to emerge\\."),
+        ("25_decisions",     total >= 25,  f"25 decisions tracked\\. You now have statistically meaningful behavioral data\\."),
+        ("50_decisions",     total >= 50,  f"50 decisions tracked\\. Your journal is now a powerful self\\-improvement tool\\."),
+        ("system_beating_user",
+            f30 is not None and o30 is not None and (f30 - o30) > 0.05,
+            f"The system is outperforming your overrides by {f30 - o30 if f30 and o30 else 0:.1%} on 30\\-day returns\\. Trust the process\\."),
+        ("user_beating_system",
+            f30 is not None and o30 is not None and (o30 - f30) > 0.05,
+            f"Your overrides are outperforming the system by {o30 - f30 if f30 and o30 else 0:.1%}\\. Impressive instincts\\."),
+    ]
+
+    for milestone_key, condition, detail in milestone_checks:
+        if not condition:
+            continue
+        cache_key = f"milestone_sent:{user_id}:{milestone_key}"
+        already_sent = _redis_get(cache_key)
+        if already_sent:
+            continue
+        try:
+            sent = await send_journal_milestone_alert(
+                milestone=milestone_key,
+                detail=detail,
+                chat_id=chat_id,
+                bot_token=bot_token,
+            )
+            if sent:
+                _redis_set(cache_key, "1", ex=365 * 24 * 3600)  # 1-year TTL
+        except Exception as exc:
+            logger.debug("Milestone send failed for %s: %s", milestone_key, exc)
+
+
 async def register_telegram_webhook(base_url: str) -> bool:
     """Register the Telegram webhook URL with Bot API. Called on app startup in production."""
     if not settings.telegram_bot_token:
