@@ -1,15 +1,16 @@
 "use client";
 
 /**
- * /journal — Decision log, override accuracy scorecard, pattern analysis.
- * Phase 5: live data from /journal and /journal/stats API endpoints.
+ * /journal — Decision log, override accuracy scorecard, behavioral patterns, AI insight.
+ * Phase 9: full implementation with backfill trigger, CSV export, pagination.
  */
 
 import { useCallback, useEffect, useState } from "react";
 import { api } from "@/lib/api";
 
 // ── Design tokens ─────────────────────────────────────────────────────────────
-const glass = "rounded-2xl border border-white/[0.08] bg-white/[0.03] backdrop-blur-sm";
+const glass =
+  "rounded-2xl border border-white/[0.08] bg-white/[0.04] backdrop-blur-sm";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 interface JournalEntry {
@@ -39,470 +40,450 @@ interface JournalStats {
   system_outperformance_90d: number | null;
 }
 
+interface BehavioralPattern {
+  pattern_type: string;
+  description: string;
+  severity: string;
+  supporting_data: Record<string, unknown>;
+}
+
+interface JournalInsight {
+  insight: string;
+  has_enough_data: boolean;
+  followed_count: number;
+  overrode_count: number;
+  system_outperformance_30d: number | null;
+}
+
 // ── Helpers ───────────────────────────────────────────────────────────────────
-function fmtPct(n: number | null | undefined, decimals = 1): string {
-  if (n == null) return "—";
-  const sign = n >= 0 ? "+" : "";
-  return `${sign}${(n * 100).toFixed(decimals)}%`;
+function pct(v: number | null, digits = 1) {
+  if (v == null) return "—";
+  return `${v >= 0 ? "+" : ""}${(v * 100).toFixed(digits)}%`;
 }
 
-function fmtDate(iso: string): string {
-  return new Date(iso).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "2-digit" });
+function fmtDate(iso: string) {
+  const d = new Date(iso);
+  return d.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
 }
 
-function Skeleton({ className = "" }: { className?: string }) {
-  return <div className={`animate-pulse rounded bg-white/[0.06] ${className}`} />;
-}
+const ACTION_STYLES: Record<string, { bg: string; text: string; border: string; label: string }> = {
+  followed:     { bg: "bg-emerald-500/10", text: "text-emerald-400", border: "border-emerald-500/20", label: "Followed" },
+  overrode:     { bg: "bg-rose-500/10",    text: "text-rose-400",    border: "border-rose-500/20",    label: "Overrode" },
+  deferred:     { bg: "bg-amber-500/10",   text: "text-amber-400",   border: "border-amber-500/20",   label: "Deferred" },
+  manual_trade: { bg: "bg-violet-500/10",  text: "text-violet-400",  border: "border-violet-500/20",  label: "Manual" },
+};
 
-// ── Action badge ─────────────────────────────────────────────────────────────
-const ACTION_CONFIG = {
-  followed:     { label: "Followed",     color: "#10b981" },
-  overrode:     { label: "Overrode",     color: "#f43f5e" },
-  deferred:     { label: "Deferred",     color: "#f59e0b" },
-  manual_trade: { label: "Manual",       color: "#8b5cf6" },
-} as const;
+const SEVERITY_COLORS: Record<string, string> = {
+  high: "text-rose-400",
+  medium: "text-amber-400",
+  low: "text-slate-400",
+};
 
-function ActionBadge({ type }: { type: keyof typeof ACTION_CONFIG }) {
-  const cfg = ACTION_CONFIG[type] ?? ACTION_CONFIG.manual_trade;
-  return (
-    <span
-      className="text-[10px] font-medium px-2 py-0.5 rounded-full border"
-      style={{ color: cfg.color, background: `${cfg.color}14`, borderColor: `${cfg.color}30` }}
-    >
-      {cfg.label}
-    </span>
-  );
-}
+// ── Component ─────────────────────────────────────────────────────────────────
+export default function JournalPage() {
+  const [entries, setEntries]       = useState<JournalEntry[]>([]);
+  const [stats, setStats]           = useState<JournalStats | null>(null);
+  const [patterns, setPatterns]     = useState<BehavioralPattern[]>([]);
+  const [insight, setInsight]       = useState<JournalInsight | null>(null);
+  const [loading, setLoading]       = useState(true);
+  const [error, setError]           = useState<string | null>(null);
+  const [page, setPage]             = useState(0);
+  const [filterAction, setFilter]   = useState<string>("all");
+  const [backfilling, setBackfilling] = useState(false);
+  const [backfillMsg, setBackfillMsg] = useState<string | null>(null);
+  const [expandedRow, setExpanded]  = useState<string | null>(null);
 
-// ── Outcome cell ─────────────────────────────────────────────────────────────
-function OutcomeCell({ value }: { value: number | null }) {
-  if (value == null) return <span className="text-white/20 font-mono text-xs">—</span>;
-  const positive = value >= 0;
-  return (
-    <span
-      className="font-mono text-xs font-medium"
-      style={{ color: positive ? "#10b981" : "#ef4444" }}
-    >
-      {fmtPct(value)}
-    </span>
-  );
-}
+  const PAGE_SIZE = 20;
 
-// ── Log Decision Modal ────────────────────────────────────────────────────────
-function LogDecisionModal({ onClose, onSaved }: { onClose: () => void; onSaved: () => void }) {
-  const [actionType, setActionType] = useState<string>("followed");
-  const [reasoning, setReasoning] = useState("");
-  const [saving, setSaving] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-
-  async function handleSave() {
-    if (!reasoning.trim()) { setError("Reasoning is required"); return; }
-    setSaving(true);
+  const load = useCallback(async () => {
+    setLoading(true);
     setError(null);
     try {
-      await api.createJournalEntry({ action_type: actionType, reasoning: reasoning.trim() });
-      onSaved();
-      onClose();
-    } catch (e) {
-      setError(e instanceof Error ? e.message : "Failed to save");
-    } finally {
-      setSaving(false);
-    }
-  }
-
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm">
-      <div className={`${glass} p-6 w-full max-w-md space-y-4`}>
-        <div className="flex items-center justify-between">
-          <h2 className="text-sm font-semibold text-white/90">Log Decision</h2>
-          <button onClick={onClose} className="text-white/40 hover:text-white/70 text-lg">×</button>
-        </div>
-
-        <div>
-          <label className="text-[10px] text-white/40 uppercase tracking-widest block mb-2">Action Type</label>
-          <div className="flex gap-2 flex-wrap">
-            {(["followed", "overrode", "deferred", "manual_trade"] as const).map((t) => {
-              const cfg = ACTION_CONFIG[t];
-              return (
-                <button
-                  key={t}
-                  onClick={() => setActionType(t)}
-                  className="px-3 py-1.5 text-xs rounded-lg border transition-all"
-                  style={{
-                    color: cfg.color,
-                    background: actionType === t ? `${cfg.color}20` : "transparent",
-                    borderColor: actionType === t ? `${cfg.color}50` : "rgba(255,255,255,0.08)",
-                  }}
-                >
-                  {cfg.label}
-                </button>
-              );
-            })}
-          </div>
-        </div>
-
-        <div>
-          <label className="text-[10px] text-white/40 uppercase tracking-widest block mb-2">Reasoning</label>
-          <textarea
-            value={reasoning}
-            onChange={(e) => setReasoning(e.target.value)}
-            placeholder="Why did you follow, override, or defer the system recommendation?"
-            rows={4}
-            className="w-full text-xs text-white/80 bg-white/[0.04] border border-white/[0.08] rounded-lg px-3 py-2 resize-none outline-none focus:border-violet-500/40 placeholder:text-white/20"
-          />
-        </div>
-
-        {error && <p className="text-xs text-rose-400">{error}</p>}
-
-        <div className="flex gap-3 justify-end pt-1">
-          <button
-            onClick={onClose}
-            className="px-4 py-2 text-xs text-white/50 hover:text-white/70 transition-colors"
-          >
-            Cancel
-          </button>
-          <button
-            onClick={handleSave}
-            disabled={saving}
-            className="px-4 py-2 text-xs font-medium rounded-lg transition-all"
-            style={{ background: "rgba(139,92,246,0.2)", color: "#a78bfa", border: "1px solid rgba(139,92,246,0.35)" }}
-          >
-            {saving ? "Saving…" : "Save Entry"}
-          </button>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-// ── Override Accuracy Scorecard ───────────────────────────────────────────────
-function AccuracyScorecard({ stats, loading }: { stats: JournalStats | null; loading: boolean }) {
-  if (loading) {
-    return (
-      <div className="grid grid-cols-2 gap-4">
-        <Skeleton className="h-32" />
-        <Skeleton className="h-32" />
-      </div>
-    );
-  }
-
-  const followedAvg90 = stats?.avg_outcome_followed_90d;
-  const overrodeAvg90 = stats?.avg_outcome_overrode_90d;
-  const outperf90 = stats?.system_outperformance_90d;
-
-  return (
-    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-      {/* Followed card */}
-      <div
-        className={`${glass} p-5`}
-        style={{ boxShadow: "0 0 30px rgba(16,185,129,0.08)", borderColor: "rgba(16,185,129,0.2)" }}
-      >
-        <div className="flex items-center gap-2 mb-3">
-          <span className="text-base">✓</span>
-          <p className="text-xs font-medium text-white/70">When You Followed the System</p>
-        </div>
-        <p
-          className="text-3xl font-bold font-mono"
-          style={{ color: followedAvg90 != null && followedAvg90 >= 0 ? "#10b981" : "#ef4444" }}
-        >
-          {fmtPct(followedAvg90)}
-        </p>
-        <p className="text-[10px] text-white/40 mt-1">avg 90-day outcome</p>
-        <div className="flex gap-3 mt-3 pt-3 border-t border-white/[0.06]">
-          <div>
-            <p className="text-[10px] text-white/30">Count</p>
-            <p className="text-sm font-mono text-white/70">{stats?.followed_count ?? "—"}</p>
-          </div>
-          <div>
-            <p className="text-[10px] text-white/30">30d avg</p>
-            <p className="text-sm font-mono" style={{ color: "#10b981" }}>{fmtPct(stats?.avg_outcome_followed_30d)}</p>
-          </div>
-        </div>
-      </div>
-
-      {/* Overrode card */}
-      <div
-        className={`${glass} p-5`}
-        style={{ boxShadow: "0 0 30px rgba(245,158,11,0.08)", borderColor: "rgba(245,158,11,0.2)" }}
-      >
-        <div className="flex items-center justify-between mb-3">
-          <div className="flex items-center gap-2">
-            <span className="text-base">⚠</span>
-            <p className="text-xs font-medium text-white/70">When You Overrode the System</p>
-          </div>
-          {outperf90 != null && (
-            <span
-              className="text-[10px] px-2 py-0.5 rounded-full border font-mono"
-              style={{
-                color: outperf90 >= 0 ? "#10b981" : "#ef4444",
-                background: outperf90 >= 0 ? "rgba(16,185,129,0.1)" : "rgba(239,68,68,0.1)",
-                borderColor: outperf90 >= 0 ? "rgba(16,185,129,0.25)" : "rgba(239,68,68,0.25)",
-              }}
-            >
-              System {outperf90 >= 0 ? "+" : ""}{fmtPct(outperf90)} vs overrides
-            </span>
-          )}
-        </div>
-        <p
-          className="text-3xl font-bold font-mono"
-          style={{ color: overrodeAvg90 != null && overrodeAvg90 >= 0 ? "#10b981" : "#f59e0b" }}
-        >
-          {fmtPct(overrodeAvg90)}
-        </p>
-        <p className="text-[10px] text-white/40 mt-1">avg 90-day outcome</p>
-        <div className="flex gap-3 mt-3 pt-3 border-t border-white/[0.06]">
-          <div>
-            <p className="text-[10px] text-white/30">Count</p>
-            <p className="text-sm font-mono text-white/70">{stats?.overrode_count ?? "—"}</p>
-          </div>
-          <div>
-            <p className="text-[10px] text-white/30">30d avg</p>
-            <p className="text-sm font-mono" style={{ color: "#f59e0b" }}>{fmtPct(stats?.avg_outcome_overrode_30d)}</p>
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-// ── Pattern Analysis Card ─────────────────────────────────────────────────────
-function PatternCard({ stats }: { stats: JournalStats | null }) {
-  if (!stats || stats.total_decisions < 5) {
-    return (
-      <div
-        className={`${glass} p-4`}
-        style={{ borderLeft: "2px solid rgba(139,92,246,0.4)" }}
-      >
-        <p className="text-[10px] text-violet-400 uppercase tracking-widest mb-2">✦ AI Behavioral Analysis</p>
-        <p className="text-xs text-white/40">
-          Log at least 5 decisions to unlock pattern analysis. Currently {stats?.total_decisions ?? 0} decision{stats?.total_decisions === 1 ? "" : "s"} tracked.
-        </p>
-      </div>
-    );
-  }
-
-  const outperf = stats.system_outperformance_90d;
-  const systemWins = outperf != null && outperf > 0;
-
-  return (
-    <div
-      className={`${glass} p-4`}
-      style={{ borderLeft: "2px solid rgba(139,92,246,0.4)" }}
-    >
-      <p className="text-[10px] text-violet-400 uppercase tracking-widest mb-2">✦ Behavioral Pattern Summary</p>
-      <p className="text-xs text-white/65 leading-relaxed">
-        {systemWins
-          ? `The system outperformed your overrides by ${fmtPct(outperf)} on a 90-day horizon (${stats.followed_count} followed vs ${stats.overrode_count} overrode). Consider trusting the engine more during high-conviction signals.`
-          : `Your overrides have outperformed the system by ${fmtPct(Math.abs(outperf ?? 0))} on a 90-day basis. ${stats.overrode_count} overrides tracked — your judgment is adding alpha.`
-        }
-        {" "}You&apos;ve deferred {stats.deferred_count} time{stats.deferred_count !== 1 ? "s" : ""} and executed {stats.manual_count} manual trade{stats.manual_count !== 1 ? "s" : ""} outside the system.
-      </p>
-    </div>
-  );
-}
-
-// ── Main component ────────────────────────────────────────────────────────────
-export default function JournalPage() {
-  const [entries, setEntries] = useState<JournalEntry[]>([]);
-  const [stats, setStats] = useState<JournalStats | null>(null);
-  const [loadingEntries, setLoadingEntries] = useState(true);
-  const [loadingStats, setLoadingStats] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const [actionFilter, setActionFilter] = useState<string>("all");
-  const [showModal, setShowModal] = useState(false);
-  const [offset, setOffset] = useState(0);
-  const PAGE_SIZE = 25;
-
-  const loadEntries = useCallback(async () => {
-    setLoadingEntries(true);
-    try {
-      const data = await api.listJournal({
-        limit: PAGE_SIZE,
-        offset,
-        action_type: actionFilter !== "all" ? actionFilter : undefined,
-      });
-      setEntries(data as unknown as JournalEntry[]);
-      setError(null);
+      const [entriesRes, statsRes, patternsRes, insightRes] = await Promise.allSettled([
+        api.listJournal({ limit: 200, action_type: filterAction === "all" ? undefined : filterAction }),
+        api.journalStats(),
+        api.journalPatterns(),
+        api.journalInsight(),
+      ]);
+      if (entriesRes.status === "fulfilled") setEntries(entriesRes.value as JournalEntry[]);
+      if (statsRes.status === "fulfilled")   setStats(statsRes.value as JournalStats);
+      if (patternsRes.status === "fulfilled") setPatterns(patternsRes.value as BehavioralPattern[]);
+      if (insightRes.status === "fulfilled")  setInsight(insightRes.value as JournalInsight);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Failed to load journal");
     } finally {
-      setLoadingEntries(false);
+      setLoading(false);
     }
-  }, [offset, actionFilter]);
+  }, [filterAction]);
 
-  const loadStats = useCallback(async () => {
-    setLoadingStats(true);
+  useEffect(() => { load(); }, [load]);
+
+  const handleBackfill = async () => {
+    setBackfilling(true);
+    setBackfillMsg(null);
     try {
-      const data = await api.journalStats();
-      setStats(data as unknown as JournalStats);
+      const res = await api.triggerJournalBackfill() as { queued: number; message: string };
+      setBackfillMsg(res.message);
     } catch {
-      // stats are optional — don't block the page
+      setBackfillMsg("Backfill request failed.");
     } finally {
-      setLoadingStats(false);
+      setBackfilling(false);
     }
-  }, []);
+  };
 
-  useEffect(() => { loadEntries(); }, [loadEntries]);
-  useEffect(() => { loadStats(); }, [loadStats]);
+  const handleExport = () => {
+    window.open(
+      `${process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000"}/journal/export`,
+      "_blank"
+    );
+  };
 
-  function handleSaved() {
-    loadEntries();
-    loadStats();
-  }
+  // Paginated slice
+  const pageEntries = entries.slice(page * PAGE_SIZE, (page + 1) * PAGE_SIZE);
+  const totalPages  = Math.ceil(entries.length / PAGE_SIZE);
+
+  const delta30 = stats?.system_outperformance_30d;
+  const delta90 = stats?.system_outperformance_90d;
 
   return (
-    <div className="min-h-screen p-6 space-y-5" style={{ background: "#050508" }}>
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-xl font-semibold text-white/95 tracking-tight">Decision Journal</h1>
-          <p className="text-xs text-white/40 mt-0.5">
-            {stats?.total_decisions ?? "—"} decisions tracked · override accuracy analytics
-          </p>
+    <div className="min-h-screen bg-[#050508] text-slate-100">
+      {/* Ambient glows */}
+      <div className="fixed top-[-10%] right-[-10%] w-[500px] h-[500px] bg-emerald-500/5 blur-[120px] rounded-full pointer-events-none -z-10" />
+      <div className="fixed bottom-[-10%] left-[200px] w-[400px] h-[400px] bg-violet-500/5 blur-[100px] rounded-full pointer-events-none -z-10" />
+
+      <div className="p-8 space-y-8">
+        {/* Header */}
+        <div className="flex items-end justify-between">
+          <div>
+            <h1 className="text-4xl font-black tracking-tight text-slate-100 uppercase">
+              Decision Journal
+            </h1>
+            <p className="text-slate-400 mt-1 text-sm">
+              Audit psychological performance and system fidelity metrics.
+            </p>
+          </div>
+          <div className="flex gap-3">
+            <button
+              onClick={handleBackfill}
+              disabled={backfilling}
+              className="px-4 py-2 rounded-xl border border-white/10 bg-white/[0.04] text-sm text-slate-300 hover:bg-white/[0.08] transition-all disabled:opacity-50"
+            >
+              {backfilling ? "Backfilling…" : "↻ Backfill Outcomes"}
+            </button>
+            <button
+              onClick={handleExport}
+              className="px-4 py-2 rounded-xl border border-white/10 bg-white/[0.04] text-sm text-slate-300 hover:bg-white/[0.08] transition-all"
+            >
+              ↓ Export CSV
+            </button>
+          </div>
         </div>
-        <button
-          onClick={() => setShowModal(true)}
-          className="px-4 py-2 text-xs font-medium rounded-lg transition-all"
-          style={{ background: "rgba(139,92,246,0.15)", color: "#a78bfa", border: "1px solid rgba(139,92,246,0.3)" }}
+
+        {backfillMsg && (
+          <div className="text-sm text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 rounded-xl px-4 py-2">
+            {backfillMsg}
+          </div>
+        )}
+
+        {error && (
+          <div className="text-sm text-rose-400 bg-rose-500/10 border border-rose-500/20 rounded-xl px-4 py-2">
+            {error}
+          </div>
+        )}
+
+        {/* ── Accuracy Scorecard ── */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          {/* Followed System */}
+          <div className={`${glass} p-8 border-l-4 border-l-emerald-500`}
+               style={{ boxShadow: "0 0 20px rgba(16,185,129,0.08)" }}>
+            <div className="flex justify-between items-start mb-6">
+              <div>
+                <span className="text-[10px] font-mono uppercase tracking-[0.2em] text-emerald-400">
+                  Fidelity Protocol
+                </span>
+                <h3 className="text-xl font-bold mt-1">Followed System</h3>
+              </div>
+              <span className="text-2xl p-2 rounded-lg bg-emerald-500/10">✅</span>
+            </div>
+            {loading ? (
+              <div className="h-16 w-32 rounded-lg bg-white/5 animate-pulse" />
+            ) : (
+              <>
+                <div className="flex items-baseline gap-2">
+                  <span className="text-6xl font-bold font-mono text-emerald-400 tracking-tighter">
+                    {stats ? pct(stats.avg_outcome_followed_90d) : "—"}
+                  </span>
+                </div>
+                <div className="mt-3 text-sm text-slate-400 font-mono">
+                  {stats?.followed_count ?? 0} decisions · avg 30d: {pct(stats?.avg_outcome_followed_30d ?? null)}
+                </div>
+              </>
+            )}
+          </div>
+
+          {/* Overrode System */}
+          <div className={`${glass} p-8 border-l-4 border-l-amber-400`}>
+            <div className="flex justify-between items-start mb-6">
+              <div>
+                <span className="text-[10px] font-mono uppercase tracking-[0.2em] text-amber-400">
+                  Manual Deviation
+                </span>
+                <h3 className="text-xl font-bold mt-1">Overrode System</h3>
+              </div>
+              <span className="text-2xl p-2 rounded-lg bg-amber-500/10">⚠️</span>
+            </div>
+            {loading ? (
+              <div className="h-16 w-32 rounded-lg bg-white/5 animate-pulse" />
+            ) : (
+              <>
+                <div className="flex items-baseline gap-2">
+                  <span className="text-6xl font-bold font-mono text-amber-400 tracking-tighter">
+                    {stats ? pct(stats.avg_outcome_overrode_90d) : "—"}
+                  </span>
+                </div>
+                <div className="mt-3 text-sm text-slate-400 font-mono">
+                  {stats?.overrode_count ?? 0} overrides · avg 30d: {pct(stats?.avg_outcome_overrode_30d ?? null)}
+                </div>
+                {delta30 != null && (
+                  <div className={`mt-2 text-sm font-mono font-semibold ${delta30 >= 0 ? "text-emerald-400" : "text-rose-400"}`}>
+                    System outperforms overrides by {pct(delta30)} (30d)
+                  </div>
+                )}
+              </>
+            )}
+          </div>
+        </div>
+
+        {/* ── Behavioral Patterns ── */}
+        {patterns.length > 0 && (
+          <div className={`${glass} p-6`}>
+            <h3 className="font-bold text-lg mb-4">
+              🔍 Behavioral Patterns
+            </h3>
+            <div className="space-y-3">
+              {patterns.map((p, i) => (
+                <div key={i} className="flex items-start gap-4 p-4 rounded-xl bg-white/[0.02] border border-white/5">
+                  <span className={`text-xs font-mono uppercase font-bold mt-0.5 ${SEVERITY_COLORS[p.severity] ?? "text-slate-400"}`}>
+                    {p.severity}
+                  </span>
+                  <div>
+                    <div className="text-sm font-medium text-slate-200">{p.description}</div>
+                    <div className="text-xs text-slate-500 font-mono mt-1">
+                      {p.pattern_type.replace(/_/g, " ")}
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* ── Decision Log Table ── */}
+        <div className={glass}>
+          <div className="p-6 border-b border-white/5 flex flex-wrap items-center gap-3">
+            <h3 className="font-bold text-lg flex-1">Execution Ledger</h3>
+            {/* Filter pills */}
+            {["all", "followed", "overrode", "deferred", "manual_trade"].map((f) => (
+              <button
+                key={f}
+                onClick={() => { setFilter(f); setPage(0); }}
+                className={`px-3 py-1 rounded-full text-xs font-mono uppercase transition-all border ${
+                  filterAction === f
+                    ? "bg-white/10 border-white/20 text-slate-100"
+                    : "bg-white/[0.02] border-white/[0.06] text-slate-400 hover:bg-white/5"
+                }`}
+              >
+                {f === "all" ? "All" : ACTION_STYLES[f]?.label ?? f}
+              </button>
+            ))}
+          </div>
+
+          <div className="overflow-x-auto">
+            <table className="w-full text-left">
+              <thead>
+                <tr className="text-[10px] uppercase tracking-widest text-slate-500 font-mono border-b border-white/5">
+                  <th className="px-6 py-4 font-normal">Date</th>
+                  <th className="px-6 py-4 font-normal">Action</th>
+                  <th className="px-6 py-4 font-normal">Asset</th>
+                  <th className="px-6 py-4 font-normal">Reasoning</th>
+                  <th className="px-6 py-4 font-normal text-right">30d</th>
+                  <th className="px-6 py-4 font-normal text-right">90d</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-white/[0.04]">
+                {loading &&
+                  Array.from({ length: 5 }).map((_, i) => (
+                    <tr key={i}>
+                      {Array.from({ length: 6 }).map((_, j) => (
+                        <td key={j} className="px-6 py-4">
+                          <div className="h-4 rounded bg-white/5 animate-pulse" />
+                        </td>
+                      ))}
+                    </tr>
+                  ))}
+                {!loading && pageEntries.length === 0 && (
+                  <tr>
+                    <td colSpan={6} className="px-6 py-12 text-center text-slate-500 text-sm">
+                      No journal entries yet. Decisions will appear here after your first allocation run.
+                    </td>
+                  </tr>
+                )}
+                {!loading &&
+                  pageEntries.map((e) => {
+                    const style = ACTION_STYLES[e.action_type] ?? ACTION_STYLES.manual_trade;
+                    const isExpanded = expandedRow === e.id;
+                    const out30Color =
+                      e.outcome_30d == null ? "text-slate-500"
+                      : e.outcome_30d >= 0 ? "text-emerald-400"
+                      : "text-rose-400";
+                    const out90Color =
+                      e.outcome_90d == null ? "text-slate-500"
+                      : e.outcome_90d >= 0 ? "text-emerald-400"
+                      : "text-rose-400";
+
+                    return (
+                      <>
+                        <tr
+                          key={e.id}
+                          onClick={() => setExpanded(isExpanded ? null : e.id)}
+                          className="hover:bg-white/[0.025] transition-colors cursor-pointer"
+                        >
+                          <td className="px-6 py-4 text-sm text-slate-400 font-mono whitespace-nowrap">
+                            {fmtDate(e.event_date)}
+                          </td>
+                          <td className="px-6 py-4">
+                            <span
+                              className={`px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider border ${style.bg} ${style.text} ${style.border}`}
+                            >
+                              {style.label}
+                            </span>
+                          </td>
+                          <td className="px-6 py-4 font-mono text-sm text-slate-300">
+                            {e.asset_id ? e.asset_id.slice(0, 8) + "…" : "—"}
+                          </td>
+                          <td className="px-6 py-4 text-sm text-slate-400 max-w-[300px] truncate italic">
+                            {e.reasoning ?? "—"}
+                          </td>
+                          <td className={`px-6 py-4 text-right font-mono text-sm ${out30Color}`}>
+                            {pct(e.outcome_30d)}
+                          </td>
+                          <td className={`px-6 py-4 text-right font-mono text-sm ${out90Color}`}>
+                            {pct(e.outcome_90d)}
+                          </td>
+                        </tr>
+                        {isExpanded && (
+                          <tr key={`${e.id}-expand`} className="bg-white/[0.015]">
+                            <td colSpan={6} className="px-8 py-4">
+                              <div className="grid grid-cols-2 gap-6 text-sm">
+                                <div>
+                                  <div className="text-xs text-slate-500 uppercase font-mono mb-1">System Recommendation</div>
+                                  <pre className="text-slate-300 text-xs bg-white/[0.04] rounded-lg p-3 overflow-auto max-h-32">
+                                    {e.system_recommendation
+                                      ? JSON.stringify(e.system_recommendation, null, 2)
+                                      : "—"}
+                                  </pre>
+                                </div>
+                                <div>
+                                  <div className="text-xs text-slate-500 uppercase font-mono mb-1">Actual Action</div>
+                                  <pre className="text-slate-300 text-xs bg-white/[0.04] rounded-lg p-3 overflow-auto max-h-32">
+                                    {e.actual_action
+                                      ? JSON.stringify(e.actual_action, null, 2)
+                                      : "—"}
+                                  </pre>
+                                </div>
+                              </div>
+                              {e.signal_run_id && (
+                                <div className="mt-2 text-xs text-slate-500 font-mono">
+                                  Signal run: {e.signal_run_id}
+                                </div>
+                              )}
+                            </td>
+                          </tr>
+                        )}
+                      </>
+                    );
+                  })}
+              </tbody>
+            </table>
+          </div>
+
+          {/* Pagination */}
+          {totalPages > 1 && (
+            <div className="px-6 py-4 border-t border-white/5 flex items-center justify-between text-sm text-slate-400">
+              <span className="font-mono">
+                Showing {page * PAGE_SIZE + 1}–{Math.min((page + 1) * PAGE_SIZE, entries.length)} of {entries.length}
+              </span>
+              <div className="flex gap-2">
+                <button
+                  disabled={page === 0}
+                  onClick={() => setPage((p) => p - 1)}
+                  className="px-3 py-1 rounded-lg border border-white/10 bg-white/[0.03] hover:bg-white/[0.06] disabled:opacity-30 transition-all"
+                >
+                  ← Prev
+                </button>
+                <button
+                  disabled={page >= totalPages - 1}
+                  onClick={() => setPage((p) => p + 1)}
+                  className="px-3 py-1 rounded-lg border border-white/10 bg-white/[0.03] hover:bg-white/[0.06] disabled:opacity-30 transition-all"
+                >
+                  Next →
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* ── AI Behavioral Insight ── */}
+        <div
+          className={`${glass} p-8 relative overflow-hidden`}
+          style={{ borderLeft: "3px solid #8b5cf6", boxShadow: "0 0 30px rgba(139,92,246,0.07)" }}
         >
-          + Log Decision
-        </button>
-      </div>
-
-      {/* Override accuracy scorecard */}
-      <AccuracyScorecard stats={stats} loading={loadingStats} />
-
-      {/* Pattern analysis */}
-      <PatternCard stats={stats} />
-
-      {/* Decision log table */}
-      <div className={glass}>
-        {/* Filter bar */}
-        <div className="flex items-center justify-between px-4 py-3 border-b border-white/[0.06]">
-          <p className="text-[10px] text-white/30 uppercase tracking-widest">Decision Log</p>
-          <select
-            value={actionFilter}
-            onChange={(e) => { setActionFilter(e.target.value); setOffset(0); }}
-            className="text-[10px] px-2 py-1 rounded-lg border border-white/[0.08] bg-white/[0.03] text-white/60 outline-none"
-          >
-            <option value="all">All Actions</option>
-            <option value="followed">Followed</option>
-            <option value="overrode">Overrode</option>
-            <option value="deferred">Deferred</option>
-            <option value="manual_trade">Manual</option>
-          </select>
-        </div>
-
-        {/* Table header */}
-        <div className="grid grid-cols-12 gap-3 px-4 py-2 border-b border-white/[0.04]">
-          {[
-            ["DATE",       "col-span-1"],
-            ["ACTION",     "col-span-2"],
-            ["ASSET",      "col-span-1"],
-            ["REASONING",  "col-span-4"],
-            ["SYS REC",    "col-span-1"],
-            ["30D",        "col-span-1"],
-            ["90D",        "col-span-1"],
-            ["SIGNAL",     "col-span-1"],
-          ].map(([label, span]) => (
-            <div key={label} className={`text-[10px] font-medium text-white/25 uppercase tracking-widest ${span}`}>
-              {label}
-            </div>
-          ))}
-        </div>
-
-        {/* Rows */}
-        {loadingEntries ? (
-          <div className="p-4 space-y-2">
-            {Array.from({ length: 6 }).map((_, i) => <Skeleton key={i} className="h-10 rounded-xl" />)}
-          </div>
-        ) : error ? (
-          <div className="p-8 text-center">
-            <p className="text-sm text-rose-400">⚠ {error}</p>
-          </div>
-        ) : entries.length === 0 ? (
-          <div className="p-12 text-center">
-            <p className="text-sm text-white/20">No journal entries yet</p>
-            <p className="text-xs text-white/10 mt-1">Use the signals page to log decisions, or click &quot;Log Decision&quot; above.</p>
-          </div>
-        ) : (
-          entries.map((entry) => (
-            <div
-              key={entry.id}
-              className="grid grid-cols-12 gap-3 px-4 py-3 border-b border-white/[0.03] hover:bg-white/[0.015] transition-colors items-center"
-            >
-              {/* Date */}
-              <div className="col-span-1 text-[10px] font-mono text-white/40">
-                {fmtDate(entry.event_date)}
+          <div className="flex flex-col md:flex-row gap-8">
+            <div className="md:w-1/3 space-y-4">
+              <div className="flex items-center gap-3">
+                <span className="text-violet-400 text-2xl">🧠</span>
+                <h4 className="text-xl font-bold">Behavioral Insight</h4>
               </div>
-
-              {/* Action badge */}
-              <div className="col-span-2">
-                <ActionBadge type={entry.action_type} />
+              <div className="p-4 bg-violet-500/5 rounded-xl border border-violet-500/10">
+                <p className="text-xs text-violet-400 font-mono uppercase mb-1">System vs Override</p>
+                <p className="text-2xl font-bold font-mono">
+                  {delta90 != null ? pct(delta90) : "—"}
+                </p>
+                <p className="text-xs text-slate-500 mt-1">90d system outperformance</p>
               </div>
-
-              {/* Asset */}
-              <div className="col-span-1 text-xs font-mono text-white/50 truncate">
-                {entry.asset_id ? entry.asset_id.slice(0, 8) + "…" : "—"}
-              </div>
-
-              {/* Reasoning */}
-              <div className="col-span-4 text-xs text-white/50 truncate" title={entry.reasoning ?? undefined}>
-                {entry.reasoning ?? <span className="text-white/20">—</span>}
-              </div>
-
-              {/* System recommendation summary */}
-              <div className="col-span-1 text-[10px] text-white/30 truncate">
-                {entry.system_recommendation
-                  ? <span className="text-white/40">json</span>
-                  : <span className="text-white/20">—</span>}
-              </div>
-
-              {/* 30d outcome */}
-              <div className="col-span-1">
-                <OutcomeCell value={entry.outcome_30d} />
-              </div>
-
-              {/* 90d outcome */}
-              <div className="col-span-1">
-                <OutcomeCell value={entry.outcome_90d} />
-              </div>
-
-              {/* Signal run link */}
-              <div className="col-span-1 text-[10px] text-white/25 truncate">
-                {entry.signal_run_id
-                  ? <span className="text-violet-400/60">{entry.signal_run_id.slice(0, 8)}…</span>
-                  : "—"}
+              <div className="p-4 bg-white/[0.03] rounded-xl border border-white/5">
+                <p className="text-xs text-slate-500 font-mono uppercase mb-1">Total Decisions</p>
+                <p className="text-2xl font-bold font-mono">
+                  {stats?.total_decisions ?? "—"}
+                </p>
               </div>
             </div>
-          ))
-        )}
 
-        {/* Pagination */}
-        {entries.length === PAGE_SIZE && (
-          <div className="px-4 py-3 flex justify-end">
-            <button
-              onClick={() => setOffset((o) => o + PAGE_SIZE)}
-              className="text-[10px] text-white/40 hover:text-white/60 transition-colors px-3 py-1 rounded-lg border border-white/[0.06] hover:border-white/[0.12]"
-            >
-              Load more →
-            </button>
+            <div className="flex-1">
+              <h5 className="text-violet-400 font-mono text-xs uppercase tracking-widest mb-4">
+                AI Analysis
+              </h5>
+              {loading ? (
+                <div className="space-y-3">
+                  {[1,2,3].map(i => (
+                    <div key={i} className="h-4 rounded bg-white/5 animate-pulse" style={{ width: `${85 - i * 10}%` }} />
+                  ))}
+                </div>
+              ) : insight?.has_enough_data ? (
+                <p className="text-slate-300 leading-relaxed text-sm max-w-2xl">
+                  {insight.insight}
+                </p>
+              ) : (
+                <p className="text-slate-500 text-sm italic">
+                  {insight
+                    ? "Not enough data yet — make more decisions and check back after 10+ entries."
+                    : "AI insight unavailable. Check API connection."}
+                </p>
+              )}
+            </div>
           </div>
-        )}
-        {offset > 0 && (
-          <div className="px-4 py-1 flex justify-start">
-            <button
-              onClick={() => setOffset((o) => Math.max(0, o - PAGE_SIZE))}
-              className="text-[10px] text-white/40 hover:text-white/60 transition-colors"
-            >
-              ← Back
-            </button>
-          </div>
-        )}
+        </div>
       </div>
-
-      {/* Log Decision modal */}
-      {showModal && <LogDecisionModal onClose={() => setShowModal(false)} onSaved={handleSaved} />}
     </div>
   );
 }

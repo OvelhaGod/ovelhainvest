@@ -1,6 +1,6 @@
 {
   "name": "OvelhaInvest — Journal Outcome Backfill",
-  "description": "Runs daily at midnight UTC (00:05). Finds journal entries ≥30d or ≥90d old with missing outcomes. Fetches performance returns and patches each entry via PATCH /journal/{id}/outcome.",
+  "description": "Runs daily at 00:05 UTC. Finds journal entries ≥30d or ≥90d old with missing outcomes. Uses POST /journal/backfill API endpoint to trigger server-side backfill with asset_valuations lookup. Falls back to performance/summary proxy for portfolio-level entries. Sends Telegram summary when entries are updated.",
   "active": false,
   "nodes": [
     {
@@ -16,110 +16,133 @@
       }
     },
     {
-      "id": "d4e5f6a7-0002-0002-0002-000000000002",
-      "name": "GET /journal",
+      "id": "d4e5f6a7-0010-0010-0010-000000000010",
+      "name": "POST /journal/backfill",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
       "position": [440, 300],
       "parameters": {
-        "method": "GET",
-        "url": "={{ $vars.OVELHAINVEST_API_URL }}/journal?limit=200&user_id={{ $vars.OVELHAINVEST_USER_ID }}",
+        "method": "POST",
+        "url": "={{ $vars.OVELHAINVEST_API_URL }}/journal/backfill?user_id={{ $vars.OVELHAINVEST_USER_ID }}",
         "authentication": "none",
-        "options": { "timeout": 30000 }
+        "options": { "timeout": 60000 }
       }
     },
     {
-      "id": "d4e5f6a7-0003-0003-0003-000000000003",
-      "name": "Filter: Needs Backfill",
-      "type": "n8n-nodes-base.code",
-      "typeVersion": 2,
-      "position": [640, 300],
-      "parameters": {
-        "jsCode": "// Filter entries needing 30d or 90d outcome backfill\nconst entries = $input.all().flatMap(i => Array.isArray(i.json) ? i.json : [i.json]);\nconst now = new Date();\nconst toBackfill = [];\nfor (const e of entries) {\n  const age = (now - new Date(e.event_date)) / (1000 * 60 * 60 * 24);\n  const needs30 = age >= 30 && e.outcome_30d == null;\n  const needs90 = age >= 90 && e.outcome_90d == null;\n  if (needs30 || needs90) {\n    toBackfill.push({ json: { ...e, needs_30d: needs30, needs_90d: needs90, age_days: Math.floor(age) } });\n  }\n}\nreturn toBackfill.length > 0 ? toBackfill : [{ json: { _empty: true } }];"
-      }
-    },
-    {
-      "id": "d4e5f6a7-0004-0004-0004-000000000004",
-      "name": "Check: Has Entries?",
+      "id": "d4e5f6a7-0011-0011-0011-000000000011",
+      "name": "Check: Any Queued?",
       "type": "n8n-nodes-base.if",
       "typeVersion": 2,
-      "position": [840, 300],
+      "position": [640, 300],
       "parameters": {
         "conditions": {
           "options": { "caseSensitive": true, "leftValue": "", "typeValidation": "strict" },
           "conditions": [{
-            "id": "cond-1",
-            "leftValue": "={{ $json._empty }}",
-            "rightValue": true,
-            "operator": { "type": "boolean", "operation": "notEquals" }
+            "id": "cond-queued",
+            "leftValue": "={{ $json.queued }}",
+            "rightValue": 0,
+            "operator": { "type": "number", "operation": "gt" }
           }]
         },
         "combineOperation": "all"
       }
     },
     {
-      "id": "d4e5f6a7-0005-0005-0005-000000000005",
-      "name": "GET /performance/summary",
+      "id": "d4e5f6a7-0012-0012-0012-000000000012",
+      "name": "Wait 90s for backfill",
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [840, 160],
+      "parameters": {
+        "resume": "timeInterval",
+        "unit": "seconds",
+        "amount": 90
+      }
+    },
+    {
+      "id": "d4e5f6a7-0013-0013-0013-000000000013",
+      "name": "GET /journal/stats",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
       "position": [1040, 160],
       "parameters": {
         "method": "GET",
-        "url": "={{ $vars.OVELHAINVEST_API_URL }}/performance/summary?user_id={{ $vars.OVELHAINVEST_USER_ID }}",
+        "url": "={{ $vars.OVELHAINVEST_API_URL }}/journal/stats?user_id={{ $vars.OVELHAINVEST_USER_ID }}",
         "authentication": "none",
         "options": { "timeout": 30000 }
       }
     },
     {
-      "id": "d4e5f6a7-0006-0006-0006-000000000006",
-      "name": "PATCH /journal/{id}/outcome",
-      "type": "n8n-nodes-base.httpRequest",
-      "typeVersion": 4.2,
+      "id": "d4e5f6a7-0014-0014-0014-000000000014",
+      "name": "Build Telegram Summary",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
       "position": [1240, 160],
       "parameters": {
-        "method": "PATCH",
-        "url": "={{ $vars.OVELHAINVEST_API_URL }}/journal/{{ $('Filter: Needs Backfill').item.json.id }}/outcome",
-        "authentication": "none",
-        "sendBody": true,
-        "contentType": "json",
-        "body": "={{ JSON.stringify({ outcome_30d: $('Filter: Needs Backfill').item.json.needs_30d ? ($json.period_returns?.['1mo']?.portfolio ?? null) : undefined, outcome_90d: $('Filter: Needs Backfill').item.json.needs_90d ? ($json.period_returns?.['3mo']?.portfolio ?? null) : undefined }) }}",
-        "options": { "timeout": 15000 }
+        "jsCode": "const stats = $input.first().json;\nconst queued = $('POST /journal/backfill').first().json.queued;\nconst f30 = stats.avg_outcome_followed_30d != null ? (stats.avg_outcome_followed_30d * 100).toFixed(1) + '%' : 'n/a';\nconst o30 = stats.avg_outcome_overrode_30d != null ? (stats.avg_outcome_overrode_30d * 100).toFixed(1) + '%' : 'n/a';\nconst delta = stats.system_outperformance_30d != null ? (stats.system_outperformance_30d * 100).toFixed(1) + '%' : 'n/a';\nconst msg = `📓 *Journal Outcome Backfill Complete*\\n\\n`\n  + `Updated ${queued} entr${queued === 1 ? 'y' : 'ies'} with 30d\\/90d outcomes\\.\\n\\n`\n  + `📊 *Current Accuracy \\(30d\\):*\\n`\n  + `  • Followed system: \\+${f30}\\n`\n  + `  • Overrode system: \\+${o30}\\n`\n  + `  • System edge: \\+${delta}\\n\\n`\n  + `_\\[automated backfill \\ OvelhaInvest\\]_`;\nreturn [{ json: { text: msg } }];"
       }
     },
     {
-      "id": "d4e5f6a7-0007-0007-0007-000000000007",
+      "id": "d4e5f6a7-0015-0015-0015-000000000015",
+      "name": "Telegram: Backfill Done",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [1440, 160],
+      "parameters": {
+        "chatId": "={{ $vars.TELEGRAM_CHAT_ID }}",
+        "text": "={{ $json.text }}",
+        "additionalFields": { "parse_mode": "MarkdownV2", "disable_notification": true }
+      },
+      "credentials": { "telegramApi": { "id": "telegram-cred-id", "name": "Telegram Bot" } }
+    },
+    {
+      "id": "d4e5f6a7-0016-0016-0016-000000000016",
       "name": "No Backfill Needed",
       "type": "n8n-nodes-base.noOp",
       "typeVersion": 1,
-      "position": [1040, 440],
+      "position": [840, 440],
       "parameters": {}
+    },
+    {
+      "id": "d4e5f6a7-0017-0017-0017-000000000017",
+      "name": "Error Handler",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1240, 440],
+      "parameters": {
+        "jsCode": "const err = $input.first().json;\nconsole.error('Journal backfill workflow error:', JSON.stringify(err));\nreturn [{ json: { error: true, message: String(err?.message ?? err) } }];"
+      }
     }
   ],
   "connections": {
     "Schedule Trigger": {
-      "main": [[{ "node": "GET /journal", "type": "main", "index": 0 }]]
+      "main": [[{ "node": "POST /journal/backfill", "type": "main", "index": 0 }]]
     },
-    "GET /journal": {
-      "main": [[{ "node": "Filter: Needs Backfill", "type": "main", "index": 0 }]]
+    "POST /journal/backfill": {
+      "main": [[{ "node": "Check: Any Queued?", "type": "main", "index": 0 }]]
     },
-    "Filter: Needs Backfill": {
-      "main": [[{ "node": "Check: Has Entries?", "type": "main", "index": 0 }]]
-    },
-    "Check: Has Entries?": {
+    "Check: Any Queued?": {
       "main": [
-        [{ "node": "GET /performance/summary", "type": "main", "index": 0 }],
-        [{ "node": "No Backfill Needed",        "type": "main", "index": 0 }]
+        [{ "node": "Wait 90s for backfill", "type": "main", "index": 0 }],
+        [{ "node": "No Backfill Needed",   "type": "main", "index": 0 }]
       ]
     },
-    "GET /performance/summary": {
-      "main": [[{ "node": "PATCH /journal/{id}/outcome", "type": "main", "index": 0 }]]
+    "Wait 90s for backfill": {
+      "main": [[{ "node": "GET /journal/stats", "type": "main", "index": 0 }]]
+    },
+    "GET /journal/stats": {
+      "main": [[{ "node": "Build Telegram Summary", "type": "main", "index": 0 }]]
+    },
+    "Build Telegram Summary": {
+      "main": [[{ "node": "Telegram: Backfill Done", "type": "main", "index": 0 }]]
     }
   },
   "settings": {
     "saveManualExecutions": true,
     "saveExecutionProgress": true,
     "callerPolicy": "workflowsFromSameOwner",
-    "executionOrder": "v1"
+    "executionOrder": "v1",
+    "errorWorkflow": "d4e5f6a7-0017-0017-0017-000000000017"
   },
   "staticData": null,
   "tags": ["ovelhainvest", "journal"],

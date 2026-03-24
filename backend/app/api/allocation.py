@@ -366,6 +366,23 @@ def run_allocation(
         except Exception as exc:
             logger.error("AI advisor/alert step failed (non-critical) run_id=%s: %s", run_id, exc)
 
+        # ── Phase 9 — journal milestone alerts (fire-and-forget) ──────────
+        try:
+            from app.config import settings as _s
+            from app.services.alert_engine import check_and_send_journal_milestones
+            if _s.telegram_bot_token and _s.telegram_chat_id:
+                import asyncio as _asyncio
+                _loop = asyncio.get_event_loop()
+                _loop.run_until_complete(
+                    check_and_send_journal_milestones(
+                        user_id=user_id,
+                        chat_id=_s.telegram_chat_id,
+                        bot_token=_s.telegram_bot_token,
+                    )
+                )
+        except Exception as exc:
+            logger.debug("Journal milestone check failed (non-critical): %s", exc)
+
         logger.info(
             "run_allocation complete run_id=%s trades=%d approvals=%d alerts=%d",
             run_id, len(proposed_trades), approval_count, alerts_dispatched,

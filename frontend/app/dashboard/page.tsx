@@ -101,6 +101,13 @@ export default function DashboardPage() {
     darf_pct: number;
     darf_triggered: boolean;
   } | null>(null);
+  const [journalAccuracy, setJournalAccuracy] = useState<{
+    followed_count: number;
+    overrode_count: number;
+    avg_followed_30d: number | null;
+    avg_overrode_30d: number | null;
+    system_outperformance_30d: number | null;
+  } | null>(null);
   const [loading, setLoading]             = useState(true);
   const [error, setError]                 = useState<string | null>(null);
   const [lastRefresh, setLastRefresh]     = useState<Date>(new Date());
@@ -124,6 +131,16 @@ export default function DashboardPage() {
     api.listAlertHistory({ limit: 10 }).then(setAlertHistory).catch(() => null);
     api.adminStatus().then(setAdminStatus).catch(() => null);
     api.simulationDashboardPreview().then(setMcPreview).catch(() => null);
+    api.journalStats().then((s) => {
+      const stats = s as Record<string, unknown>;
+      setJournalAccuracy({
+        followed_count: (stats.followed_count as number) ?? 0,
+        overrode_count: (stats.overrode_count as number) ?? 0,
+        avg_followed_30d: (stats.avg_outcome_followed_30d as number | null) ?? null,
+        avg_overrode_30d: (stats.avg_outcome_overrode_30d as number | null) ?? null,
+        system_outperformance_30d: (stats.system_outperformance_30d as number | null) ?? null,
+      });
+    }).catch(() => null);
     // Tax snapshot — combine estimate + DARF
     Promise.all([
       api.taxEstimate().catch(() => null),
@@ -676,6 +693,65 @@ export default function DashboardPage() {
                 </div>
               </div>
               <p className="text-[10px] text-white/25 mt-0.5">of R$20k limit</p>
+            </div>
+          </div>
+        </a>
+      )}
+
+      {/* ── Journal Accuracy card ── */}
+      {journalAccuracy && (journalAccuracy.followed_count + journalAccuracy.overrode_count) > 0 && (
+        <a
+          href="/journal"
+          className={`${glassInner} block hover:border-white/[0.14] transition-colors`}
+          style={{ borderColor: "rgba(139,92,246,0.12)", boxShadow: "0 0 20px rgba(139,92,246,0.04)" }}
+        >
+          <div className="flex items-center justify-between mb-3">
+            <p className="text-xs text-white/40 uppercase tracking-widest">Decision Journal</p>
+            <span className="text-[10px] text-white/30 hover:text-white/50 transition-colors">View journal →</span>
+          </div>
+          <div className="grid grid-cols-3 gap-4">
+            <div>
+              <p className="text-[10px] text-white/30 mb-1">Followed System</p>
+              <p className="text-lg font-bold font-mono text-emerald-400">
+                {journalAccuracy.followed_count}
+                <span className="text-xs text-white/30 ml-1">decisions</span>
+              </p>
+              {journalAccuracy.avg_followed_30d != null && (
+                <p className="text-[10px] font-mono mt-0.5" style={{ color: journalAccuracy.avg_followed_30d >= 0 ? "#10b981" : "#ef4444" }}>
+                  avg 30d: {journalAccuracy.avg_followed_30d >= 0 ? "+" : ""}
+                  {(journalAccuracy.avg_followed_30d * 100).toFixed(1)}%
+                </p>
+              )}
+            </div>
+            <div>
+              <p className="text-[10px] text-white/30 mb-1">Overrode System</p>
+              <p className="text-lg font-bold font-mono text-amber-400">
+                {journalAccuracy.overrode_count}
+                <span className="text-xs text-white/30 ml-1">overrides</span>
+              </p>
+              {journalAccuracy.avg_overrode_30d != null && (
+                <p className="text-[10px] font-mono mt-0.5" style={{ color: journalAccuracy.avg_overrode_30d >= 0 ? "#10b981" : "#ef4444" }}>
+                  avg 30d: {journalAccuracy.avg_overrode_30d >= 0 ? "+" : ""}
+                  {(journalAccuracy.avg_overrode_30d * 100).toFixed(1)}%
+                </p>
+              )}
+            </div>
+            <div>
+              <p className="text-[10px] text-white/30 mb-1">System Edge</p>
+              {journalAccuracy.system_outperformance_30d != null ? (
+                <>
+                  <p
+                    className="text-lg font-bold font-mono"
+                    style={{ color: journalAccuracy.system_outperformance_30d >= 0 ? "#10b981" : "#ef4444" }}
+                  >
+                    {journalAccuracy.system_outperformance_30d >= 0 ? "+" : ""}
+                    {(journalAccuracy.system_outperformance_30d * 100).toFixed(1)}%
+                  </p>
+                  <p className="text-[10px] text-white/25 mt-0.5">system vs overrides</p>
+                </>
+              ) : (
+                <p className="text-lg font-bold font-mono text-white/20">—</p>
+              )}
             </div>
           </div>
         </a>
