@@ -27,6 +27,7 @@ const navItems = [
   { group: "Tax & Admin", items: [
     { href: "/tax",          label: "Tax" },
     { href: "/journal",      label: "Journal" },
+    { href: "/reports",      label: "Reports" },
     { href: "/config",       label: "Config" },
   ]},
 ];
