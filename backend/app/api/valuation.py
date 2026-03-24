@@ -26,13 +26,10 @@ from app.schemas.allocation_models import EconomicSeason
 logger = logging.getLogger(__name__)
 router = APIRouter()
 
-_DEFAULT_USER = "00000000-0000-0000-0000-000000000001"
-
-
 # ── POST /admin/seed ──────────────────────────────────────────────────────────
 
 @router.post("/admin/seed", tags=["admin"])
-def seed_dev_data(user_id: str = Query(default=_DEFAULT_USER)) -> dict:
+def seed_dev_data(user_id: str = Query(default=None)) -> dict:
     """
     Full dev seed — idempotent, safe to call multiple times.
 
@@ -45,6 +42,11 @@ def seed_dev_data(user_id: str = Query(default=_DEFAULT_USER)) -> dict:
     from app.db.repositories.assets import run_seed_data
     from app.db.supabase_client import get_supabase_client
     from app.services.alert_engine import BUILT_IN_ALERT_RULES
+    from app.config import get_settings
+
+    if not user_id:
+        _s = get_settings()
+        user_id = _s.default_user_id or "00000000-0000-0000-0000-000000000001"
 
     results: dict = {"assets": {}, "alert_rules": {}, "benchmarks": {}, "strategy_config": {}}
 

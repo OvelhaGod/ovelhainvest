@@ -39,7 +39,8 @@ from app.services.simulation_engine import (
 router = APIRouter()
 logger = logging.getLogger(__name__)
 
-_DEFAULT_USER = "00000000-0000-0000-0000-000000000001"
+from app.config import get_default_user_id as _get_default_user_id
+_DEFAULT_USER = _get_default_user_id()
 
 # Default sleeve weights (IPS targets from CLAUDE.md Section 5)
 _DEFAULT_WEIGHTS = {

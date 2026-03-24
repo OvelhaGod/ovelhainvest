@@ -53,8 +53,9 @@ DEFAULT_USER_ID_HEADER = "x-user-id"
 
 
 def _get_user_id(user_id: str = Query(default=None)) -> str:
-    """Extract user_id from query param. Single-user app — returns placeholder if missing."""
-    return user_id or "00000000-0000-0000-0000-000000000001"
+    """Extract user_id from query param. Single-user app — falls back to configured default."""
+    from app.config import get_default_user_id
+    return user_id or get_default_user_id()
 
 
 @router.post("/run_allocation", response_model=AllocationRunResponse)
@@ -650,7 +651,7 @@ async def admin_pause(
 
 @router.get("/admin/status", tags=["admin"])
 def admin_status(
-    user_id: str = Query(default="00000000-0000-0000-0000-000000000001"),
+    user_id: str = Query(default=None),
 ) -> dict:
     """
     System health dashboard — 10 fields.

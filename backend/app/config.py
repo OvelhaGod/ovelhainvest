@@ -71,3 +71,8 @@ def get_settings() -> Settings:
 
 # Module-level singleton for backwards compat
 settings = get_settings()
+
+
+def get_default_user_id() -> str:
+    """Return configured default user ID. Single-user app convenience."""
+    return settings.default_user_id or "00000000-0000-0000-0000-000000000001"

@@ -27,7 +27,8 @@ logger = logging.getLogger(__name__)
 # In-memory task tracker (process-local; fine for single-user app)
 _TASKS: dict[str, dict[str, Any]] = {}
 
-DEFAULT_USER = "00000000-0000-0000-0000-000000000001"
+from app.config import get_default_user_id as _get_default_user_id
+DEFAULT_USER = _get_default_user_id()
 
 
 # ── Request / response models ──────────────────────────────────────────────
