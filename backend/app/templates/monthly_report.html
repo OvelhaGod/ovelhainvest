@@ -1,0 +1,483 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  @page {
+    size: A4;
+    margin: 20mm 18mm 20mm 18mm;
+    @bottom-right { content: "Page " counter(page) " of " counter(pages); font-size: 9px; color: #666; }
+  }
+  body {
+    font-family: -apple-system, 'Helvetica Neue', Arial, sans-serif;
+    font-size: 10px;
+    line-height: 1.5;
+    color: #1a1a2e;
+    background: #fff;
+  }
+  /* ── Cover ── */
+  .cover {
+    text-align: center;
+    padding: 80px 0 60px;
+    page-break-after: always;
+  }
+  .cover-logo {
+    font-size: 28px;
+    font-weight: 800;
+    color: #1a1a2e;
+    letter-spacing: -0.5px;
+  }
+  .cover-logo span { color: #6366f1; }
+  .cover-subtitle { font-size: 14px; color: #666; margin-top: 6px; }
+  .cover-report-type {
+    margin: 48px auto 12px;
+    font-size: 36px;
+    font-weight: 700;
+    color: #1a1a2e;
+  }
+  .cover-period {
+    font-size: 18px;
+    color: #6366f1;
+    font-weight: 600;
+    margin-bottom: 8px;
+  }
+  .cover-generated { font-size: 10px; color: #999; margin-top: 32px; }
+  .cover-divider {
+    width: 80px;
+    height: 3px;
+    background: linear-gradient(90deg, #6366f1, #10b981);
+    margin: 20px auto;
+    border-radius: 2px;
+  }
+  .cover-tagline { font-size: 12px; color: #888; font-style: italic; }
+
+  /* ── Sections ── */
+  .section {
+    margin-bottom: 28px;
+    page-break-inside: avoid;
+  }
+  .section-header {
+    border-bottom: 2px solid #6366f1;
+    padding-bottom: 6px;
+    margin-bottom: 14px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .section-number {
+    background: #6366f1;
+    color: #fff;
+    font-size: 9px;
+    font-weight: 700;
+    padding: 2px 6px;
+    border-radius: 4px;
+  }
+  .section-title { font-size: 13px; font-weight: 700; color: #1a1a2e; }
+  .page-break { page-break-before: always; }
+
+  /* ── KPI grid ── */
+  .kpi-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; margin-bottom: 16px; }
+  .kpi-grid-3 { grid-template-columns: repeat(3, 1fr); }
+  .kpi-grid-2 { grid-template-columns: repeat(2, 1fr); }
+  .kpi-card {
+    background: #f8f9fa;
+    border: 1px solid #e9ecef;
+    border-radius: 8px;
+    padding: 10px 12px;
+  }
+  .kpi-label { font-size: 8px; font-weight: 600; color: #888; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 4px; }
+  .kpi-value { font-size: 18px; font-weight: 800; color: #1a1a2e; font-variant-numeric: tabular-nums; }
+  .kpi-sub { font-size: 8px; color: #888; margin-top: 2px; }
+  .kpi-value.positive { color: #10b981; }
+  .kpi-value.negative { color: #ef4444; }
+  .kpi-value.warning  { color: #f59e0b; }
+  .kpi-value.purple   { color: #6366f1; }
+
+  /* ── Tables ── */
+  table { width: 100%; border-collapse: collapse; font-size: 9px; margin-bottom: 12px; }
+  th { background: #1a1a2e; color: #fff; padding: 6px 8px; text-align: left; font-weight: 600; font-size: 8px; text-transform: uppercase; letter-spacing: 0.5px; }
+  td { padding: 5px 8px; border-bottom: 1px solid #f0f0f0; }
+  tr:nth-child(even) td { background: #f8f9fa; }
+  tr:last-child td { border-bottom: none; }
+  td.positive { color: #10b981; font-weight: 600; }
+  td.negative { color: #ef4444; font-weight: 600; }
+  td.warning  { color: #f59e0b; font-weight: 600; }
+  td.mono { font-family: 'Courier New', monospace; }
+
+  /* ── Bars ── */
+  .sleeve-row { display: flex; align-items: center; gap: 8px; margin-bottom: 5px; }
+  .sleeve-label { width: 80px; font-size: 8px; color: #666; }
+  .sleeve-bar-track { flex: 1; height: 8px; background: #f0f0f0; border-radius: 4px; position: relative; }
+  .sleeve-bar-fill { height: 100%; border-radius: 4px; }
+  .sleeve-bar-target { position: absolute; top: 0; height: 100%; width: 1.5px; background: #1a1a2e; opacity: 0.3; }
+  .sleeve-pct { width: 36px; font-size: 8px; color: #333; text-align: right; font-variant-numeric: tabular-nums; }
+
+  /* ── Text blocks ── */
+  .insight-box {
+    background: #f0f0ff;
+    border-left: 3px solid #6366f1;
+    padding: 10px 14px;
+    font-size: 9px;
+    line-height: 1.6;
+    color: #444;
+    border-radius: 0 6px 6px 0;
+    margin-bottom: 12px;
+  }
+  .alert-box {
+    background: #fff8f0;
+    border-left: 3px solid #f59e0b;
+    padding: 8px 12px;
+    font-size: 9px;
+    color: #444;
+    border-radius: 0 6px 6px 0;
+    margin-bottom: 8px;
+  }
+  .positive-box {
+    background: #f0fff8;
+    border-left: 3px solid #10b981;
+    padding: 8px 12px;
+    font-size: 9px;
+    color: #444;
+    border-radius: 0 6px 6px 0;
+    margin-bottom: 8px;
+  }
+  .framework-row {
+    display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 10px;
+  }
+  .framework-badge {
+    font-size: 8px;
+    padding: 3px 8px;
+    border-radius: 4px;
+    font-weight: 600;
+  }
+  .fw-pass    { background: #d1fae5; color: #065f46; }
+  .fw-warning { background: #fef3c7; color: #92400e; }
+  .fw-fail    { background: #fee2e2; color: #991b1b; }
+
+  /* ── Footer ── */
+  .report-footer {
+    margin-top: 40px;
+    padding-top: 12px;
+    border-top: 1px solid #e9ecef;
+    font-size: 8px;
+    color: #999;
+    text-align: center;
+  }
+
+  /* ── Section 7 outlook ── */
+  .watchlist-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 6px 10px;
+    background: #f8f9fa;
+    border-radius: 6px;
+    margin-bottom: 5px;
+  }
+  .watchlist-symbol { font-weight: 700; font-size: 10px; color: #1a1a2e; }
+  .watchlist-score  { font-size: 9px; color: #6366f1; font-weight: 600; }
+  .watchlist-mos    { font-size: 9px; color: #10b981; }
+</style>
+</head>
+<body>
+
+<!-- ══════════════════════════════════════════════════════════════════
+     COVER PAGE
+══════════════════════════════════════════════════════════════════ -->
+<div class="cover">
+  <div class="cover-logo">Ovelha<span>Invest</span></div>
+  <div class="cover-subtitle">Thiago Wealth OS — Personal Portfolio Operating System</div>
+  <div class="cover-divider"></div>
+  <div class="cover-report-type">{{ report_type_label }}</div>
+  <div class="cover-period">{{ period_label }}</div>
+  <div class="cover-tagline">Powered by Swensen · Dalio · Marks · Graham · Bogle frameworks</div>
+  <div class="cover-generated">Generated: {{ generated_at }} · Confidential</div>
+</div>
+
+<!-- ══════════════════════════════════════════════════════════════════
+     SECTION 1 — PORTFOLIO SUMMARY
+══════════════════════════════════════════════════════════════════ -->
+<div class="section">
+  <div class="section-header">
+    <span class="section-number">1</span>
+    <span class="section-title">Portfolio Summary</span>
+  </div>
+
+  <div class="kpi-grid">
+    <div class="kpi-card">
+      <div class="kpi-label">Net Worth (End)</div>
+      <div class="kpi-value">{{ net_worth_end }}</div>
+      <div class="kpi-sub">{{ net_worth_start }} at start</div>
+    </div>
+    <div class="kpi-card">
+      <div class="kpi-label">Period Return (TWR)</div>
+      <div class="kpi-value {{ period_return_class }}">{{ period_return }}</div>
+      <div class="kpi-sub">{{ ytd_return }} YTD</div>
+    </div>
+    <div class="kpi-card">
+      <div class="kpi-label">vs Benchmark (SPY)</div>
+      <div class="kpi-value {{ alpha_class }}">{{ alpha }}</div>
+      <div class="kpi-sub">Active return vs S&P 500</div>
+    </div>
+    <div class="kpi-card">
+      <div class="kpi-label">USD/BRL Rate</div>
+      <div class="kpi-value purple">{{ usd_brl_rate }}</div>
+      <div class="kpi-sub">{{ total_value_brl }} BRL equivalent</div>
+    </div>
+  </div>
+
+  <!-- Sleeve allocation bars -->
+  <p style="font-size:9px;color:#888;margin-bottom:8px;font-weight:600;text-transform:uppercase;letter-spacing:0.5px;">Asset Allocation vs Targets</p>
+  {% for sleeve in sleeve_weights %}
+  <div class="sleeve-row">
+    <div class="sleeve-label">{{ sleeve.label }}</div>
+    <div class="sleeve-bar-track">
+      <div class="sleeve-bar-fill" style="width:{{ sleeve.actual_pct }}%;background:{{ sleeve.color }};opacity:0.8;"></div>
+      <div class="sleeve-bar-target" style="left:{{ sleeve.target_pct }}%;"></div>
+    </div>
+    <div class="sleeve-pct">{{ sleeve.actual_pct_str }} <span style="color:#aaa;">({{ sleeve.target_pct_str }})</span></div>
+  </div>
+  {% endfor %}
+</div>
+
+<!-- ══════════════════════════════════════════════════════════════════
+     SECTION 2 — PERFORMANCE METRICS
+══════════════════════════════════════════════════════════════════ -->
+<div class="section">
+  <div class="section-header">
+    <span class="section-number">2</span>
+    <span class="section-title">Performance Metrics</span>
+  </div>
+
+  <div class="kpi-grid">
+    <div class="kpi-card">
+      <div class="kpi-label">Sharpe Ratio</div>
+      <div class="kpi-value {{ sharpe_class }}">{{ sharpe }}</div>
+      <div class="kpi-sub">{{ sharpe_label }}</div>
+    </div>
+    <div class="kpi-card">
+      <div class="kpi-label">Sortino Ratio</div>
+      <div class="kpi-value {{ sortino_class }}">{{ sortino }}</div>
+      <div class="kpi-sub">Downside-adjusted</div>
+    </div>
+    <div class="kpi-card">
+      <div class="kpi-label">Calmar Ratio</div>
+      <div class="kpi-value {{ calmar_class }}">{{ calmar }}</div>
+      <div class="kpi-sub">Return / Max Drawdown</div>
+    </div>
+    <div class="kpi-card">
+      <div class="kpi-label">Max Drawdown</div>
+      <div class="kpi-value {{ drawdown_class }}">{{ max_drawdown }}</div>
+      <div class="kpi-sub">{{ volatility }} ann. vol</div>
+    </div>
+  </div>
+
+  <table>
+    <thead><tr><th>Metric</th><th>Portfolio</th><th>SPY</th><th>ACWI</th><th>AGG (Bonds)</th></tr></thead>
+    <tbody>
+      <tr><td>Period Return</td><td class="{{ period_return_class }}">{{ period_return }}</td><td>{{ spy_return }}</td><td>{{ acwi_return }}</td><td>{{ agg_return }}</td></tr>
+      <tr><td>YTD Return</td><td class="{{ ytd_class }}">{{ ytd_return }}</td><td>{{ spy_ytd }}</td><td>{{ acwi_ytd }}</td><td>{{ agg_ytd }}</td></tr>
+      <tr><td>Annualized Volatility</td><td>{{ volatility }}</td><td>~14%</td><td>~13%</td><td>~4%</td></tr>
+      <tr><td>Max Drawdown (current)</td><td class="{{ drawdown_class }}">{{ max_drawdown }}</td><td>—</td><td>—</td><td>—</td></tr>
+    </tbody>
+  </table>
+</div>
+
+<!-- ══════════════════════════════════════════════════════════════════
+     SECTION 3 — INVESTMENT ACTIVITY
+══════════════════════════════════════════════════════════════════ -->
+<div class="section page-break">
+  <div class="section-header">
+    <span class="section-number">3</span>
+    <span class="section-title">Investment Activity</span>
+  </div>
+
+  {% if trades %}
+  <table>
+    <thead><tr><th>Date</th><th>Type</th><th>Symbol</th><th>Amount</th><th>Account</th><th>Status</th></tr></thead>
+    <tbody>
+      {% for trade in trades %}
+      <tr>
+        <td class="mono">{{ trade.date }}</td>
+        <td><span style="font-weight:700;color:{% if trade.type=='BUY' %}#10b981{% else %}#ef4444{% endif %}">{{ trade.type }}</span></td>
+        <td style="font-weight:700;">{{ trade.symbol }}</td>
+        <td class="mono">{{ trade.amount }}</td>
+        <td>{{ trade.account }}</td>
+        <td>{{ trade.status }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% else %}
+  <p style="color:#888;font-size:9px;font-style:italic;">No trades executed this period.</p>
+  {% endif %}
+
+  {% if opportunities %}
+  <div class="alert-box">
+    <strong>Opportunity Events:</strong> {{ opportunities }}
+  </div>
+  {% endif %}
+</div>
+
+<!-- ══════════════════════════════════════════════════════════════════
+     SECTION 4 — AI ADVISOR SUMMARY
+══════════════════════════════════════════════════════════════════ -->
+<div class="section">
+  <div class="section-header">
+    <span class="section-number">4</span>
+    <span class="section-title">AI Advisor Summary</span>
+  </div>
+
+  <p style="font-size:8px;color:#888;margin-bottom:8px;">Framework alignment this period:</p>
+  <div class="framework-row">
+    {% for fw in framework_checks %}
+    <span class="framework-badge fw-{{ fw.status }}">{{ fw.name }}: {{ fw.status|upper }}</span>
+    {% endfor %}
+  </div>
+
+  {% if ai_excerpts %}
+  <p style="font-size:8px;color:#888;margin-bottom:6px;font-weight:600;">Notable AI Commentary:</p>
+  {% for excerpt in ai_excerpts %}
+  <div class="insight-box">{{ excerpt }}</div>
+  {% endfor %}
+  {% endif %}
+</div>
+
+<!-- ══════════════════════════════════════════════════════════════════
+     SECTION 5 — TAX SUMMARY
+══════════════════════════════════════════════════════════════════ -->
+<div class="section">
+  <div class="section-header">
+    <span class="section-number">5</span>
+    <span class="section-title">Tax Summary</span>
+  </div>
+
+  <div class="kpi-grid kpi-grid-3">
+    <div class="kpi-card">
+      <div class="kpi-label">Realized Gains YTD</div>
+      <div class="kpi-value {{ realized_class }}">{{ realized_gains_ytd }}</div>
+      <div class="kpi-sub">ST + LT combined</div>
+    </div>
+    <div class="kpi-card">
+      <div class="kpi-label">Est. Tax Liability</div>
+      <div class="kpi-value warning">{{ estimated_tax }}</div>
+      <div class="kpi-sub">At applicable rates</div>
+    </div>
+    <div class="kpi-card">
+      <div class="kpi-label">Harvest Opportunity</div>
+      <div class="kpi-value positive">{{ harvest_savings }}</div>
+      <div class="kpi-sub">Potential tax savings</div>
+    </div>
+  </div>
+
+  <div style="display:flex;gap:12px;align-items:center;">
+    <div style="flex:1;">
+      <p style="font-size:8px;color:#888;margin-bottom:4px;">Brazil DARF (this month)</p>
+      <div style="background:#f0f0f0;border-radius:4px;height:10px;position:relative;">
+        <div style="height:100%;border-radius:4px;background:{{ darf_bar_color }};width:{{ darf_pct }}%;"></div>
+      </div>
+      <p style="font-size:8px;color:#666;margin-top:3px;">{{ darf_used }} of R$20,000 — {{ darf_pct }}% used</p>
+    </div>
+    <div style="font-size:9px;color:{{ darf_status_color }};font-weight:600;">{{ darf_status_label }}</div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════════════════════════════
+     SECTION 6 — DECISION JOURNAL
+══════════════════════════════════════════════════════════════════ -->
+<div class="section page-break">
+  <div class="section-header">
+    <span class="section-number">6</span>
+    <span class="section-title">Decision Journal</span>
+  </div>
+
+  <div class="kpi-grid kpi-grid-2" style="margin-bottom:16px;">
+    <div class="kpi-card">
+      <div class="kpi-label">When You Followed the System</div>
+      <div class="kpi-value {{ followed_class }}">{{ followed_avg_30d }}</div>
+      <div class="kpi-sub">Avg 30d outcome · {{ followed_count }} decisions</div>
+    </div>
+    <div class="kpi-card">
+      <div class="kpi-label">When You Overrode the System</div>
+      <div class="kpi-value {{ overrode_class }}">{{ overrode_avg_30d }}</div>
+      <div class="kpi-sub">Avg 30d outcome · {{ overrode_count }} decisions</div>
+    </div>
+  </div>
+
+  {% if journal_insight %}
+  <div class="insight-box">{{ journal_insight }}</div>
+  {% endif %}
+
+  {% if period_journal_entries %}
+  <table>
+    <thead><tr><th>Date</th><th>Action</th><th>Asset</th><th>Reasoning (summary)</th><th>30d</th><th>90d</th></tr></thead>
+    <tbody>
+      {% for entry in period_journal_entries %}
+      <tr>
+        <td class="mono">{{ entry.date }}</td>
+        <td style="font-weight:600;color:{{ entry.action_color }}">{{ entry.action_label }}</td>
+        <td style="font-weight:700;">{{ entry.asset }}</td>
+        <td style="max-width:180px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">{{ entry.reasoning }}</td>
+        <td class="{{ entry.outcome30_class }}">{{ entry.outcome_30d }}</td>
+        <td class="{{ entry.outcome90_class }}">{{ entry.outcome_90d }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% endif %}
+</div>
+
+<!-- ══════════════════════════════════════════════════════════════════
+     SECTION 7 — OUTLOOK
+══════════════════════════════════════════════════════════════════ -->
+<div class="section">
+  <div class="section-header">
+    <span class="section-number">7</span>
+    <span class="section-title">Outlook &amp; Watchlist</span>
+  </div>
+
+  <div class="kpi-grid kpi-grid-3" style="margin-bottom:14px;">
+    <div class="kpi-card">
+      <div class="kpi-label">Current Regime</div>
+      <div class="kpi-value purple">{{ regime }}</div>
+      <div class="kpi-sub">Volatility classification</div>
+    </div>
+    <div class="kpi-card">
+      <div class="kpi-label">Dalio Economic Season</div>
+      <div class="kpi-value">{{ economic_season }}</div>
+      <div class="kpi-sub">Factor weight tilts active</div>
+    </div>
+    <div class="kpi-card">
+      <div class="kpi-label">Monte Carlo 20yr Median</div>
+      <div class="kpi-value positive">{{ mc_20yr_median }}</div>
+      <div class="kpi-sub">{{ mc_swr_prob }} SWR survival</div>
+    </div>
+  </div>
+
+  <p style="font-size:8px;color:#888;margin-bottom:8px;font-weight:600;">Top 3 Watchlist by Composite Score:</p>
+  {% for item in watchlist %}
+  <div class="watchlist-item">
+    <div>
+      <span class="watchlist-symbol">{{ item.symbol }}</span>
+      <span style="font-size:8px;color:#888;margin-left:8px;">{{ item.name }}</span>
+    </div>
+    <div style="display:flex;gap:16px;">
+      <span class="watchlist-score">Score: {{ item.composite_score }}</span>
+      <span class="watchlist-mos">MoS: {{ item.margin_of_safety }}</span>
+      <span style="font-size:8px;color:#888;">{{ item.tier }}</span>
+    </div>
+  </div>
+  {% endfor %}
+</div>
+
+<!-- ══════════════════════════════════════════════════════════════════
+     FOOTER
+══════════════════════════════════════════════════════════════════ -->
+<div class="report-footer">
+  OvelhaInvest — Personal Wealth OS · Thiago &amp; Spouse · Generated {{ generated_at }} ·
+  This report is for personal use only and does not constitute financial advice.
+</div>
+
+</body>
+</html>

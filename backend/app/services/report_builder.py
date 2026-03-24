@@ -1,16 +1,18 @@
 """
-Report builder — daily digest + Telegram message formatter + opportunity alerts.
+Report builder — daily digest + Telegram formatter + PDF generation (Phase 9).
 
-Formats structured data into human-readable Telegram messages.
-PDF generation is Phase 9 (WeasyPrint).
+PDF reports use WeasyPrint to render HTML → PDF.
 """
 
 from __future__ import annotations
 
+import calendar
 import logging
+import os
 import re
 from dataclasses import dataclass, field
-from datetime import date
+from datetime import date, datetime, timezone
+from pathlib import Path
 from typing import Any
 
 from app.schemas.ai_models import AIResponse
@@ -301,3 +303,290 @@ def build_opportunity_alert(
         message = message[:3990] + "\n_\\.\\.\\. truncated_"
 
     return message
+
+
+# ── PDF Report Generation ──────────────────────────────────────────────────
+
+_TEMPLATE_DIR = Path(__file__).parent.parent / "templates"
+
+
+def _render_template(template_name: str, context: dict[str, Any]) -> str:
+    """Render a Jinja2 HTML template to string."""
+    try:
+        from jinja2 import Environment, FileSystemLoader, select_autoescape
+
+        env = Environment(
+            loader=FileSystemLoader(str(_TEMPLATE_DIR)),
+            autoescape=select_autoescape(["html"]),
+        )
+        tmpl = env.get_template(template_name)
+        return tmpl.render(**context)
+    except Exception as exc:
+        logger.warning("Jinja2 render failed (%s): %s", template_name, exc)
+        return _minimal_html_report(context)
+
+
+def _minimal_html_report(context: dict[str, Any]) -> str:
+    """Fallback minimal HTML when Jinja2/template unavailable."""
+    month = context.get("month_name", "")
+    year = context.get("year", "")
+    net_worth = context.get("net_worth_usd", 0.0)
+    twr_ytd = context.get("twr_ytd", 0.0)
+    return f"""<!DOCTYPE html>
+<html><head><meta charset="utf-8">
+<title>OvelhaInvest Report — {month} {year}</title>
+<style>body{{font-family:Arial,sans-serif;margin:40px;color:#111}}
+h1{{color:#10b981}}table{{border-collapse:collapse;width:100%}}
+td,th{{border:1px solid #ddd;padding:8px;text-align:right}}th{{background:#f5f5f5}}</style>
+</head><body>
+<h1>OvelhaInvest Monthly Report</h1>
+<h2>{month} {year}</h2>
+<p><strong>Net Worth:</strong> ${net_worth:,.2f}</p>
+<p><strong>YTD TWR:</strong> {twr_ytd*100:+.2f}%</p>
+<p><em>Full template unavailable — install Jinja2 for formatted reports.</em></p>
+</body></html>"""
+
+
+def _html_to_pdf(html: str) -> bytes:
+    """Convert HTML string to PDF bytes via WeasyPrint."""
+    try:
+        from weasyprint import HTML  # type: ignore[import]
+
+        return HTML(string=html).write_pdf()
+    except Exception as exc:
+        logger.error("WeasyPrint PDF generation failed: %s", exc)
+        raise RuntimeError(f"PDF generation failed: {exc}") from exc
+
+
+def _build_report_context(
+    year: int,
+    month: int,
+    daily_status: dict[str, Any],
+    signals_runs: list[dict[str, Any]],
+    performance: dict[str, Any],
+    journal_entries: list[dict[str, Any]],
+    tax_summary: dict[str, Any],
+    ai_summaries: list[str],
+) -> dict[str, Any]:
+    """
+    Assemble template context dict for monthly_report.html.
+
+    Args:
+        year: Report year.
+        month: Report month (1-12).
+        daily_status: Latest /daily_status response.
+        signals_runs: All signals_runs for the month.
+        performance: /performance/summary response.
+        journal_entries: /journal entries for the month.
+        tax_summary: /tax/estimate response.
+        ai_summaries: List of AI short_summary strings from this month's runs.
+
+    Returns:
+        Dict suitable for Jinja2 template rendering.
+    """
+    month_name = calendar.month_name[month]
+    generated_at = datetime.now(timezone.utc).strftime("%B %d, %Y at %H:%M UTC")
+
+    # Portfolio summary
+    net_worth_usd = daily_status.get("total_value_usd", 0.0)
+    sleeve_weights = daily_status.get("sleeve_weights", {})
+    regime = daily_status.get("regime_state", "normal")
+
+    # Performance
+    twr_ytd = performance.get("twr_ytd", 0.0) or 0.0
+    twr_1mo = performance.get("twr_1mo", 0.0) or 0.0
+    benchmark_ytd = performance.get("benchmark_ytd", 0.0) or 0.0
+    sharpe = performance.get("sharpe_ratio")
+    sortino = performance.get("sortino_ratio")
+    calmar = performance.get("calmar_ratio")
+    max_dd = performance.get("max_drawdown_pct", 0.0) or 0.0
+
+    # Trade activity
+    executed_trades: list[dict[str, Any]] = []
+    total_buy_usd = 0.0
+    total_sell_usd = 0.0
+    for run in signals_runs:
+        for t in (run.get("proposed_trades") or []):
+            if run.get("status") in ("approved", "executed"):
+                executed_trades.append(t)
+                amt = float(t.get("amount_usd", 0))
+                if t.get("trade_type") == "buy":
+                    total_buy_usd += amt
+                else:
+                    total_sell_usd += amt
+
+    # Journal stats
+    followed = sum(1 for e in journal_entries if e.get("action_type") == "followed")
+    overrode = sum(1 for e in journal_entries if e.get("action_type") == "overrode")
+    deferred = sum(1 for e in journal_entries if e.get("action_type") == "deferred")
+
+    # Tax
+    unrealized_gain = 0.0
+    estimated_tax = 0.0
+    harvest_savings = 0.0
+    try:
+        unrealized_gain = tax_summary.get("unrealized", {}).get("total_unrealized_gain", 0.0) or 0.0
+        estimated_tax = tax_summary.get("estimated_tax", {}).get("on_realized_gains", 0.0) or 0.0
+        harvest_savings = tax_summary.get("harvest_savings", {}).get("potential_savings_usd", 0.0) or 0.0
+    except Exception:
+        pass
+
+    # Sleeve allocation rows
+    sleeve_rows = []
+    targets = {
+        "us_equity": 0.45, "intl_equity": 0.15, "bonds": 0.20,
+        "brazil_equity": 0.10, "crypto": 0.07, "cash": 0.03,
+    }
+    for sleeve, target in targets.items():
+        actual = sleeve_weights.get(sleeve, 0.0) or 0.0
+        drift = actual - target
+        sleeve_rows.append({
+            "name": sleeve.replace("_", " ").title(),
+            "actual_pct": actual * 100,
+            "target_pct": target * 100,
+            "drift_pct": drift * 100,
+            "drift_class": "positive" if abs(drift) < 0.03 else ("warning" if abs(drift) < 0.05 else "negative"),
+        })
+
+    return {
+        "year": year,
+        "month": month,
+        "month_name": month_name,
+        "generated_at": generated_at,
+        "net_worth_usd": net_worth_usd,
+        "net_worth_formatted": f"${net_worth_usd:,.2f}",
+        "regime": regime,
+        "regime_label": str(regime).replace("_", " ").title(),
+        "twr_ytd": twr_ytd,
+        "twr_1mo": twr_1mo,
+        "benchmark_ytd": benchmark_ytd,
+        "alpha_ytd": twr_ytd - benchmark_ytd,
+        "sharpe": sharpe,
+        "sortino": sortino,
+        "calmar": calmar,
+        "max_drawdown_pct": max_dd,
+        "sleeve_rows": sleeve_rows,
+        "executed_trades": executed_trades[:20],
+        "total_buy_usd": total_buy_usd,
+        "total_sell_usd": total_sell_usd,
+        "trade_count": len(executed_trades),
+        "followed_count": followed,
+        "overrode_count": overrode,
+        "deferred_count": deferred,
+        "journal_entries": journal_entries[:10],
+        "unrealized_gain": unrealized_gain,
+        "estimated_tax": estimated_tax,
+        "harvest_savings": harvest_savings,
+        "ai_summaries": ai_summaries[:3],
+        "app_url": APP_URL,
+    }
+
+
+def generate_monthly_report(
+    year: int,
+    month: int,
+    daily_status: dict[str, Any],
+    signals_runs: list[dict[str, Any]],
+    performance: dict[str, Any],
+    journal_entries: list[dict[str, Any]],
+    tax_summary: dict[str, Any],
+    ai_summaries: list[str],
+) -> bytes:
+    """
+    Generate a monthly PDF report.
+
+    Args:
+        year: Report year (e.g. 2025).
+        month: Report month (1-12).
+        daily_status: Latest portfolio status dict.
+        signals_runs: All signals_runs records for the month.
+        performance: Performance summary dict.
+        journal_entries: Journal entries for the month.
+        tax_summary: Tax estimate dict.
+        ai_summaries: List of AI short_summary strings.
+
+    Returns:
+        PDF bytes.
+    """
+    context = _build_report_context(
+        year=year,
+        month=month,
+        daily_status=daily_status,
+        signals_runs=signals_runs,
+        performance=performance,
+        journal_entries=journal_entries,
+        tax_summary=tax_summary,
+        ai_summaries=ai_summaries,
+    )
+    html = _render_template("monthly_report.html", context)
+    logger.info("Generating monthly PDF report for %s/%s", month, year)
+    return _html_to_pdf(html)
+
+
+def generate_annual_report(
+    year: int,
+    monthly_contexts: list[dict[str, Any]],
+    daily_status: dict[str, Any],
+    performance: dict[str, Any],
+    tax_summary: dict[str, Any],
+) -> bytes:
+    """
+    Generate an annual PDF report by aggregating 12 monthly contexts.
+
+    Args:
+        year: Report year.
+        monthly_contexts: List of up to 12 monthly context dicts
+                          (from _build_report_context) for aggregation.
+        daily_status: Year-end portfolio status.
+        performance: Full-year performance summary.
+        tax_summary: Year-end tax estimate.
+
+    Returns:
+        PDF bytes.
+    """
+    # Aggregate monthly trade counts and journal stats
+    total_trades = sum(c.get("trade_count", 0) for c in monthly_contexts)
+    total_buy = sum(c.get("total_buy_usd", 0.0) for c in monthly_contexts)
+    total_sell = sum(c.get("total_sell_usd", 0.0) for c in monthly_contexts)
+    total_followed = sum(c.get("followed_count", 0) for c in monthly_contexts)
+    total_overrode = sum(c.get("overrode_count", 0) for c in monthly_contexts)
+    total_deferred = sum(c.get("deferred_count", 0) for c in monthly_contexts)
+    all_ai_summaries = []
+    for c in monthly_contexts:
+        all_ai_summaries.extend(c.get("ai_summaries", []))
+
+    # Build annual context reusing monthly structure but with year-level numbers
+    context = _build_report_context(
+        year=year,
+        month=12,  # placeholder — template checks for annual flag
+        daily_status=daily_status,
+        signals_runs=[],
+        performance=performance,
+        journal_entries=[],
+        tax_summary=tax_summary,
+        ai_summaries=all_ai_summaries[:5],
+    )
+    context.update(
+        {
+            "is_annual": True,
+            "month_name": "Annual Summary",
+            "trade_count": total_trades,
+            "total_buy_usd": total_buy,
+            "total_sell_usd": total_sell,
+            "followed_count": total_followed,
+            "overrode_count": total_overrode,
+            "deferred_count": total_deferred,
+            "monthly_summaries": [
+                {
+                    "month_name": calendar.month_name[c.get("month", 1)],
+                    "twr_1mo": c.get("twr_1mo", 0.0),
+                    "trade_count": c.get("trade_count", 0),
+                }
+                for c in monthly_contexts
+            ],
+        }
+    )
+
+    html = _render_template("monthly_report.html", context)
+    logger.info("Generating annual PDF report for %s", year)
+    return _html_to_pdf(html)
