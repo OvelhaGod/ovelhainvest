@@ -24,6 +24,7 @@ import {
   YAxis,
 } from "recharts";
 import { api } from "@/lib/api";
+import { getRatioRating, RATIO_BADGE_CLASSES } from "@/lib/chart-theme";
 import { CorrelationHeatmap } from "@/components/charts/CorrelationHeatmap";
 import type {
   AttributionResponse,
@@ -51,13 +52,7 @@ function colorPct(v: number | null | undefined): string {
   return v >= 0 ? "text-[#10b981]" : "text-[#ef4444]";
 }
 
-const RATIO_COLORS: Record<string, string> = {
-  Excellent: "text-primary bg-primary/10 border-primary/20",
-  Good: "text-primary bg-primary/10 border-primary/20",
-  Fair: "text-tertiary bg-tertiary/10 border-tertiary/20",
-  Poor: "text-error bg-error/10 border-error/20",
-  "—": "text-[#475569] bg-[rgba(71,85,105,0.12)] border-[rgba(71,85,105,0.25)]",
-};
+// RATIO_COLORS intentionally removed — use RATIO_BADGE_CLASSES from chart-theme.ts
 
 const SLEEVE_COLORS: Record<string, string> = {
   us_equity: "#6366f1",
@@ -86,21 +81,22 @@ function GlassCard({ children, className = "" }: { children: React.ReactNode; cl
 function RatioCard({
   label,
   value,
-  interpretation,
+  ratioType,
   subtitle,
 }: {
   label: string;
   value: number | null;
-  interpretation: string;
+  ratioType?: "sharpe" | "sortino" | "calmar";
   subtitle?: string;
 }) {
-  const colorClass = RATIO_COLORS[interpretation] || RATIO_COLORS["—"];
+  const rating = getRatioRating(value, ratioType ?? "sharpe");
+  const colorClass = RATIO_BADGE_CLASSES[rating];
   return (
     <GlassCard>
       <p className="text-xs text-[#475569] uppercase tracking-wider mb-1">{label}</p>
       <p className="text-3xl font-bold font-mono text-[#f1f5f9] mt-1">{num(value)}</p>
       <span className={`mt-2 inline-block text-xs font-semibold px-2.5 py-0.5 rounded-full border ${colorClass}`}>
-        {interpretation}
+        {rating}
       </span>
       {subtitle && <p className="text-xs text-[#475569] mt-1">{subtitle}</p>}
     </GlassCard>
@@ -154,19 +150,19 @@ function SummaryTab({ data, benchmark }: { data: PerformanceSummaryResponse; ben
           <RatioCard
             label="Sharpe Ratio"
             value={data.sharpe.value}
-            interpretation={data.sharpe.label}
+            ratioType="sharpe"
             subtitle="Risk-adjusted return"
           />
           <RatioCard
             label="Sortino Ratio"
             value={data.sortino.value}
-            interpretation={data.sortino.label}
+            ratioType="sortino"
             subtitle="Downside-risk adjusted"
           />
           <RatioCard
             label="Calmar Ratio"
             value={data.calmar.value}
-            interpretation={data.calmar.label}
+            ratioType="calmar"
             subtitle="Return / max drawdown"
           />
         </div>
