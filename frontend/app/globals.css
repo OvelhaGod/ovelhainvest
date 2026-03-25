@@ -152,6 +152,13 @@ body {
 /* iOS safe area */
 .pb-safe { padding-bottom: env(safe-area-inset-bottom, 0px); }
 
+/* Net Worth card — subtle pulsing green glow */
+@keyframes net-worth-glow {
+  0%, 100% { box-shadow: 0 0 16px rgba(16,185,129,0.06), 0 0 0 1px rgba(16,185,129,0.22); }
+  50%       { box-shadow: 0 0 28px rgba(16,185,129,0.14), 0 0 0 1px rgba(16,185,129,0.38); }
+}
+.net-worth-card { animation: net-worth-glow 3.5s ease-in-out infinite; }
+
 /* Active nav glow indicator */
 .nav-active-glow::before {
   content: '';

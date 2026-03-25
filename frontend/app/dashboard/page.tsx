@@ -87,6 +87,24 @@ function Skeleton({ className = "" }: { className?: string }) {
   return <div className={`animate-pulse rounded bg-white/[0.06] ${className}`} />;
 }
 
+// ── Background sparkline (pure SVG, no Recharts, ~0 overhead) ─────────────────
+function SparklineBg({ data, color }: { data: number[]; color: string }) {
+  if (!data || data.length < 2) return null;
+  const min = Math.min(...data);
+  const max = Math.max(...data);
+  const range = max - min || 1;
+  const W = 100, H = 40;
+  const points = data
+    .map((v, i) => `${(i / (data.length - 1)) * W},${H - ((v - min) / range) * H}`)
+    .join(" ");
+  return (
+    <svg viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="none"
+      className="absolute inset-0 w-full h-full opacity-[0.10] pointer-events-none">
+      <polyline points={points} fill="none" stroke={color} strokeWidth="1.5" strokeLinecap="round" />
+    </svg>
+  );
+}
+
 // ── Custom donut tooltip ──────────────────────────────────────────────────────
 function DonutTooltip({ active, payload }: { active?: boolean; payload?: { name: string; value: number }[] }) {
   if (!active || !payload?.length) return null;
@@ -140,11 +158,13 @@ export default function DashboardPage() {
     avg_overrode_30d: number | null;
     system_outperformance_30d: number | null;
   } | null>(null);
+  const [sparklineData, setSparklineData] = useState<number[]>([]);
 
   // Parallel independent fetches — all gracefully degrade
   useEffect(() => {
     api.valuationSummary().then(setValSummary).catch(() => null);
     api.listAlertHistory({ limit: 10 }).then(setAlertHistory).catch(() => null);
+    api.performanceSparkline(30).then((r) => setSparklineData((r as { values: number[] }).values ?? [])).catch(() => null);
     api.adminStatus().then(setAdminStatus).catch(() => null);
     api.simulationDashboardPreview().then(setMcPreview).catch(() => null);
     api.journalStats().then((s) => {
@@ -253,7 +273,14 @@ export default function DashboardPage() {
       {/* ── Top metrics row ── */}
       <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
         {/* Net Worth */}
-        <div className={glassInner} style={{ borderColor: "rgba(16,185,129,0.2)", boxShadow: "0 0 20px rgba(16,185,129,0.05)" }}>
+        <div
+          className={`${glassInner} relative overflow-hidden net-worth-card`}
+          style={{ borderColor: "rgba(16,185,129,0.22)" }}
+        >
+          <SparklineBg
+            data={sparklineData}
+            color={status?.today_pnl_usd != null && status.today_pnl_usd < 0 ? "#ef4444" : "#10b981"}
+          />
           <p className="text-xs text-white/40 uppercase tracking-widest mb-2">Net Worth</p>
           {loading ? (
             <Skeleton className="h-9 w-36 mb-2" />
@@ -304,7 +331,10 @@ export default function DashboardPage() {
               {fmtPct(status.max_drawdown_pct)}
             </p>
           ) : (
-            <p className="text-xl font-semibold text-[#10b981] font-mono mt-1">No drawdown yet</p>
+            <div className="flex items-center gap-2 mt-1">
+              <span className="text-[#10b981] text-base">📈</span>
+              <p className="text-sm text-[#10b981]/80 font-mono">At all-time high</p>
+            </div>
           )}
           <p className="text-xs text-white/30 mt-1">View full analysis →</p>
         </a>
