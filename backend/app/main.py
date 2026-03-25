@@ -77,9 +77,27 @@ app.add_middleware(
 )
 
 # ---------------------------------------------------------------------------
+# Cache-Control middleware
+# ---------------------------------------------------------------------------
+
+@app.middleware("http")
+async def add_cache_headers(request, call_next):
+    response = await call_next(request)
+    if request.method == "GET" and response.status_code == 200:
+        path = request.url.path
+        if "/markets/" in path:
+            response.headers["Cache-Control"] = "public, max-age=60, stale-while-revalidate=300"
+        elif "/performance/" in path:
+            response.headers["Cache-Control"] = "private, max-age=30, stale-while-revalidate=120"
+        elif path in ("/daily_status", "/valuation_summary", "/assets/list"):
+            response.headers["Cache-Control"] = "private, max-age=30, stale-while-revalidate=60"
+    return response
+
+
+# ---------------------------------------------------------------------------
 # Routers
 # ---------------------------------------------------------------------------
-from app.api import alerts, allocation, journal, performance, reports, research, simulation, tax, valuation
+from app.api import alerts, allocation, journal, markets, performance, reports, research, simulation, tax, valuation
 app.include_router(allocation.router, prefix="", tags=["allocation"])
 app.include_router(valuation.router, prefix="", tags=["valuation"])
 app.include_router(performance.router, prefix="", tags=["performance"])
@@ -89,6 +107,7 @@ app.include_router(simulation.router, prefix="", tags=["simulation"])
 app.include_router(tax.router, prefix="", tags=["tax"])
 app.include_router(reports.router, prefix="", tags=["reports"])
 app.include_router(research.router, prefix="", tags=["research"])
+app.include_router(markets.router, prefix="/markets", tags=["markets"])
 
 # ---------------------------------------------------------------------------
 # Routes
