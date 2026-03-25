@@ -61,13 +61,19 @@ function pctColor(n: number | null | undefined): string {
 }
 
 function sectorBg(chg: number | null): string {
-  if (chg == null) return "rgba(255,255,255,0.04)";
-  if (chg > 1.5)   return "rgba(16,185,129,0.25)";
-  if (chg > 0.5)   return "rgba(16,185,129,0.14)";
-  if (chg > 0)     return "rgba(16,185,129,0.06)";
-  if (chg > -0.5)  return "rgba(244,63,94,0.06)";
-  if (chg > -1.5)  return "rgba(244,63,94,0.14)";
-  return "rgba(244,63,94,0.25)";
+  if (chg == null) return "rgba(255,255,255,0.03)";
+  if (chg > 2.0)   return "rgba(6,78,59,0.85)";   // dark emerald — strong green
+  if (chg > 1.0)   return "rgba(6,95,70,0.65)";
+  if (chg > 0)     return "rgba(6,78,59,0.35)";
+  if (chg > -1.0)  return "rgba(76,16,16,0.40)";
+  if (chg > -2.0)  return "rgba(76,16,16,0.65)";
+  return "rgba(91,26,26,0.85)";                     // dark red — strong loss
+}
+
+function sectorBorder(chg: number | null): string {
+  if (chg == null) return "rgba(255,255,255,0.06)";
+  if (chg > 0) return "rgba(16,185,129,0.25)";
+  return "rgba(244,63,94,0.20)";
 }
 
 // Mini SVG sparkline (no lib, lightweight)
@@ -150,7 +156,20 @@ export default function MarketsPage() {
   const indices = (overview as any)?.indices as IndexTicker[] | undefined;
   const sectors = (overview as any)?.sectors as SectorData[] | undefined;
   const fx      = (overview as any)?.fx as FxData[] | undefined;
-  const heldAssets = (movers as any)?.held_assets as HeldAsset[] | undefined;
+  const heldAssetsRaw = (movers as any)?.held_assets as HeldAsset[] | undefined;
+  // Deduplicate by symbol, summing quantities
+  const heldAssets = heldAssetsRaw
+    ? Object.values(
+        heldAssetsRaw.reduce<Record<string, HeldAsset>>((acc, a) => {
+          if (acc[a.symbol]) {
+            acc[a.symbol] = { ...acc[a.symbol], quantity: acc[a.symbol].quantity + a.quantity };
+          } else {
+            acc[a.symbol] = { ...a };
+          }
+          return acc;
+        }, {})
+      )
+    : undefined;
   const periods = (pvMarket as any)?.periods as string[] | undefined;
   const pRows = pvMarket as any;
 
@@ -268,8 +287,8 @@ export default function MarketsPage() {
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
                 {(sectors ?? []).map(s => (
                   <div key={s.symbol}
-                    className="rounded-xl p-3 border border-white/[0.06] transition-all hover:border-white/10"
-                    style={{ background: sectorBg(s.change_pct) }}>
+                    className="rounded-xl p-3 border transition-all hover:brightness-110"
+                    style={{ background: sectorBg(s.change_pct), borderColor: sectorBorder(s.change_pct) }}>
                     <div className="text-[10px] text-white/50 mb-0.5">{s.symbol}</div>
                     <div className="text-xs font-medium text-white/80 leading-tight">{s.name}</div>
                     <div className={`text-sm font-mono font-bold mt-1 ${pctColor(s.change_pct)}`}>
