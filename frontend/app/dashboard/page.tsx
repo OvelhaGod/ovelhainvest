@@ -5,7 +5,7 @@
  * Auto-refreshes every 60 seconds.
  */
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import useSWR from "swr";
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip, AreaChart, Area, XAxis, YAxis } from "recharts";
 import { fetcher, CACHE_TTL } from "@/lib/swr-config";
