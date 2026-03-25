@@ -1,6 +1,19 @@
 "use client";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { preload } from "swr";
+import { fetcher } from "@/lib/swr-config";
+
+// Endpoints to prefetch when hovering each nav item
+const PREFETCH_MAP: Record<string, string[]> = {
+  "/dashboard":    ["/daily_status"],
+  "/performance":  ["/performance/summary"],
+  "/signals":      ["/signals/runs"],
+  "/assets":       ["/assets/list"],
+  "/markets":      ["/markets/overview"],
+  "/projections":  ["/simulation/dashboard_preview"],
+  "/tax":          ["/tax/estimate"],
+};
 
 const navItems = [
   {
@@ -58,6 +71,10 @@ export function Sidebar() {
                   key={href}
                   href={href}
                   title={label}
+                  onMouseEnter={() => {
+                    const endpoints = PREFETCH_MAP[href];
+                    if (endpoints) endpoints.forEach((ep) => preload(ep, fetcher));
+                  }}
                   className={`relative flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs transition-all justify-center lg:justify-start ${
                     active
                       ? "nav-active-glow bg-primary/5 text-primary"
