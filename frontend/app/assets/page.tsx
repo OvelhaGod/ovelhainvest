@@ -478,10 +478,8 @@ export default function AssetsPage() {
     try {
       setLoading(true);
       setError(null);
-      // Fetch all latest valuations via /valuation_summary
-      const summary = await api.valuationSummary();
-      const all = summary.top_by_composite as AssetValuation[];
-      setData(all);
+      const response = await api.assetsList();
+      setData(response.assets);
     } catch (err) {
       setError((err as Error).message);
     } finally {

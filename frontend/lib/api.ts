@@ -83,6 +83,12 @@ export const api = {
       (r) => r.top_by_composite as AssetValuation[]
     ),
 
+  // Full asset list with sub-scores (all 22, no cap)
+  assetsList: () =>
+    request<{ assets: AssetValuation[]; total: number; scored: number; as_of_date: string | null }>(
+      "/assets/list"
+    ),
+
   // ── Performance (Phase 4) ─────────────────────────────────────────────────
 
   performanceSummary: (period = "ytd", userId?: string) => {

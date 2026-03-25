@@ -420,6 +420,57 @@ def valuation_summary(
     return val_result
 
 
+# ── GET /assets/list ─────────────────────────────────────────────────────────
+
+@router.get("/assets/list", tags=["valuation"])
+def assets_list() -> dict:
+    """
+    Return ALL active assets with their latest valuation data.
+    Unlike /valuation_summary (which caps at 8), this returns the full universe.
+    Includes value_score, momentum_score, quality_score for the assets page table.
+    """
+    from app.db.repositories.valuations import get_latest_valuations
+
+    try:
+        rows = get_latest_valuations()
+    except Exception as exc:
+        logger.error("assets_list failed: %s", exc)
+        rows = []
+
+    as_of_date = rows[0].get("as_of_date") if rows else None
+    scored = sum(1 for r in rows if r.get("composite_score") is not None)
+
+    assets = []
+    for row in rows:
+        assets.append({
+            "symbol":                   row.get("symbol"),
+            "name":                     row.get("name"),
+            "asset_class":              row.get("asset_class"),
+            "moat_rating":              row.get("moat_rating"),
+            "currency":                 row.get("currency"),
+            "sector":                   row.get("sector"),
+            "is_dcf_eligible":          row.get("is_dcf_eligible"),
+            "price":                    row.get("price"),
+            "value_score":              row.get("value_score"),
+            "momentum_score":           row.get("momentum_score"),
+            "quality_score":            row.get("quality_score"),
+            "composite_score":          row.get("composite_score"),
+            "margin_of_safety_pct":     row.get("margin_of_safety_pct"),
+            "fair_value_estimate_dcf":  row.get("fair_value_estimate_dcf"),
+            "buy_target":               row.get("buy_target"),
+            "hold_range_low":           row.get("hold_range_low"),
+            "hold_range_high":          row.get("hold_range_high"),
+            "sell_target":              row.get("sell_target"),
+            "tier":                     row.get("tier"),
+            "rank_in_universe":         row.get("rank_in_universe"),
+            "as_of_date":               row.get("as_of_date"),
+            "vol_30d":                  row.get("vol_30d"),
+            "drawdown_from_6_12m_high_pct": row.get("drawdown_from_6_12m_high_pct"),
+        })
+
+    return {"assets": assets, "total": len(assets), "scored": scored, "as_of_date": as_of_date}
+
+
 # ── GET /valuation/{symbol} ───────────────────────────────────────────────────
 
 @router.get("/valuation/{symbol}", response_model=AssetValuationDetail, tags=["valuation"])
