@@ -8,6 +8,7 @@ import { OfflineBanner } from "@/components/pwa/OfflineBanner";
 import { InstallPrompt } from "@/components/pwa/InstallPrompt";
 import { SWRProvider } from "@/lib/swr-config";
 import { SnapshotInit } from "@/components/pwa/SnapshotInit";
+import { UserProvider } from "@/lib/user-context";
 
 const jetbrainsMono = JetBrains_Mono({
   variable: "--font-geist-mono",
@@ -43,7 +44,9 @@ export default function RootLayout({
         <MobileNav />
         <Sidebar />
         <SWRProvider>
-          <main className="flex-1 overflow-auto pb-16 md:pb-0">{children}</main>
+          <UserProvider>
+            <main className="flex-1 overflow-auto pb-16 md:pb-0">{children}</main>
+          </UserProvider>
         </SWRProvider>
       </body>
     </html>
