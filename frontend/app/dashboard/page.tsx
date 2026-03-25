@@ -5,11 +5,22 @@
  * Auto-refreshes every 60 seconds.
  */
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import useSWR from "swr";
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip, AreaChart, Area, XAxis, YAxis } from "recharts";
-import { api } from "@/lib/api";
-import { fetcher } from "@/lib/swr-config";
+import { fetcher, CACHE_TTL } from "@/lib/swr-config";
+
+const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? "https://investapi.ovelha.us";
+
+async function postFetcher(path: string) {
+  const res = await fetch(`${API_BASE}${path}`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({}),
+  });
+  if (!res.ok) throw new Error(`${res.status}`);
+  return res.json();
+}
 import { OIErrorState } from "@/components/ui/oi";
 import type { AdminStatus, AlertHistoryItem, DailyStatusResponse, SleeveWeight, ValuationSummaryResponse, VaultBalance } from "@/lib/types";
 
@@ -139,60 +150,42 @@ export default function DashboardPage() {
     if (status) setLastRefresh(new Date());
   }, [status]);
 
-  const [valSummary, setValSummary]       = useState<ValuationSummaryResponse | null>(null);
-  const [alertHistory, setAlertHistory]   = useState<AlertHistoryItem[]>([]);
-  const [adminStatus, setAdminStatus]     = useState<AdminStatus | null>(null);
-  const [mcPreview, setMcPreview]         = useState<{ median_10yr: number; median_20yr: number; swr_probability: number } | null>(null);
-  const [taxSnapshot, setTaxSnapshot]     = useState<{
-    unrealized_gain: number;
-    worst_case_tax: number;
-    harvest_savings: number;
-    harvest_count: number;
-    darf_pct: number;
-    darf_triggered: boolean;
-  } | null>(null);
-  const [journalAccuracy, setJournalAccuracy] = useState<{
-    followed_count: number;
-    overrode_count: number;
-    avg_followed_30d: number | null;
-    avg_overrode_30d: number | null;
-    system_outperformance_30d: number | null;
-  } | null>(null);
-  const [sparklineData, setSparklineData] = useState<number[]>([]);
+  // Secondary data via SWR — all gracefully degrade on error
+  const { data: valSummary }       = useSWR<ValuationSummaryResponse>("/valuation_summary", fetcher, { refreshInterval: CACHE_TTL.SLOW });
+  const { data: alertHistoryRaw }  = useSWR<AlertHistoryItem[]>("/alerts/history?limit=10", fetcher, { refreshInterval: CACHE_TTL.FAST });
+  const { data: sparklineRaw }     = useSWR<{ values: number[]; dates: string[] }>("/performance/sparkline?days=30", fetcher, { refreshInterval: CACHE_TTL.SLOW });
+  const { data: adminStatus }      = useSWR<AdminStatus>("/admin/status", fetcher, { refreshInterval: CACHE_TTL.FAST });
+  const { data: journalStatsRaw }  = useSWR<Record<string, unknown>>("/journal/stats", fetcher, { refreshInterval: CACHE_TTL.SLOW });
+  const { data: taxEstimateRaw }   = useSWR<{
+    unrealized: { total_unrealized_gain: number; open_positions: number };
+    worst_case: { if_close_everything_today: number };
+    harvest_savings: { potential_savings_usd: number; top_candidates: unknown[] };
+  }>("/tax/estimate", fetcher, { refreshInterval: CACHE_TTL.SLOW });
+  const { data: taxDarfRaw }       = useSWR<{
+    darf_status: { exemption_pct_used: number; is_triggered: boolean; darf_due: number | null };
+  }>("/tax/brazil_darf", fetcher, { refreshInterval: CACHE_TTL.SLOW });
+  const { data: mcPreview }        = useSWR<{
+    median_10yr: number; median_20yr: number; swr_probability: number;
+  }>("/simulation/dashboard_preview", postFetcher, { refreshInterval: CACHE_TTL.SLOW });
 
-  // Parallel independent fetches — all gracefully degrade
-  useEffect(() => {
-    api.valuationSummary().then(setValSummary).catch(() => null);
-    api.listAlertHistory({ limit: 10 }).then(setAlertHistory).catch(() => null);
-    api.performanceSparkline(30).then((r) => setSparklineData((r as { values: number[] }).values ?? [])).catch(() => null);
-    api.adminStatus().then(setAdminStatus).catch(() => null);
-    api.simulationDashboardPreview().then(setMcPreview).catch(() => null);
-    api.journalStats().then((s) => {
-      const stats = s as Record<string, unknown>;
-      setJournalAccuracy({
-        followed_count: (stats.followed_count as number) ?? 0,
-        overrode_count: (stats.overrode_count as number) ?? 0,
-        avg_followed_30d: (stats.avg_outcome_followed_30d as number | null) ?? null,
-        avg_overrode_30d: (stats.avg_outcome_overrode_30d as number | null) ?? null,
-        system_outperformance_30d: (stats.system_outperformance_30d as number | null) ?? null,
-      });
-    }).catch(() => null);
-    // Tax snapshot — combine estimate + DARF
-    Promise.all([
-      api.taxEstimate().catch(() => null),
-      api.taxBrazilDarf().catch(() => null),
-    ]).then(([est, darf]) => {
-      if (!est && !darf) return;
-      setTaxSnapshot({
-        unrealized_gain: est?.unrealized?.total_unrealized_gain ?? 0,
-        worst_case_tax: est?.worst_case?.if_close_everything_today ?? 0,
-        harvest_savings: est?.harvest_savings?.potential_savings_usd ?? 0,
-        harvest_count: (est?.harvest_savings?.top_candidates?.length ?? 0) as number,
-        darf_pct: darf?.darf_status?.exemption_pct_used ?? 0,
-        darf_triggered: darf?.darf_status?.is_triggered ?? false,
-      });
-    });
-  }, []);
+  // Derived values
+  const alertHistory  = alertHistoryRaw ?? [];
+  const sparklineData = sparklineRaw?.values ?? [];
+  const journalAccuracy = journalStatsRaw ? {
+    followed_count: (journalStatsRaw.followed_count as number) ?? 0,
+    overrode_count: (journalStatsRaw.overrode_count as number) ?? 0,
+    avg_followed_30d: (journalStatsRaw.avg_outcome_followed_30d as number | null) ?? null,
+    avg_overrode_30d: (journalStatsRaw.avg_outcome_overrode_30d as number | null) ?? null,
+    system_outperformance_30d: (journalStatsRaw.system_outperformance_30d as number | null) ?? null,
+  } : null;
+  const taxSnapshot = (taxEstimateRaw || taxDarfRaw) ? {
+    unrealized_gain: taxEstimateRaw?.unrealized?.total_unrealized_gain ?? 0,
+    worst_case_tax: taxEstimateRaw?.worst_case?.if_close_everything_today ?? 0,
+    harvest_savings: taxEstimateRaw?.harvest_savings?.potential_savings_usd ?? 0,
+    harvest_count: (taxEstimateRaw?.harvest_savings?.top_candidates?.length ?? 0) as number,
+    darf_pct: taxDarfRaw?.darf_status?.exemption_pct_used ?? 0,
+    darf_triggered: taxDarfRaw?.darf_status?.is_triggered ?? false,
+  } : null;
 
   const regime = status ? (REGIME_CONFIG[status.regime_state] ?? REGIME_CONFIG.normal) : REGIME_CONFIG.normal;
 
