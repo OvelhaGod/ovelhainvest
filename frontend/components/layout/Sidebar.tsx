@@ -127,7 +127,7 @@ export function Sidebar() {
                       collapsed ? "justify-center" : ""
                     } ${
                       active
-                        ? "bg-[rgba(16,185,129,0.10)] text-[#10b981] border border-[rgba(16,185,129,0.20)] shadow-[inset_0_0_0_1px_rgba(16,185,129,0.08)]"
+                        ? "bg-[rgba(16,185,129,0.08)] text-[#10b981] border-l-2 border-l-[#10b981] border-t-0 border-r-0 border-b-0 pl-[calc(0.5rem-2px)]"
                         : "text-white/45 hover:text-white/80 hover:bg-white/[0.04] border border-transparent"
                     }`}
                   >
