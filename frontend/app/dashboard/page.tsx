@@ -9,6 +9,7 @@ import { useEffect, useState } from "react";
 import useSWR from "swr";
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip, AreaChart, Area, XAxis, YAxis } from "recharts";
 import { api } from "@/lib/api";
+import { fetcher } from "@/lib/swr-config";
 import { OIErrorState } from "@/components/ui/oi";
 import type { AdminStatus, AlertHistoryItem, DailyStatusResponse, SleeveWeight, ValuationSummaryResponse, VaultBalance } from "@/lib/types";
 
@@ -99,7 +100,7 @@ function DonutTooltip({ active, payload }: { active?: boolean; payload?: { name:
 
 // ── Main component ────────────────────────────────────────────────────────────
 export default function DashboardPage() {
-  // SWR for /daily_status — auto-refreshes every 60 seconds
+  // SWR for /daily_status — use global fetcher so NEXT_PUBLIC_API_URL is always respected
   const {
     data: status,
     error: statusError,
@@ -107,7 +108,7 @@ export default function DashboardPage() {
     mutate: refetchStatus,
   } = useSWR<DailyStatusResponse>(
     "/daily_status",
-    () => api.dailyStatus(),
+    fetcher,
     { refreshInterval: 60_000 }
   );
 
@@ -303,7 +304,7 @@ export default function DashboardPage() {
               {fmtPct(status.max_drawdown_pct)}
             </p>
           ) : (
-            <p className="text-3xl font-bold text-white/20 font-mono">—</p>
+            <p className="text-xl font-semibold text-[#10b981] font-mono mt-1">No drawdown yet</p>
           )}
           <p className="text-xs text-white/30 mt-1">View full analysis →</p>
         </a>
@@ -333,11 +334,14 @@ export default function DashboardPage() {
             </>
           ) : (
             <>
-              <p className="text-3xl font-bold text-white/20 font-mono">—</p>
-              <p className="text-xs text-white/30 mt-1">
+              <div className="flex items-center gap-2 mt-1">
+                <span className="text-white/30 text-lg">🕐</span>
+                <p className="text-sm text-white/40 font-mono">Building history...</p>
+              </div>
+              <p className="text-xs text-white/25 mt-1">
                 {(status?.pending_approvals ?? 0) > 0
                   ? <a href="/signals" className="text-tertiary/70 hover:text-tertiary transition-colors">{status?.pending_approvals} approval{status?.pending_approvals !== 1 ? "s" : ""} pending →</a>
-                  : "Needs 12mo of snapshots"}
+                  : "Available after 20+ daily snapshots"}
               </p>
             </>
           )}

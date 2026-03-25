@@ -460,6 +460,8 @@ export default function AssetsPage() {
   const [loading, setLoading]   = useState(true);
   const [error, setError]       = useState<string | null>(null);
   const [selected, setSelected] = useState<AssetValuation | null>(null);
+  const [valRunning, setValRunning] = useState(false);
+  const [valMsg, setValMsg]     = useState<string | null>(null);
 
   // Filters
   const [filterClass, setFilterClass]   = useState<string>("");
@@ -593,13 +595,39 @@ export default function AssetsPage() {
           <span className="text-xs font-mono text-[#94a3b8] w-20">{minMoS === -100 ? "All Assets" : `${minMoS}%`}</span>
         </div>
 
+        {/* Valuation Update */}
+        <button
+          onClick={async () => {
+            setValRunning(true);
+            setValMsg(null);
+            try {
+              await api.runValuationUpdate();
+              setValMsg("Valuation pipeline started — refreshing in 5s...");
+              setTimeout(() => { load(); setValMsg(null); }, 5000);
+            } catch (e) {
+              setValMsg(`Failed: ${(e as Error).message}`);
+            } finally {
+              setValRunning(false);
+            }
+          }}
+          disabled={valRunning}
+          className="ml-auto px-3 py-1.5 rounded-lg text-xs bg-emerald-500/10 border border-emerald-500/20 text-emerald-300 hover:bg-emerald-500/15 transition-colors disabled:opacity-50"
+        >
+          {valRunning ? "Running..." : "⚡ Run Valuation Update"}
+        </button>
+
         {/* Refresh */}
         <button
           onClick={load}
-          className="ml-auto px-3 py-1.5 rounded-lg text-xs bg-indigo-500/10 border border-indigo-500/20 text-indigo-300 hover:bg-indigo-500/15 transition-colors"
+          className="px-3 py-1.5 rounded-lg text-xs bg-indigo-500/10 border border-indigo-500/20 text-indigo-300 hover:bg-indigo-500/15 transition-colors"
         >
           ↻ Refresh
         </button>
+
+        {/* Valuation status msg */}
+        {valMsg && (
+          <span className="text-[10px] text-emerald-400/80">{valMsg}</span>
+        )}
       </div>
 
       {/* Error */}
