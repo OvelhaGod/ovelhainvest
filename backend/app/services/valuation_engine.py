@@ -376,6 +376,12 @@ def run_valuation_pipeline(
                 vol_30d=vol or None,
                 market_median_vol=market_median_vol,
             )
+
+            # Crypto override: no traditional fundamental data applies
+            if asset.get("asset_class") == "Crypto":
+                v_score = 0.3
+                q_score = 0.2
+
             c_score    = compute_composite_score(v_score, m_score, q_score, season)
             drawdown   = compute_drawdown_from_high(hist, window_months=9)
 
