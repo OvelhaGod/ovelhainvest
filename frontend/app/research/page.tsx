@@ -74,7 +74,7 @@ export default function ResearchPage() {
   }, []);
 
   return (
-    <div className="p-6 space-y-6">
+    <div className="p-5 space-y-5">
       {/* Header */}
       <div>
         <h1 className="text-xl font-semibold text-[#f1f5f9]">Research</h1>

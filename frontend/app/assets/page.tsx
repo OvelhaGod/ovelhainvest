@@ -528,7 +528,7 @@ export default function AssetsPage() {
 
   return (
     <div
-      className="min-h-screen p-6"
+      className="min-h-screen p-5"
       style={{
         background:
           "radial-gradient(ellipse 80% 50% at 50% -20%, rgba(99,102,241,0.10) 0%, transparent 60%), #050508",

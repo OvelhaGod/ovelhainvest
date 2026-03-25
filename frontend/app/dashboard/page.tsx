@@ -206,7 +206,7 @@ export default function DashboardPage() {
   const isPaused = adminStatus?.automation_paused ?? (status?.regime_state === "paused");
 
   return (
-    <div className="min-h-screen p-6 space-y-5" style={{ background: "#050508" }}>
+    <div className="min-h-screen p-5 space-y-4" style={{ background: "#050508" }}>
 
       {/* ── Automation Paused Banner ── */}
       {isPaused && (
@@ -384,8 +384,8 @@ export default function DashboardPage() {
               </div>
             </div>
           ) : (
-            <div className="flex flex-col sm:flex-row gap-6 items-start">
-              <div className="w-48 h-48 shrink-0">
+            <div className="flex flex-col sm:flex-row gap-4 items-start min-h-0">
+              <div className="w-44 h-44 shrink-0 min-w-[160px]">
                 <ResponsiveContainer width="100%" height="100%">
                   <PieChart>
                     {/* Inner ghost ring = target weights */}
@@ -424,7 +424,7 @@ export default function DashboardPage() {
               </div>
 
               {/* Sleeve bars */}
-              <div className="flex-1 space-y-2.5 w-full">
+              <div className="flex-1 min-h-0 space-y-2 w-full">
                 {status?.sleeve_weights?.map((sw) => (
                   <SleeveBar key={sw.sleeve} sw={sw} />
                 ))}

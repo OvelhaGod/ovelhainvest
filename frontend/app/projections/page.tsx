@@ -866,7 +866,7 @@ export default function ProjectionsPage() {
   const [tab, setTab] = useState("monte_carlo");
 
   return (
-    <div className="p-6 space-y-6 min-h-screen" style={{ background: "radial-gradient(ellipse 80% 50% at 50% -20%, rgba(99,102,241,0.10) 0%, transparent 60%), #050508" }}>
+    <div className="p-5 space-y-5 min-h-screen" style={{ background: "radial-gradient(ellipse 80% 50% at 50% -20%, rgba(99,102,241,0.10) 0%, transparent 60%), #050508" }}>
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-xl font-semibold" style={{ color: "#f1f5f9" }}>Projections</h1>

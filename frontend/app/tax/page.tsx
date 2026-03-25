@@ -189,7 +189,7 @@ export default function TaxPage() {
   const darfColor = darfPct >= 90 ? "#ef4444" : darfPct >= 60 ? "#f59e0b" : "#10b981";
 
   return (
-    <div className="p-6 space-y-5 min-h-screen" style={{ background: "radial-gradient(ellipse 80% 50% at 50% -20%, rgba(16,185,129,0.06) 0%, transparent 60%), #050508" }}>
+    <div className="p-5 space-y-5 min-h-screen" style={{ background: "radial-gradient(ellipse 80% 50% at 50% -20%, rgba(16,185,129,0.06) 0%, transparent 60%), #050508" }}>
 
       {/* ── Header ── */}
       <div>
