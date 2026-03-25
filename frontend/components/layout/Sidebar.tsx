@@ -1,8 +1,14 @@
 "use client";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { useEffect, useState } from "react";
 import { preload } from "swr";
 import { fetcher } from "@/lib/swr-config";
+import {
+  LayoutDashboard, Activity, TrendingUp, LineChart,
+  Package, Globe, Newspaper, Receipt, BookMarked, FileText, Settings,
+  ChevronLeft, ChevronRight, User,
+} from "lucide-react";
 
 // Endpoints to prefetch when hovering each nav item
 const PREFETCH_MAP: Record<string, string[]> = {
@@ -19,80 +25,153 @@ const navItems = [
   {
     group: "Portfolio",
     items: [
-      { href: "/dashboard", label: "Dashboard" },
-      { href: "/signals", label: "Signals" },
-      { href: "/performance", label: "Performance" },
-      { href: "/projections", label: "Projections" },
+      { href: "/dashboard",   label: "Dashboard",   icon: LayoutDashboard },
+      { href: "/signals",     label: "Signals",     icon: Activity },
+      { href: "/performance", label: "Performance", icon: TrendingUp },
+      { href: "/projections", label: "Projections", icon: LineChart },
     ],
   },
   {
     group: "Research",
     items: [
-      { href: "/assets", label: "Assets" },
-      { href: "/markets", label: "Markets" },
-      { href: "/research", label: "Research" },
+      { href: "/assets",   label: "Assets",   icon: Package },
+      { href: "/markets",  label: "Markets",  icon: Globe },
+      { href: "/research", label: "Research", icon: Newspaper },
     ],
   },
   {
     group: "Tax & Admin",
     items: [
-      { href: "/tax", label: "Tax" },
-      { href: "/journal", label: "Journal" },
-      { href: "/reports", label: "Reports" },
-      { href: "/config", label: "Config" },
+      { href: "/tax",     label: "Tax",     icon: Receipt },
+      { href: "/journal", label: "Journal", icon: BookMarked },
+      { href: "/reports", label: "Reports", icon: FileText },
+      { href: "/config",  label: "Config",  icon: Settings },
     ],
   },
 ];
 
+const STORAGE_KEY = "oi_sidebar_collapsed";
+
 export function Sidebar() {
   const pathname = usePathname();
+  const [collapsed, setCollapsed] = useState(false);
+
+  // Restore collapse state from localStorage (client-only)
+  useEffect(() => {
+    const stored = localStorage.getItem(STORAGE_KEY);
+    if (stored === "true") setCollapsed(true);
+  }, []);
+
+  const toggle = () => {
+    setCollapsed((prev) => {
+      const next = !prev;
+      localStorage.setItem(STORAGE_KEY, String(next));
+      return next;
+    });
+  };
+
+  const w = collapsed ? "w-[64px]" : "w-[220px]";
 
   return (
-    <aside className="hidden md:flex lg:w-52 w-16 flex-none border-r border-white/[0.06] flex-col transition-all">
-      {/* Logo */}
-      <div className="px-3 lg:px-4 py-5 border-b border-white/[0.06] flex items-center gap-2 overflow-hidden">
-        <span className="text-primary font-bold tracking-tight text-sm shrink-0">🐑</span>
-        <span className="text-primary font-bold tracking-tight text-sm hidden lg:block truncate">OvelhaInvest</span>
-        <p className="text-outline text-xs mt-0.5 hidden lg:block">Wealth OS · v1.0</p>
+    <aside
+      className={`hidden md:flex ${w} flex-none flex-col transition-[width] duration-200 ease-in-out overflow-hidden`}
+      style={{
+        background: "linear-gradient(180deg, rgba(13,13,20,0.97) 0%, rgba(5,5,8,0.99) 100%)",
+        borderRight: "1px solid rgba(255,255,255,0.06)",
+      }}
+    >
+      {/* Logo + collapse toggle */}
+      <div
+        className="flex items-center justify-between px-3 py-4"
+        style={{ borderBottom: "1px solid rgba(255,255,255,0.06)" }}
+      >
+        <div className={`flex items-center gap-2 min-w-0 ${collapsed ? "justify-center w-full" : ""}`}>
+          <span className="text-[#10b981] shrink-0 text-base leading-none">🐑</span>
+          {!collapsed && (
+            <span className="text-[#10b981] font-semibold text-sm tracking-tight truncate">OvelhaInvest</span>
+          )}
+        </div>
+        {!collapsed && (
+          <button
+            onClick={toggle}
+            className="shrink-0 text-white/30 hover:text-white/60 transition-colors p-0.5 rounded"
+            aria-label="Collapse sidebar"
+          >
+            <ChevronLeft size={14} />
+          </button>
+        )}
       </div>
 
       {/* Nav */}
-      <nav className="flex-1 px-1.5 lg:px-2 py-4 space-y-4 overflow-y-auto">
+      <nav className="flex-1 px-2 py-3 space-y-4 overflow-y-auto overflow-x-hidden">
         {navItems.map(({ group, items }) => (
           <div key={group}>
-            <p className="px-3 mb-1 text-[10px] font-semibold uppercase tracking-widest text-outline hidden lg:block">
-              {group}
-            </p>
-            {items.map(({ href, label }) => {
-              const active =
-                pathname === href || pathname?.startsWith(href + "/");
-              return (
-                <Link
-                  key={href}
-                  href={href}
-                  title={label}
-                  onMouseEnter={() => {
-                    const endpoints = PREFETCH_MAP[href];
-                    if (endpoints) endpoints.forEach((ep) => preload(ep, fetcher));
-                  }}
-                  className={`relative flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs transition-all justify-center lg:justify-start ${
-                    active
-                      ? "nav-active-glow bg-primary/5 text-primary"
-                      : "text-on-surface-variant hover:text-on-surface hover:bg-white/[0.03] border border-transparent"
-                  }`}
-                >
-                  <span className="text-sm shrink-0">{label.charAt(0)}</span>
-                  <span className="hidden lg:block">{label}</span>
-                </Link>
-              );
-            })}
+            {!collapsed && (
+              <p className="px-2 mb-1.5 text-[10px] font-semibold uppercase tracking-widest text-white/25">
+                {group}
+              </p>
+            )}
+            <div className="space-y-0.5">
+              {items.map(({ href, label, icon: Icon }) => {
+                const active = pathname === href || pathname?.startsWith(href + "/");
+                return (
+                  <Link
+                    key={href}
+                    href={href}
+                    title={collapsed ? label : undefined}
+                    onMouseEnter={() => {
+                      const endpoints = PREFETCH_MAP[href];
+                      if (endpoints) endpoints.forEach((ep) => preload(ep, fetcher));
+                    }}
+                    className={`flex items-center gap-2.5 px-2 py-2 rounded-lg text-xs font-medium transition-all duration-150 ${
+                      collapsed ? "justify-center" : ""
+                    } ${
+                      active
+                        ? "bg-[rgba(16,185,129,0.10)] text-[#10b981] border border-[rgba(16,185,129,0.20)] shadow-[inset_0_0_0_1px_rgba(16,185,129,0.08)]"
+                        : "text-white/45 hover:text-white/80 hover:bg-white/[0.04] border border-transparent"
+                    }`}
+                  >
+                    <Icon size={15} className="shrink-0" strokeWidth={active ? 2.2 : 1.8} />
+                    {!collapsed && <span className="truncate">{label}</span>}
+                  </Link>
+                );
+              })}
+            </div>
           </div>
         ))}
       </nav>
 
-      {/* Footer */}
-      <div className="px-3 lg:px-4 py-3 border-t border-white/[0.06]">
-        <p className="text-outline text-xs hidden lg:block">Phase 10 · PWA Ready</p>
+      {/* User profile + version */}
+      <div
+        className="px-2 py-3 space-y-1"
+        style={{ borderTop: "1px solid rgba(255,255,255,0.06)" }}
+      >
+        {/* Expand button when collapsed */}
+        {collapsed && (
+          <button
+            onClick={toggle}
+            className="w-full flex justify-center text-white/30 hover:text-white/60 transition-colors py-1 rounded"
+            aria-label="Expand sidebar"
+          >
+            <ChevronRight size={14} />
+          </button>
+        )}
+
+        <div className={`flex items-center gap-2 px-1 py-1 rounded-lg ${collapsed ? "justify-center" : ""}`}>
+          <div className="w-6 h-6 rounded-full bg-[rgba(16,185,129,0.15)] border border-[rgba(16,185,129,0.25)] flex items-center justify-center shrink-0">
+            <User size={11} className="text-[#10b981]" />
+          </div>
+          {!collapsed && (
+            <div className="min-w-0">
+              <p className="text-xs font-medium text-white/70 truncate">Thiago</p>
+              <p className="text-[10px] text-white/25 truncate">Personal Wealth OS</p>
+            </div>
+          )}
+        </div>
+
+        {!collapsed && (
+          <p className="text-[10px] text-white/20 px-1 pt-0.5">v1.5.0 · Phase 10</p>
+        )}
       </div>
     </aside>
   );
