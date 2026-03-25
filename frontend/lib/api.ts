@@ -282,6 +282,29 @@ export const api = {
     return request<Record<string, unknown>[]>(`/news/earnings_calendar${qs.toString() ? `?${qs}` : ""}`);
   },
 
+  // ── Markets (Phase v1.4) ─────────────────────────────────────────────────
+
+  marketsOverview: () =>
+    request<Record<string, unknown>>("/markets/overview"),
+
+  marketsPortfolioVsMarket: (userId?: string) =>
+    request<Record<string, unknown>>(
+      `/markets/portfolio_vs_market${userId ? `?user_id=${userId}` : ""}`
+    ),
+
+  marketsMovers: (userId?: string) =>
+    request<Record<string, unknown>>(
+      `/markets/movers${userId ? `?user_id=${userId}` : ""}`
+    ),
+
+  performanceSparkline: (days = 30, userId?: string) => {
+    const params = new URLSearchParams({ days: String(days) });
+    if (userId) params.set("user_id", userId);
+    return request<{ values: number[]; dates: string[] }>(
+      `/performance/sparkline?${params}`
+    );
+  },
+
   taxBrazilDarf: (params?: { user_id?: string; year?: number; month?: number }) => {
     const qs = new URLSearchParams(
       Object.entries(params ?? {})

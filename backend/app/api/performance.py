@@ -710,3 +710,24 @@ async def correlation_history(
         })
 
     return {"pairs": pairs_data, "highest_pair": highest_pair}
+
+
+@router.get("/performance/sparkline")
+def performance_sparkline(
+    user_id: str = Query(default=None),
+    days: int = Query(default=30, ge=7, le=365),
+) -> dict:
+    """
+    Return the last N daily portfolio values for sparkline display on dashboard.
+    Fast — no computation, just raw snapshot values.
+    """
+    uid = _resolve_user(user_id)
+    snapshots = get_snapshot_history(uid, days=days + 10)
+    if not snapshots:
+        return {"values": [], "dates": []}
+    # Trim to requested days
+    cutoff = (date.today() - timedelta(days=days)).isoformat()
+    filtered = [s for s in snapshots if s["snapshot_date"] >= cutoff]
+    values = [float(s["total_value_usd"]) for s in filtered]
+    dates  = [s["snapshot_date"] for s in filtered]
+    return {"values": values, "dates": dates}

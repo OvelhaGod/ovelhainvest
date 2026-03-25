@@ -15,6 +15,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { api } from "@/lib/api";
 import { OIErrorState } from "@/components/ui/oi";
+import { AssetLogo } from "@/lib/asset-logos";
 import type { AssetValuation } from "@/lib/types";
 
 // ── Design tokens ─────────────────────────────────────────────────────────────
@@ -692,8 +693,11 @@ export default function AssetsPage() {
                       </td>
                       {/* Symbol */}
                       <td className="px-3 py-3">
-                        <div className="font-mono font-semibold text-sm text-[#f1f5f9]">
-                          {asset.symbol}
+                        <div className="flex items-center gap-2">
+                          <AssetLogo symbol={asset.symbol} size={24} />
+                          <div className="font-mono font-semibold text-sm text-[#f1f5f9]">
+                            {asset.symbol}
+                          </div>
                         </div>
                         {asset.name && (
                           <div className="text-[10px] text-[#475569] truncate max-w-[120px]">

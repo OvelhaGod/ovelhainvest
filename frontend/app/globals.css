@@ -161,3 +161,16 @@ body {
   box-shadow: 0 0 10px var(--color-primary);
   border-radius: 0 2px 2px 0;
 }
+
+/* Markets ticker strip scroll animation */
+@keyframes ticker-scroll {
+  0%   { transform: translateX(0); }
+  100% { transform: translateX(-50%); }
+}
+.ticker-scroll {
+  animation: ticker-scroll 40s linear infinite;
+  width: max-content;
+}
+.ticker-scroll:hover {
+  animation-play-state: paused;
+}

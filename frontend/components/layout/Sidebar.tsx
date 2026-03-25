@@ -16,6 +16,7 @@ const navItems = [
     group: "Research",
     items: [
       { href: "/assets", label: "Assets" },
+      { href: "/markets", label: "Markets" },
       { href: "/research", label: "Research" },
     ],
   },
