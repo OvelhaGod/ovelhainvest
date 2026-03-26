@@ -104,6 +104,44 @@ def _fetch_ohlcv(symbol: str, period: str) -> list[dict]:
         return []
 
 
+@router.get("/price_history/batch")
+def get_price_history_batch(
+    symbols: str = Query(description="Comma-separated symbols e.g. VTI,GOOG,BTC"),
+    period: str = Query(default="1m", pattern="^(1d|1w|1m|3m|6m|1y)$"),
+):
+    """Return sparkline arrays (close prices only) for multiple symbols. Used for inline MiniCharts.
+
+    Returns a map: { "VTI": [321.5, 322.1, ...], "GOOG": [288.1, ...] }
+    NOTE: This route MUST be defined before /price_history/{symbol} to avoid FastAPI
+    matching 'batch' as the {symbol} path parameter.
+    """
+    symbol_list = [s.strip().upper() for s in symbols.split(",") if s.strip()]
+    if not symbol_list:
+        return {}
+
+    result: dict[str, list[float]] = {}
+    missing: list[str] = []
+
+    # Check cache first
+    for sym in symbol_list:
+        cached = _cache_get(f"sparkline:{sym}:{period}")
+        if cached is not None:
+            result[sym] = cached
+        else:
+            missing.append(sym)
+
+    # Fetch missing
+    for sym in missing:
+        data = _fetch_ohlcv(sym, period)
+        closes = [r["close"] for r in data if r["close"] is not None]
+        result[sym] = closes
+        # Only cache if we got actual data — don't cache empty to allow retry on next request
+        if len(closes) >= 2:
+            _cache_set(f"sparkline:{sym}:{period}", closes, _TTL_BY_PERIOD.get(period, 1800))
+
+    return result
+
+
 @router.get("/price_history/{symbol}")
 def get_price_history(
     symbol: str,
@@ -135,39 +173,6 @@ def get_price_history(
         "color": color,
     }
     _cache_set(cache_key, result, _TTL_BY_PERIOD.get(period, 1800))
-    return result
-
-
-@router.get("/price_history/batch")
-def get_price_history_batch(
-    symbols: str = Query(description="Comma-separated symbols e.g. VTI,GOOG,BTC"),
-    period: str = Query(default="1m", pattern="^(1d|1w|1m|3m|6m|1y)$"),
-):
-    """Return sparkline arrays (close prices only) for multiple symbols. Used for inline MiniCharts."""
-    symbol_list = [s.strip().upper() for s in symbols.split(",") if s.strip()]
-    if not symbol_list:
-        return {}
-
-    result: dict[str, list[float]] = {}
-    missing: list[str] = []
-
-    # Check cache first
-    for sym in symbol_list:
-        cached = _cache_get(f"sparkline:{sym}:{period}")
-        if cached is not None:
-            result[sym] = cached
-        else:
-            missing.append(sym)
-
-    # Fetch missing
-    for sym in missing:
-        data = _fetch_ohlcv(sym, period)
-        closes = [r["close"] for r in data if r["close"] is not None]
-        result[sym] = closes
-        # Only cache if we got actual data — don't cache empty to allow retry on next request
-        if len(closes) >= 2:
-            _cache_set(f"sparkline:{sym}:{period}", closes, _TTL_BY_PERIOD.get(period, 1800))
-
     return result
 
 

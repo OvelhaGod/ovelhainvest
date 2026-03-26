@@ -550,7 +550,7 @@ export default function AssetsPage() {
       {/* Header */}
       <div className="mb-6">
         <h1 className="text-xl font-bold text-[#f1f5f9]">Assets & Valuations</h1>
-        <p className="text-xs text-[#475569] mt-1">
+        <p className="text-sm text-[#475569] mt-1">
           Fama-French multi-factor scoring · Graham margin of safety · DCF fair values
         </p>
       </div>

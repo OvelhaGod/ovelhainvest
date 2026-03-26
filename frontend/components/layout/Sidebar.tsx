@@ -81,26 +81,25 @@ export function Sidebar() {
         borderRight: "1px solid rgba(255,255,255,0.06)",
       }}
     >
-      {/* Logo + collapse toggle */}
+      {/* Logo + collapse/expand toggle — always at top */}
       <div
-        className="flex items-center justify-between px-3 py-4"
+        className={`flex ${collapsed ? "flex-col items-center gap-1 py-3 px-1" : "items-center justify-between px-3 py-4"}`}
         style={{ borderBottom: "1px solid rgba(255,255,255,0.06)" }}
       >
-        <div className={`flex items-center gap-2 min-w-0 ${collapsed ? "justify-center w-full" : ""}`}>
+        <div className={`flex items-center gap-2 min-w-0 ${collapsed ? "justify-center" : ""}`}>
           <span className="text-[#10b981] shrink-0 text-base leading-none">🐑</span>
           {!collapsed && (
             <span className="text-[#10b981] font-semibold text-sm tracking-tight truncate">OvelhaInvest</span>
           )}
         </div>
-        {!collapsed && (
-          <button
-            onClick={toggle}
-            className="shrink-0 text-white/30 hover:text-white/60 transition-colors p-0.5 rounded"
-            aria-label="Collapse sidebar"
-          >
-            <ChevronLeft size={14} />
-          </button>
-        )}
+        {/* Toggle button — always at top, below logo when collapsed */}
+        <button
+          onClick={toggle}
+          className="shrink-0 text-white/30 hover:text-white/60 transition-colors p-0.5 rounded"
+          aria-label={collapsed ? "Expand sidebar" : "Collapse sidebar"}
+        >
+          {collapsed ? <ChevronRight size={14} /> : <ChevronLeft size={14} />}
+        </button>
       </div>
 
       {/* Nav */}
@@ -147,17 +146,6 @@ export function Sidebar() {
         className="px-2 py-3 space-y-1"
         style={{ borderTop: "1px solid rgba(255,255,255,0.06)" }}
       >
-        {/* Expand button when collapsed */}
-        {collapsed && (
-          <button
-            onClick={toggle}
-            className="w-full flex justify-center text-white/30 hover:text-white/60 transition-colors py-1 rounded"
-            aria-label="Expand sidebar"
-          >
-            <ChevronRight size={14} />
-          </button>
-        )}
-
         <div className={`flex items-center gap-2 px-1 py-1 rounded-lg ${collapsed ? "justify-center" : ""}`}>
           <div className="w-6 h-6 rounded-full bg-[rgba(16,185,129,0.15)] border border-[rgba(16,185,129,0.25)] flex items-center justify-center shrink-0">
             <User size={11} className="text-[#10b981]" />
