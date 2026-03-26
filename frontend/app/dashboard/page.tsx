@@ -139,7 +139,7 @@ export default function DashboardPage() {
   } = useSWR<DailyStatusResponse>(
     "/daily_status",
     fetcher,
-    { refreshInterval: 60_000 }
+    { refreshInterval: 60_000, dedupingInterval: 5_000 }
   );
 
   const loading = isLoading;

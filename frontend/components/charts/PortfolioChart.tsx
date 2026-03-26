@@ -54,14 +54,27 @@ export function PortfolioChart({
 }: PortfolioChartProps) {
   const [period, setPeriod] = useState<Period>(defaultPeriod);
 
-  const { data, isLoading } = useSWR<PortfolioHistoryData>(
+  const { data, isLoading, error } = useSWR<PortfolioHistoryData>(
     `/portfolio_history?period=${PERIOD_API[period]}`,
     fetcher,
     { refreshInterval: CACHE_TTL.MEDIUM }
   );
 
-  if (isLoading) return <SkeletonChart height={height + 40} />;
-  if (!data?.portfolio_indexed?.length) {
+  // Show skeleton only on the initial load when no data has been cached yet.
+  // Using `isLoading && !data` prevents the skeleton from re-appearing during
+  // background revalidations when stale data is already rendered.
+  if (isLoading && !data) return <SkeletonChart height={height + 40} />;
+  if (error) {
+    return (
+      <div
+        className="flex items-center justify-center text-white/20 text-xs rounded-xl border border-white/[0.06]"
+        style={{ height, background: "rgba(255,255,255,0.02)" }}
+      >
+        Unable to load chart data
+      </div>
+    );
+  }
+  if (!data?.data?.length) {
     return (
       <div
         className="flex items-center justify-center text-white/20 text-xs rounded-xl border border-white/[0.06]"
@@ -74,12 +87,12 @@ export function PortfolioChart({
 
   // Merge all series by date
   const allDates = new Set<string>();
-  data.portfolio_indexed.forEach((d) => allDates.add(d.date));
-  Object.values(data.benchmarks).forEach((arr) => arr.forEach((d) => allDates.add(d.date)));
+  (data.portfolio_indexed ?? []).forEach((d) => allDates.add(d.date));
+  Object.values(data.benchmarks ?? {}).forEach((arr) => arr.forEach((d) => allDates.add(d.date)));
 
-  const portMap = Object.fromEntries(data.portfolio_indexed.map((d) => [d.date, d.value]));
+  const portMap = Object.fromEntries((data.portfolio_indexed ?? []).map((d) => [d.date, d.value]));
   const benchMaps: Record<string, Record<string, number>> = {};
-  for (const [sym, arr] of Object.entries(data.benchmarks)) {
+  for (const [sym, arr] of Object.entries(data.benchmarks ?? {})) {
     benchMaps[sym] = Object.fromEntries(arr.map((d) => [d.date, d.value]));
   }
 
