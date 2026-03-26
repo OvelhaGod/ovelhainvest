@@ -72,7 +72,7 @@
 @theme inline {
   --color-background: var(--color-background);
   --color-foreground: var(--color-on-surface);
-  --font-sans: var(--font-geist-mono, "JetBrains Mono", monospace);
+  --font-sans: var(--font-geist, system-ui, -apple-system, sans-serif);
   --font-mono: var(--font-geist-mono, "JetBrains Mono", monospace);
 
   /* Stitch colors as Tailwind utilities */
@@ -99,8 +99,30 @@ html {
 body {
   background-color: var(--color-background);
   color: var(--color-on-surface);
-  font-family: "JetBrains Mono", "Fira Code", monospace;
+  font-family: var(--font-sans, system-ui, sans-serif);
   font-size: 0.875rem;
+  line-height: 1.6;
+  letter-spacing: -0.01em;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* Financial numbers, tickers, prices — always mono */
+.font-mono, code, .tabular-nums {
+  font-family: var(--font-mono, "JetBrains Mono", monospace);
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0;
+}
+
+/* Skeleton shimmer */
+@keyframes shimmer {
+  0%   { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
+.skeleton {
+  background: linear-gradient(90deg, rgba(255,255,255,0.04) 25%, rgba(255,255,255,0.08) 50%, rgba(255,255,255,0.04) 75%);
+  background-size: 200% 100%;
+  animation: shimmer 1.5s infinite;
 }
 
 /* Glassmorphism base */

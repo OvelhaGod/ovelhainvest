@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { JetBrains_Mono } from "next/font/google";
+import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import { Sidebar } from "@/components/layout/Sidebar";
 import { MobileNav } from "@/components/layout/MobileNav";
@@ -10,10 +10,16 @@ import { SWRProvider } from "@/lib/swr-config";
 import { SnapshotInit } from "@/components/pwa/SnapshotInit";
 import { UserProvider } from "@/lib/user-context";
 
-const jetbrainsMono = JetBrains_Mono({
+const geist = Geist({
+  variable: "--font-geist",
+  subsets: ["latin"],
+  display: "swap",
+});
+
+const geistMono = Geist_Mono({
   variable: "--font-geist-mono",
   subsets: ["latin"],
-  weight: ["400", "500", "700"],
+  display: "swap",
 });
 
 export const metadata: Metadata = {
@@ -31,12 +37,12 @@ export default function RootLayout({
   children,
 }: Readonly<{ children: React.ReactNode }>) {
   return (
-    <html lang="en" className={`${jetbrainsMono.variable} h-full dark`}>
+    <html lang="en" className={`${geist.variable} ${geistMono.variable} h-full dark`}>
       <head>
         <meta name="theme-color" content="#050508" />
         <meta name="mobile-web-app-capable" content="yes" />
       </head>
-      <body className="min-h-full flex bg-[hsl(222.2,84%,4.9%)] text-[hsl(210,40%,98%)]">
+      <body className="min-h-full flex bg-[hsl(222.2,84%,4.9%)] text-[hsl(210,40%,98%)] font-sans">
         <PWAInit />
         <SnapshotInit />
         <OfflineBanner />
