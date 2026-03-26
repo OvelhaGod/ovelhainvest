@@ -22,6 +22,7 @@ async function postFetcher(path: string) {
   return res.json();
 }
 import { OIErrorState } from "@/components/ui/oi";
+import { PortfolioChart } from "@/components/charts/PortfolioChart";
 import type { AdminStatus, AlertHistoryItem, DailyStatusResponse, SleeveWeight, ValuationSummaryResponse, VaultBalance } from "@/lib/types";
 
 // ── Design tokens (DESIGN.md) ─────────────────────────────────────────────────
@@ -369,6 +370,13 @@ export default function DashboardPage() {
             </>
           )}
         </div>
+      </div>
+
+      {/* ── Portfolio Evolution Chart ── */}
+      <div className={glassInner}>
+        <p className="text-xs text-white/40 uppercase tracking-widest mb-4">Portfolio Evolution</p>
+        <p className="text-[10px] text-white/25 mb-3">Indexed to 100 at period start · vs SPY, QQQ, ACWI</p>
+        <PortfolioChart height={200} defaultPeriod="3M" />
       </div>
 
       {/* ── Middle row: Donut + Vaults ── */}
