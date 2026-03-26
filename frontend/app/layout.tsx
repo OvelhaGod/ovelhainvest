@@ -51,7 +51,9 @@ export default function RootLayout({
         <Sidebar />
         <SWRProvider>
           <UserProvider>
-            <main className="flex-1 overflow-auto pb-16 md:pb-0">{children}</main>
+            <main className="flex-1 overflow-auto pb-16 md:pb-0">
+            <div className="max-w-[1600px] mx-auto">{children}</div>
+          </main>
           </UserProvider>
         </SWRProvider>
       </body>
