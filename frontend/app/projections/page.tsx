@@ -110,7 +110,7 @@ async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> {
   return res.json() as Promise<T>;
 }
 
-async function pollMonteCarlo(taskId: string, maxAttempts = 30): Promise<MonteCarloResult> {
+async function pollMonteCarlo(taskId: string, maxAttempts = 45): Promise<MonteCarloResult> {
   for (let i = 0; i < maxAttempts; i++) {
     await new Promise((r) => setTimeout(r, 2000));
     const data = await apiFetch<{ status: string; result?: MonteCarloResult }>(
@@ -119,7 +119,7 @@ async function pollMonteCarlo(taskId: string, maxAttempts = 30): Promise<MonteCa
     if (data.status === "complete" && data.result) return data.result;
     if (data.status === "error") throw new Error("Monte Carlo simulation failed");
   }
-  throw new Error("Monte Carlo timed out");
+  throw new Error("Monte Carlo timed out after 90s");
 }
 
 // ── Shared sub-components ──────────────────────────────────────────────────────
@@ -245,7 +245,7 @@ function MonteCarloTab() {
     try {
       const { task_id } = await apiFetch<{ task_id: string; status: string }>(
         "/simulation/monte_carlo",
-        { method: "POST", body: JSON.stringify({ monthly_contribution: c, years: y, target_value: t }) }
+        { method: "POST", body: JSON.stringify({ monthly_contribution: c, years: y, target_value: t, n_simulations: 2000 }) }
       );
       const res = await pollMonteCarlo(task_id);
       setResult(res);
@@ -267,7 +267,7 @@ function MonteCarloTab() {
         "/simulation/monte_carlo",
         {
           method: "POST",
-          body: JSON.stringify({ monthly_contribution: contribution, years, target_value: target }),
+          body: JSON.stringify({ monthly_contribution: contribution, years, target_value: target, n_simulations: 5000 }),
         }
       );
       const res = await pollMonteCarlo(task_id);

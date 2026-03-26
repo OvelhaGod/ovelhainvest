@@ -343,9 +343,16 @@ def fetch_earnings_calendar(symbols: list[str]) -> list[dict]:
 # ── helpers ────────────────────────────────────────────────────────────────────
 
 def _to_yf_symbol(symbol: str) -> str:
-    """Map internal symbol to yfinance ticker (e.g. BTC → BTC-USD)."""
+    """Map internal symbol to yfinance ticker (e.g. BTC → BTC-USD, PETR4 → PETR4.SA)."""
+    sym = symbol.upper()
     crypto_map = {"BTC": "BTC-USD", "ETH": "ETH-USD", "SOL": "SOL-USD", "LINK": "LINK-USD"}
-    return crypto_map.get(symbol.upper(), symbol)
+    if sym in crypto_map:
+        return crypto_map[sym]
+    # Brazil B3 stocks — yfinance requires .SA suffix
+    brazil_stocks = {"PETR4", "VALE3", "ITUB4", "BBDC4", "ABEV3", "MGLU3", "BBAS3", "EGIE3"}
+    if sym in brazil_stocks:
+        return f"{sym}.SA"
+    return symbol
 
 
 def _safe_float(val: Any) -> float | None:

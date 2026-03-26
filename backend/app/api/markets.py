@@ -167,7 +167,7 @@ def portfolio_vs_market(user_id: str | None = None) -> dict:
     Compare portfolio returns vs SPY / QQQ / ACWI across multiple periods.
     Uses portfolio_snapshots for portfolio returns, yfinance for benchmarks.
     """
-    cache_key = "markets:pvmarket"
+    cache_key = "markets:pvmarket:v2"
     cached = _try_redis_get(cache_key)
     if cached:
         return cached
@@ -216,23 +216,30 @@ def portfolio_vs_market(user_id: str | None = None) -> dict:
 
     start_dl = (oldest_start - timedelta(days=5)).isoformat()
     for key, sym in bench_syms.items():
-        try:
-            hist = yf.Ticker(sym).history(start=start_dl)
-            if hist.empty:
-                continue
-            hist.index = pd.to_datetime(hist.index).normalize()
-            for period, period_start in periods.items():
-                # Closest available date on or after period_start
-                after = hist[hist.index.date >= period_start]
-                if after.empty:
-                    continue
-                v_start = float(after["Close"].iloc[0])
-                v_end   = float(hist["Close"].iloc[-1])
-                if v_start <= 0:
-                    continue
-                bench_returns[key][period] = round((v_end - v_start) / v_start, 6)
-        except Exception as exc:
-            logger.warning("Benchmark %s failed: %s", sym, exc)
+        # Try up to 2 times with explicit ticker object to avoid silent failures
+        for attempt in range(2):
+            try:
+                ticker = yf.Ticker(sym)
+                hist = ticker.history(start=start_dl, auto_adjust=True)
+                if hist.empty:
+                    logger.warning("Benchmark %s returned empty history (attempt %d)", sym, attempt + 1)
+                    if attempt == 0:
+                        continue  # retry once
+                    break
+                hist.index = pd.to_datetime(hist.index).normalize()
+                for period, period_start in periods.items():
+                    # Closest available date on or after period_start
+                    after = hist[hist.index.date >= period_start]
+                    if after.empty:
+                        continue
+                    v_start = float(after["Close"].iloc[0])
+                    v_end   = float(hist["Close"].iloc[-1])
+                    if v_start <= 0:
+                        continue
+                    bench_returns[key][period] = round((v_end - v_start) / v_start, 6)
+                break  # success — no need to retry
+            except Exception as exc:
+                logger.warning("Benchmark %s failed (attempt %d): %s", sym, attempt + 1, exc)
 
     # Alpha vs SPY
     alpha: dict = {}
@@ -253,7 +260,9 @@ def portfolio_vs_market(user_id: str | None = None) -> dict:
         "alpha_vs_spy": alpha,
         "updated_at": datetime.now(timezone.utc).isoformat(),
     }
-    _try_redis_set(cache_key, result, ttl=300)
+    # Only cache if we got data for at least SPY — don't cache incomplete benchmark results
+    if bench_returns["spy"]:
+        _try_redis_set(cache_key, result, ttl=300)
     return result
 
 
