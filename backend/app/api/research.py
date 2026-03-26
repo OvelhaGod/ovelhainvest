@@ -1,15 +1,18 @@
 """
 Research API endpoints.
 
-GET /news/feed                  — News feed for held/watched assets
-GET /news/earnings_calendar     — Earnings calendar for next 30 days
+GET  /news/feed                  — News feed for held/watched assets
+GET  /news/earnings_calendar     — Earnings calendar for next 30 days
+GET  /news/{symbol}              — News for a specific symbol
+POST /news/summarize             — AI summary of a news item
 """
 
 from __future__ import annotations
 
 import logging
 
-from fastapi import APIRouter, Query
+from fastapi import APIRouter, HTTPException, Query
+from pydantic import BaseModel
 
 from app.config import get_default_user_id as _get_default_user_id
 from app.db.supabase_client import get_supabase_client
@@ -101,3 +104,58 @@ def earnings_calendar(
     except Exception as exc:
         logger.warning("earnings_calendar failed: %s", exc)
         return []
+
+
+@router.get("/news/{symbol}")
+def news_by_symbol(symbol: str, limit: int = Query(default=5)) -> list[dict]:
+    """Return recent news for a specific symbol."""
+    try:
+        items = fetch_news(symbol, limit=limit)
+        return [{**item, "related_symbol": symbol} for item in items]
+    except Exception as exc:
+        logger.debug("news_by_symbol failed for %s: %s", symbol, exc)
+        return []
+
+
+class SummarizeRequest(BaseModel):
+    headline: str | None = None
+    summary: str | None = None
+    symbol: str | None = None
+
+
+@router.post("/news/summarize")
+def summarize_news(req: SummarizeRequest) -> dict:
+    """
+    Generate a concise AI-powered investment-focused summary of a news item.
+    Uses Claude API. Returns {summary: str} or raises 503 if AI unavailable.
+    """
+    text = req.summary or req.headline or ""
+    if not text.strip():
+        raise HTTPException(status_code=400, detail="No content to summarize")
+
+    try:
+        import anthropic
+        from app.config import get_settings
+        settings = get_settings()
+        if not settings.anthropic_api_key:
+            raise HTTPException(status_code=503, detail="ANTHROPIC_API_KEY not configured")
+        client = anthropic.Anthropic(api_key=settings.anthropic_api_key)
+        symbol_ctx = f" The news relates to {req.symbol}." if req.symbol else ""
+        prompt = (
+            f"Summarize the following news item in 2-3 sentences from an investor's perspective."
+            f"{symbol_ctx} Focus on what matters for portfolio decisions (valuation, risk, opportunity).\n\n"
+            f"Headline: {req.headline or 'N/A'}\n"
+            f"Content: {text[:1500]}"
+        )
+        message = client.messages.create(
+            model="claude-sonnet-4-20250514",
+            max_tokens=256,
+            messages=[{"role": "user", "content": prompt}],
+        )
+        summary_text = message.content[0].text if message.content else "Summary unavailable."
+        return {"summary": summary_text}
+    except HTTPException:
+        raise
+    except Exception as exc:
+        logger.warning("AI summarize failed: %s", exc)
+        raise HTTPException(status_code=503, detail=f"AI unavailable: {exc}")

@@ -264,17 +264,29 @@ def fetch_news(symbol: str, limit: int = 5) -> list[dict]:
             resp.raise_for_status()
             items = resp.json()
 
-        news = [
-            {
-                "headline": item.get("headline", ""),
-                "summary": item.get("summary", ""),
+        HIGH_IMPACT_KEYWORDS = {
+            "earnings", "revenue", "profit", "loss", "guidance", "forecast", "acquisition",
+            "merger", "ipo", "bankruptcy", "layoff", "ceo", "fed", "rate", "inflation",
+            "beat", "miss", "upgrade", "downgrade", "crash", "rally", "surge", "plunge",
+        }
+        news = []
+        for item in items[:20]:
+            headline = item.get("headline", "")
+            summary = item.get("summary", "")
+            # Heuristic importance score 1-10
+            text_lower = (headline + " " + summary).lower()
+            keyword_hits = sum(1 for kw in HIGH_IMPACT_KEYWORDS if kw in text_lower)
+            has_summary = bool(summary and len(summary) > 50)
+            importance = min(10, keyword_hits * 2 + (3 if has_summary else 1))
+            news.append({
+                "headline": headline,
+                "summary": summary,
                 "url": item.get("url", ""),
                 "source": item.get("source", ""),
                 "published_at": datetime.fromtimestamp(item["datetime"]).isoformat() if item.get("datetime") else None,
                 "category": item.get("category", ""),
-            }
-            for item in items[:20]
-        ]
+                "importance_score": importance,
+            })
         _set_cached(cache_key, news, TTL_NEWS)
         return news[:limit]
 
