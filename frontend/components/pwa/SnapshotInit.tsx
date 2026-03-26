@@ -12,7 +12,11 @@ export function SnapshotInit() {
     const url =
       (process.env.NEXT_PUBLIC_API_URL ?? "https://investapi.ovelha.us") +
       "/performance/snapshot";
-    fetch(url, { method: "POST" }).catch(() => {});
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), 5000);
+    fetch(url, { method: "POST", signal: controller.signal })
+      .catch(() => {})
+      .finally(() => clearTimeout(timer));
   }, []);
 
   return null;

@@ -257,7 +257,7 @@ export default function DashboardPage() {
             {regime.label}
           </div>
           {status?.economic_season && status.economic_season !== "normal" && (
-            <p className="text-[10px] text-white/30 font-mono pr-1">
+            <p className="text-xs text-white/30 font-mono pr-1">
               {seasonIcon(status.economic_season)} {seasonLabel(status.economic_season)}
             </p>
           )}
@@ -265,7 +265,7 @@ export default function DashboardPage() {
       </div>
 
       {/* ── Top metrics row ── */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         {/* Net Worth */}
         <div
           className={`${glassInner} relative overflow-hidden net-worth-card`}
@@ -375,7 +375,7 @@ export default function DashboardPage() {
       {/* ── Portfolio Evolution Chart ── */}
       <div className={glassInner}>
         <p className="text-xs text-white/40 uppercase tracking-widest mb-4">Portfolio Evolution</p>
-        <p className="text-[10px] text-white/25 mb-3">Indexed to 100 at period start · vs SPY, QQQ, ACWI</p>
+        <p className="text-xs text-white/25 mb-3">Indexed to 100 at period start · vs SPY, QQQ, ACWI</p>
         <PortfolioChart height={200} defaultPeriod="3M" />
       </div>
 
@@ -517,7 +517,7 @@ export default function DashboardPage() {
             <div className="flex items-center justify-between mb-3">
               <p className="text-xs text-white/40 uppercase tracking-widest">Top Opportunities</p>
               {valSummary.opportunity_count > 0 && (
-                <span className="text-[10px] px-1.5 py-0.5 rounded-full border border-primary/30 text-primary bg-primary/8">
+                <span className="text-xs px-1.5 py-0.5 rounded-full border border-primary/30 text-primary bg-primary/8">
                   {valSummary.opportunity_count} active
                 </span>
               )}
@@ -553,7 +553,7 @@ export default function DashboardPage() {
                 );
               })}
             </div>
-            <a href="/assets" className="text-[10px] text-white/30 hover:text-white/50 mt-2 block transition-colors">
+            <a href="/assets" className="text-xs text-white/30 hover:text-white/50 mt-2 block transition-colors">
               View all assets →
             </a>
           </div>
@@ -563,7 +563,7 @@ export default function DashboardPage() {
             <div className="flex items-center justify-between mb-3">
               <p className="text-xs text-white/40 uppercase tracking-widest">Valuation Universe</p>
               {valSummary.as_of_date && (
-                <span className="text-[10px] text-white/25 font-mono">
+                <span className="text-xs text-white/25 font-mono">
                   {new Date(valSummary.as_of_date).toLocaleDateString()}
                 </span>
               )}
@@ -576,14 +576,14 @@ export default function DashboardPage() {
               ].map(({ label, value, color }) => (
                 <div key={label} className="text-center rounded-xl bg-white/[0.02] p-2">
                   <div className="text-lg font-mono font-bold" style={{ color }}>{value}</div>
-                  <div className="text-[10px] text-white/30">{label}</div>
+                  <div className="text-xs text-white/30">{label}</div>
                 </div>
               ))}
             </div>
             {/* MoS distribution bar */}
             {valSummary.margin_of_safety_distribution && (
               <div>
-                <p className="text-[10px] text-white/30 mb-1.5">Margin of Safety Distribution</p>
+                <p className="text-xs text-white/30 mb-1.5">Margin of Safety Distribution</p>
                 <div className="flex h-2 rounded-full overflow-hidden gap-px">
                   {[
                     { key: "above_20pct", color: "#10b981" },
@@ -622,7 +622,7 @@ export default function DashboardPage() {
         <div className={glassInner}>
           <div className="flex items-center justify-between mb-3">
             <p className="text-xs text-white/40 uppercase tracking-widest">Recent Alerts</p>
-            <a href="/config" className="text-[10px] text-white/30 hover:text-white/50 transition-colors">
+            <a href="/config" className="text-xs text-white/30 hover:text-white/50 transition-colors">
               Manage rules →
             </a>
           </div>
@@ -650,7 +650,7 @@ export default function DashboardPage() {
                       </span>
                     )}
                   </div>
-                  <span className="text-[10px] text-white/30 font-mono">{timeStr}</span>
+                  <span className="text-xs text-white/30 font-mono">{timeStr}</span>
                 </div>
               );
             })}
@@ -665,14 +665,14 @@ export default function DashboardPage() {
       >
         <div className="flex items-center justify-between mb-3">
           <p className="text-xs text-white/40 uppercase tracking-widest">20-Year Projection Preview</p>
-          <a href="/projections" className="text-[10px] text-violet-400/70 hover:text-violet-400 transition-colors">
+          <a href="/projections" className="text-xs text-violet-400/70 hover:text-violet-400 transition-colors">
             Run full simulation →
           </a>
         </div>
         {mcPreview ? (
           <div className="grid grid-cols-3 gap-4">
             <div>
-              <p className="text-[10px] text-white/30 mb-1">Median at 10yr</p>
+              <p className="text-xs text-white/30 mb-1">Median at 10yr</p>
               <p className="text-xl font-bold font-mono text-white/90">
                 {mcPreview.median_10yr >= 1_000_000
                   ? `$${(mcPreview.median_10yr / 1_000_000).toFixed(2)}M`
@@ -680,7 +680,7 @@ export default function DashboardPage() {
               </p>
             </div>
             <div>
-              <p className="text-[10px] text-white/30 mb-1">Median at 20yr</p>
+              <p className="text-xs text-white/30 mb-1">Median at 20yr</p>
               <p className="text-xl font-bold font-mono" style={{ color: "#10b981" }}>
                 {mcPreview.median_20yr >= 1_000_000
                   ? `$${(mcPreview.median_20yr / 1_000_000).toFixed(2)}M`
@@ -688,7 +688,7 @@ export default function DashboardPage() {
               </p>
             </div>
             <div>
-              <p className="text-[10px] text-white/30 mb-1">4% SWR Survival</p>
+              <p className="text-xs text-white/30 mb-1">4% SWR Survival</p>
               <div className="flex items-center gap-2">
                 <p
                   className="text-xl font-bold font-mono"
@@ -701,7 +701,7 @@ export default function DashboardPage() {
                   {(mcPreview.swr_probability * 100).toFixed(0)}%
                 </p>
                 <span
-                  className="text-[10px] px-1.5 py-0.5 rounded-full font-medium"
+                  className="text-xs px-1.5 py-0.5 rounded-full font-medium"
                   style={{
                     background: mcPreview.swr_probability >= 0.80 ? "rgba(16,185,129,0.1)" : "rgba(245,158,11,0.1)",
                     color: mcPreview.swr_probability >= 0.80 ? "#34d399" : "#fbbf24",
@@ -737,19 +737,19 @@ export default function DashboardPage() {
             <div className="flex items-center gap-2">
               {taxSnapshot.darf_triggered && (
                 <span
-                  className="text-[10px] px-1.5 py-0.5 rounded-full font-medium border"
+                  className="text-xs px-1.5 py-0.5 rounded-full font-medium border"
                   style={{ background: "rgba(239,68,68,0.1)", color: "#f87171", borderColor: "rgba(239,68,68,0.2)" }}
                 >
                   🇧🇷 DARF Due
                 </span>
               )}
-              <span className="text-[10px] text-white/30 hover:text-white/50 transition-colors">View details →</span>
+              <span className="text-xs text-white/30 hover:text-white/50 transition-colors">View details →</span>
             </div>
           </div>
           <div className="grid grid-cols-4 gap-4">
             {/* Unrealized Gains */}
             <div>
-              <p className="text-[10px] text-white/30 mb-1">Unrealized Gains</p>
+              <p className="text-xs text-white/30 mb-1">Unrealized Gains</p>
               <p
                 className="text-lg font-bold font-mono"
                 style={{ color: taxSnapshot.unrealized_gain >= 0 ? "#10b981" : "#ef4444" }}
@@ -760,26 +760,26 @@ export default function DashboardPage() {
             </div>
             {/* Worst-Case Tax */}
             <div>
-              <p className="text-[10px] text-white/30 mb-1">Worst-Case Tax</p>
+              <p className="text-xs text-white/30 mb-1">Worst-Case Tax</p>
               <p className="text-lg font-bold font-mono text-tertiary">
                 {fmtUSD(taxSnapshot.worst_case_tax)}
               </p>
             </div>
             {/* Harvest Savings */}
             <div>
-              <p className="text-[10px] text-white/30 mb-1">Harvest Savings</p>
+              <p className="text-xs text-white/30 mb-1">Harvest Savings</p>
               <p className="text-lg font-bold font-mono text-primary">
                 {taxSnapshot.harvest_savings > 0 ? fmtUSD(taxSnapshot.harvest_savings) : "—"}
               </p>
               {taxSnapshot.harvest_count > 0 && (
-                <p className="text-[10px] text-primary/60 mt-0.5">
+                <p className="text-xs text-primary/60 mt-0.5">
                   {taxSnapshot.harvest_count} candidate{taxSnapshot.harvest_count !== 1 ? "s" : ""}
                 </p>
               )}
             </div>
             {/* Brazil DARF */}
             <div>
-              <p className="text-[10px] text-white/30 mb-1">Brazil DARF</p>
+              <p className="text-xs text-white/30 mb-1">Brazil DARF</p>
               <div className="flex items-center gap-2">
                 <p
                   className="text-lg font-bold font-mono"
@@ -803,7 +803,7 @@ export default function DashboardPage() {
                   />
                 </div>
               </div>
-              <p className="text-[10px] text-white/25 mt-0.5">of R$20k limit</p>
+              <p className="text-xs text-white/25 mt-0.5">of R$20k limit</p>
             </div>
           </div>
         </a>
@@ -818,37 +818,37 @@ export default function DashboardPage() {
         >
           <div className="flex items-center justify-between mb-3">
             <p className="text-xs text-white/40 uppercase tracking-widest">Decision Journal</p>
-            <span className="text-[10px] text-white/30 hover:text-white/50 transition-colors">View journal →</span>
+            <span className="text-xs text-white/30 hover:text-white/50 transition-colors">View journal →</span>
           </div>
           <div className="grid grid-cols-3 gap-4">
             <div>
-              <p className="text-[10px] text-white/30 mb-1">Followed System</p>
+              <p className="text-xs text-white/30 mb-1">Followed System</p>
               <p className="text-lg font-bold font-mono text-primary">
                 {journalAccuracy.followed_count}
                 <span className="text-xs text-white/30 ml-1">decisions</span>
               </p>
               {journalAccuracy.avg_followed_30d != null && (
-                <p className="text-[10px] font-mono mt-0.5" style={{ color: journalAccuracy.avg_followed_30d >= 0 ? "#10b981" : "#ef4444" }}>
+                <p className="text-xs font-mono mt-0.5" style={{ color: journalAccuracy.avg_followed_30d >= 0 ? "#10b981" : "#ef4444" }}>
                   avg 30d: {journalAccuracy.avg_followed_30d >= 0 ? "+" : ""}
                   {(journalAccuracy.avg_followed_30d * 100).toFixed(1)}%
                 </p>
               )}
             </div>
             <div>
-              <p className="text-[10px] text-white/30 mb-1">Overrode System</p>
+              <p className="text-xs text-white/30 mb-1">Overrode System</p>
               <p className="text-lg font-bold font-mono text-tertiary">
                 {journalAccuracy.overrode_count}
                 <span className="text-xs text-white/30 ml-1">overrides</span>
               </p>
               {journalAccuracy.avg_overrode_30d != null && (
-                <p className="text-[10px] font-mono mt-0.5" style={{ color: journalAccuracy.avg_overrode_30d >= 0 ? "#10b981" : "#ef4444" }}>
+                <p className="text-xs font-mono mt-0.5" style={{ color: journalAccuracy.avg_overrode_30d >= 0 ? "#10b981" : "#ef4444" }}>
                   avg 30d: {journalAccuracy.avg_overrode_30d >= 0 ? "+" : ""}
                   {(journalAccuracy.avg_overrode_30d * 100).toFixed(1)}%
                 </p>
               )}
             </div>
             <div>
-              <p className="text-[10px] text-white/30 mb-1">System Edge</p>
+              <p className="text-xs text-white/30 mb-1">System Edge</p>
               {journalAccuracy.system_outperformance_30d != null ? (
                 <>
                   <p
@@ -858,7 +858,7 @@ export default function DashboardPage() {
                     {journalAccuracy.system_outperformance_30d >= 0 ? "+" : ""}
                     {(journalAccuracy.system_outperformance_30d * 100).toFixed(1)}%
                   </p>
-                  <p className="text-[10px] text-white/25 mt-0.5">system vs overrides</p>
+                  <p className="text-xs text-white/25 mt-0.5">system vs overrides</p>
                 </>
               ) : (
                 <p className="text-lg font-bold font-mono text-white/20">—</p>
@@ -944,10 +944,10 @@ function VaultCard({ vault }: { vault: VaultBalance }) {
           {cfg.icon} {cfg.label}
         </span>
         {!vault.is_investable && (
-          <span className="text-[10px] text-white/30 border border-white/10 rounded px-1.5 py-0.5">NON-INVESTABLE</span>
+          <span className="text-xs text-white/30 border border-white/10 rounded px-1.5 py-0.5">NON-INVESTABLE</span>
         )}
         {vault.approval_required && vault.is_investable && (
-          <span className="text-[10px] text-tertiary/70 border border-tertiary/20 rounded px-1.5 py-0.5">APPROVAL REQ.</span>
+          <span className="text-xs text-tertiary/70 border border-tertiary/20 rounded px-1.5 py-0.5">APPROVAL REQ.</span>
         )}
       </div>
 
@@ -963,7 +963,7 @@ function VaultCard({ vault }: { vault: VaultBalance }) {
               style={{ width: `${Math.min(progress * 100, 100)}%`, background: cfg.color, opacity: 0.7 }}
             />
           </div>
-          <p className="text-[10px] text-white/25 mt-1 font-mono">
+          <p className="text-xs text-white/25 mt-1 font-mono">
             {(progress * 100).toFixed(0)}% of min {fmtUSD(vault.min_balance)}
           </p>
         </div>
