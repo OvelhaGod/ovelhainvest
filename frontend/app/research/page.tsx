@@ -11,6 +11,7 @@ type NewsItem = {
   published_at?: string;
   category?: string;
   related_symbol?: string;
+  importance_score?: number | null;
 };
 
 type EarningsEvent = {
@@ -27,6 +28,12 @@ function GlassCard({ children, className = "" }: { children: React.ReactNode; cl
       {children}
     </div>
   );
+}
+
+function importanceBadge(score: number | null | undefined): { label: string; color: string; bg: string; border: string } {
+  if (score == null || score < 3) return { label: "General", color: "#475569", bg: "rgba(71,85,105,0.12)", border: "rgba(71,85,105,0.2)" };
+  if (score < 6) return { label: "Relevant", color: "#6366f1", bg: "rgba(99,102,241,0.12)", border: "rgba(99,102,241,0.25)" };
+  return { label: "High Impact", color: "#10b981", bg: "rgba(16,185,129,0.12)", border: "rgba(16,185,129,0.3)" };
 }
 
 function timeAgo(iso: string | undefined): string {
@@ -60,6 +67,10 @@ export default function ResearchPage() {
   const [loadingEarnings, setLoadingEarnings] = useState(true);
   const [newsError, setNewsError] = useState<string | null>(null);
   const [earningsError, setEarningsError] = useState<string | null>(null);
+  const [expandedIdx, setExpandedIdx] = useState<number | null>(null);
+  const [aiSummaries, setAiSummaries] = useState<Record<number, string>>({});
+  const [aiLoading, setAiLoading] = useState<Record<number, boolean>>({});
+  const [filterRelevance, setFilterRelevance] = useState<"all" | "relevant" | "high">("all");
 
   useEffect(() => {
     api.newsFeed({ limit: 40 })
@@ -84,9 +95,27 @@ export default function ResearchPage() {
       <div className="grid grid-cols-5 gap-5">
         {/* ── News Feed (left, 3/5 width) ─────────────────────────── */}
         <div className="col-span-3 space-y-3">
-          <h2 className="text-xs font-semibold text-[#475569] uppercase tracking-wider">
-            News Feed
-          </h2>
+          <div className="flex items-center justify-between">
+            <h2 className="text-xs font-semibold text-[#475569] uppercase tracking-wider">
+              News Feed
+            </h2>
+            {/* Relevance filter */}
+            <div className="flex gap-1">
+              {(["all", "relevant", "high"] as const).map((f) => (
+                <button
+                  key={f}
+                  onClick={() => setFilterRelevance(f)}
+                  className={`px-2 py-0.5 text-[10px] rounded font-mono transition-colors capitalize ${
+                    filterRelevance === f
+                      ? "bg-white/[0.10] text-white/90"
+                      : "text-white/30 hover:text-white/60"
+                  }`}
+                >
+                  {f === "all" ? "All" : f === "relevant" ? "Relevant+" : "High Impact"}
+                </button>
+              ))}
+            </div>
+          </div>
 
           {loadingNews && (
             <div className="space-y-3">
@@ -114,55 +143,119 @@ export default function ResearchPage() {
             </GlassCard>
           )}
 
-          {!loadingNews && news.map((item, i) => (
-            <div
-              key={i}
-              className="glass-card p-4 hover:bg-white/[0.06] transition-all duration-200 group"
-            >
-              <div className="flex items-start justify-between gap-3">
-                <div className="flex-1 min-w-0">
-                  {/* Symbol badge + source row */}
-                  <div className="flex items-center gap-2 mb-1.5">
-                    {item.related_symbol && (
-                      <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded bg-indigo-500/15 text-indigo-400 border border-indigo-500/25 font-mono">
-                        {item.related_symbol.replace("-USD", "")}
-                      </span>
-                    )}
-                    {item.source && (
-                      <span className="text-[10px] text-[#475569]">{item.source}</span>
-                    )}
-                    {item.category && (
-                      <span className="text-[10px] text-[#475569]">{item.category}</span>
-                    )}
-                    <span className="text-[10px] text-[#334155] ml-auto">{timeAgo(item.published_at)}</span>
+          {!loadingNews && news
+            .filter((item) => {
+              if (filterRelevance === "high") return (item.importance_score ?? 0) >= 6;
+              if (filterRelevance === "relevant") return (item.importance_score ?? 0) >= 3;
+              return true;
+            })
+            .map((item, i) => {
+              const badge = importanceBadge(item.importance_score);
+              const isExpanded = expandedIdx === i;
+              const aiSummary = aiSummaries[i];
+              const isAiLoading = aiLoading[i];
+
+              return (
+                <div
+                  key={i}
+                  className={`glass-card p-4 transition-all duration-200 group cursor-pointer ${isExpanded ? "ring-1 ring-white/[0.10]" : "hover:bg-white/[0.04]"}`}
+                  onClick={() => setExpandedIdx(isExpanded ? null : i)}
+                >
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="flex-1 min-w-0">
+                      {/* Symbol badge + source + impact badge row */}
+                      <div className="flex items-center gap-2 mb-1.5 flex-wrap">
+                        {item.related_symbol && (
+                          <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded bg-indigo-500/15 text-indigo-400 border border-indigo-500/25 font-mono">
+                            {item.related_symbol.replace("-USD", "")}
+                          </span>
+                        )}
+                        {/* Impact badge */}
+                        <span
+                          className="text-[9px] font-semibold px-1.5 py-0.5 rounded border"
+                          style={{ color: badge.color, background: badge.bg, borderColor: badge.border }}
+                        >
+                          {badge.label}
+                        </span>
+                        {item.source && (
+                          <span className="text-[10px] text-[#475569]">{item.source}</span>
+                        )}
+                        <span className="text-[10px] text-[#334155] ml-auto">{timeAgo(item.published_at)}</span>
+                      </div>
+
+                      {/* Headline */}
+                      <p className={`text-sm font-medium text-[#e2e8f0] group-hover:text-[#f1f5f9] leading-snug transition-colors ${isExpanded ? "" : "line-clamp-2"}`}>
+                        {item.headline || "Untitled"}
+                      </p>
+
+                      {/* Summary (always show; expand removes line-clamp) */}
+                      {item.summary && (
+                        <p className={`text-xs text-[#64748b] mt-1 leading-relaxed ${isExpanded ? "" : "line-clamp-2"}`}>
+                          {item.summary}
+                        </p>
+                      )}
+
+                      {/* Expanded content */}
+                      {isExpanded && (
+                        <div className="mt-3 space-y-2" onClick={(e) => e.stopPropagation()}>
+                          {/* AI Summary on demand */}
+                          {aiSummary ? (
+                            <div className="rounded-lg p-3 bg-violet-500/[0.06] border border-violet-500/20">
+                              <p className="text-[10px] text-violet-400 font-semibold uppercase tracking-wide mb-1">AI Summary</p>
+                              <p className="text-xs text-[#94a3b8] leading-relaxed">{aiSummary}</p>
+                            </div>
+                          ) : (
+                            <button
+                              disabled={isAiLoading}
+                              onClick={async () => {
+                                setAiLoading((prev) => ({ ...prev, [i]: true }));
+                                try {
+                                  const res = await fetch(
+                                    `${process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000"}/news/summarize`,
+                                    {
+                                      method: "POST",
+                                      headers: { "Content-Type": "application/json" },
+                                      body: JSON.stringify({ headline: item.headline, summary: item.summary, symbol: item.related_symbol }),
+                                    }
+                                  );
+                                  if (res.ok) {
+                                    const d = await res.json();
+                                    setAiSummaries((prev) => ({ ...prev, [i]: d.summary ?? d.text ?? "No summary returned." }));
+                                  }
+                                } catch {
+                                  setAiSummaries((prev) => ({ ...prev, [i]: "AI summary unavailable." }));
+                                } finally {
+                                  setAiLoading((prev) => ({ ...prev, [i]: false }));
+                                }
+                              }}
+                              className="text-[10px] px-2.5 py-1 rounded-lg bg-violet-500/10 border border-violet-500/20 text-violet-400 hover:bg-violet-500/15 transition-colors disabled:opacity-50"
+                            >
+                              {isAiLoading ? "Generating..." : "✦ AI Summary"}
+                            </button>
+                          )}
+                          {/* External link */}
+                          {item.url && (
+                            <a
+                              href={item.url}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="text-[10px] text-[#475569] hover:text-[#94a3b8] transition-colors"
+                            >
+                              Read full article →
+                            </a>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                    {/* Expand chevron */}
+                    <span className="text-[#334155] text-xs mt-0.5 shrink-0 transition-transform" style={{ transform: isExpanded ? "rotate(180deg)" : "none" }}>
+                      ↓
+                    </span>
                   </div>
-
-                  {/* Headline */}
-                  {item.url ? (
-                    <a
-                      href={item.url}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="text-sm font-medium text-[#e2e8f0] group-hover:text-[#f1f5f9] leading-snug transition-colors line-clamp-2"
-                    >
-                      {item.headline || "Untitled"}
-                    </a>
-                  ) : (
-                    <p className="text-sm font-medium text-[#e2e8f0] leading-snug line-clamp-2">
-                      {item.headline || "Untitled"}
-                    </p>
-                  )}
-
-                  {/* Summary */}
-                  {item.summary && (
-                    <p className="text-xs text-[#64748b] mt-1 line-clamp-2 leading-relaxed">
-                      {item.summary}
-                    </p>
-                  )}
                 </div>
-              </div>
-            </div>
-          ))}
+              );
+            })
+          }
         </div>
 
         {/* ── Earnings Calendar (right, 2/5 width) ────────────────── */}

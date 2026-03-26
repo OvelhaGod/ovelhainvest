@@ -97,7 +97,7 @@ async def add_cache_headers(request, call_next):
 # ---------------------------------------------------------------------------
 # Routers
 # ---------------------------------------------------------------------------
-from app.api import alerts, allocation, journal, markets, performance, reports, research, simulation, tax, valuation
+from app.api import alerts, allocation, connections, journal, markets, performance, price_history, reports, research, simulation, tax, valuation
 app.include_router(allocation.router, prefix="", tags=["allocation"])
 app.include_router(valuation.router, prefix="", tags=["valuation"])
 app.include_router(performance.router, prefix="", tags=["performance"])
@@ -108,6 +108,8 @@ app.include_router(tax.router, prefix="", tags=["tax"])
 app.include_router(reports.router, prefix="", tags=["reports"])
 app.include_router(research.router, prefix="", tags=["research"])
 app.include_router(markets.router, prefix="/markets", tags=["markets"])
+app.include_router(price_history.router, prefix="", tags=["price_history"])
+app.include_router(connections.router, prefix="/connections", tags=["connections"])
 
 # ---------------------------------------------------------------------------
 # Routes

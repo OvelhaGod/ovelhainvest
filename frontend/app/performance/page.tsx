@@ -7,6 +7,7 @@
  */
 
 import { useEffect, useMemo, useState } from "react";
+import { PortfolioChart } from "@/components/charts/PortfolioChart";
 import {
   Bar,
   BarChart,
@@ -229,6 +230,14 @@ function SummaryTab({ data, benchmark }: { data: PerformanceSummaryResponse; ben
           </div>
         </GlassCard>
       )}
+
+      {/* Portfolio vs Benchmarks chart */}
+      <GlassCard>
+        <h2 className="text-xs font-semibold text-[#475569] uppercase tracking-wider mb-4">
+          Portfolio vs Benchmarks — Indexed to 100
+        </h2>
+        <PortfolioChart height={220} defaultPeriod="1Y" />
+      </GlassCard>
     </div>
   );
 }
@@ -483,6 +492,26 @@ function RollingTab({ data }: { data: RollingReturnsResponse | null }) {
   // Sample to last 60 points for display
   const displayData = useMemo(() => data.data_points.slice(-60), [data.data_points]);
 
+  // Compute approximate rolling 1yr Sharpe from 1yr returns window
+  const rollingSharpData = useMemo(() => {
+    const pts = data.data_points;
+    if (pts.length < 30) return [];
+    const RF_DAILY = 0.045 / 252;
+    // Use 1yr rolling window returns to compute pseudo-Sharpe
+    // We use 63-day (~3mo) rolling returns as a rolling Sharpe proxy
+    const window = 21; // ~1 month of rolling returns
+    const result: { date: string; sharpe: number | null }[] = [];
+    for (let i = window; i < pts.length; i++) {
+      const slice = pts.slice(i - window, i).map((p) => p["1mo"] as number | null).filter((v): v is number => v != null);
+      if (slice.length < 5) { result.push({ date: String(pts[i].date ?? ""), sharpe: null }); continue; }
+      const mean = slice.reduce((s, v) => s + v, 0) / slice.length;
+      const std = Math.sqrt(slice.reduce((s, v) => s + (v - mean) ** 2, 0) / slice.length);
+      const sharpe = std > 0 ? (mean - RF_DAILY * 21) / std : null;
+      result.push({ date: String(pts[i].date ?? ""), sharpe: sharpe != null ? Math.round(sharpe * 100) / 100 : null });
+    }
+    return result;
+  }, [data.data_points]);
+
   return (
     <div className="space-y-4">
       <GlassCard>
@@ -533,6 +562,48 @@ function RollingTab({ data }: { data: RollingReturnsResponse | null }) {
           ))}
         </div>
       </GlassCard>
+
+      {/* Rolling Sharpe chart */}
+      {rollingSharpData.length > 5 && (
+        <GlassCard>
+          <h2 className="text-sm font-semibold text-[#f1f5f9] mb-1">Rolling Sharpe Ratio</h2>
+          <p className="text-xs text-[#475569] mb-4">Computed from 1-month rolling windows · Risk-free rate 4.5%</p>
+          <ResponsiveContainer width="100%" height={200}>
+            <LineChart data={rollingSharpData} margin={{ left: 10, right: 10, top: 5, bottom: 5 }}>
+              <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.06)" vertical={false} />
+              <XAxis
+                dataKey="date"
+                tick={{ fill: "#475569", fontSize: 10 }}
+                axisLine={false}
+                tickLine={false}
+                tickFormatter={(v) => (v as string).slice(5)}
+                interval={Math.floor(rollingSharpData.length / 6)}
+              />
+              <YAxis
+                tick={{ fill: "#475569", fontSize: 10 }}
+                axisLine={false}
+                tickLine={false}
+                tickFormatter={(v) => `${(v as number).toFixed(1)}`}
+              />
+              <Tooltip
+                contentStyle={{ background: "#0d0d14", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 8 }}
+                labelStyle={{ color: "#f1f5f9", fontSize: 11 }}
+                formatter={(val: number) => [val?.toFixed(2), "Sharpe"]}
+              />
+              <ReferenceLine y={1} stroke="rgba(16,185,129,0.3)" strokeDasharray="4 4" label={{ value: "1.0", fill: "#10b981", fontSize: 10 }} />
+              <ReferenceLine y={0} stroke="rgba(255,255,255,0.15)" />
+              <Line
+                type="monotone"
+                dataKey="sharpe"
+                stroke="#6366f1"
+                strokeWidth={1.5}
+                dot={false}
+                connectNulls
+              />
+            </LineChart>
+          </ResponsiveContainer>
+        </GlassCard>
+      )}
     </div>
   );
 }

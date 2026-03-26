@@ -195,6 +195,25 @@ const CustomTooltip = ({ active, payload, label }: { active?: boolean; payload?:
 
 // ── Tab 1: Monte Carlo ─────────────────────────────────────────────────────────
 
+const MC_CACHE_KEY = "oi_mc_result_v1";
+const MC_CACHE_TTL_MS = 6 * 60 * 60 * 1000; // 6 hours
+
+function loadMcCache(): { result: MonteCarloResult; contribution: number; years: number; target: number; ts: number } | null {
+  try {
+    const raw = localStorage.getItem(MC_CACHE_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw);
+    if (Date.now() - parsed.ts > MC_CACHE_TTL_MS) { localStorage.removeItem(MC_CACHE_KEY); return null; }
+    return parsed;
+  } catch { return null; }
+}
+
+function saveMcCache(result: MonteCarloResult, contribution: number, years: number, target: number) {
+  try {
+    localStorage.setItem(MC_CACHE_KEY, JSON.stringify({ result, contribution, years, target, ts: Date.now() }));
+  } catch { /* ignore quota errors */ }
+}
+
 function MonteCarloTab() {
   const [contribution, setContribution] = useState(2000);
   const [years, setYears] = useState(20);
@@ -202,11 +221,47 @@ function MonteCarloTab() {
   const [running, setRunning] = useState(false);
   const [result, setResult] = useState<MonteCarloResult | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [fromCache, setFromCache] = useState(false);
+
+  // Auto-run on mount — use cache if available, otherwise run with defaults
+  useEffect(() => {
+    const cached = loadMcCache();
+    if (cached) {
+      setResult(cached.result);
+      setContribution(cached.contribution);
+      setYears(cached.years);
+      setTarget(cached.target);
+      setFromCache(true);
+      return;
+    }
+    // Auto-run with defaults
+    runWithParams(2000, 20, 1000000);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const runWithParams = async (c: number, y: number, t: number) => {
+    setRunning(true);
+    setError(null);
+    setFromCache(false);
+    try {
+      const { task_id } = await apiFetch<{ task_id: string; status: string }>(
+        "/simulation/monte_carlo",
+        { method: "POST", body: JSON.stringify({ monthly_contribution: c, years: y, target_value: t }) }
+      );
+      const res = await pollMonteCarlo(task_id);
+      setResult(res);
+      saveMcCache(res, c, y, t);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Unknown error");
+    } finally {
+      setRunning(false);
+    }
+  };
 
   const run = async () => {
     setRunning(true);
     setError(null);
     setResult(null);
+    setFromCache(false);
     try {
       const { task_id } = await apiFetch<{ task_id: string; status: string }>(
         "/simulation/monte_carlo",
@@ -217,6 +272,7 @@ function MonteCarloTab() {
       );
       const res = await pollMonteCarlo(task_id);
       setResult(res);
+      saveMcCache(res, contribution, years, target);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Unknown error");
     } finally {
@@ -285,18 +341,23 @@ function MonteCarloTab() {
               />
             </div>
           </div>
-          <button
-            onClick={run}
-            disabled={running}
-            className="px-6 py-2 rounded-xl text-sm font-semibold transition-all"
-            style={{
-              background: running ? "rgba(99,102,241,0.3)" : "linear-gradient(135deg, #6366f1, #8b5cf6)",
-              color: "#fff",
-              boxShadow: running ? "none" : "0 0 20px rgba(99,102,241,0.3)",
-            }}
-          >
-            {running ? "Simulating…" : "Run Simulation"}
-          </button>
+          <div className="flex flex-col gap-1">
+            <button
+              onClick={run}
+              disabled={running}
+              className="px-6 py-2 rounded-xl text-sm font-semibold transition-all"
+              style={{
+                background: running ? "rgba(99,102,241,0.3)" : "linear-gradient(135deg, #6366f1, #8b5cf6)",
+                color: "#fff",
+                boxShadow: running ? "none" : "0 0 20px rgba(99,102,241,0.3)",
+              }}
+            >
+              {running ? "Simulating…" : "Run Simulation"}
+            </button>
+            {fromCache && !running && (
+              <span className="text-[10px] text-white/30 text-center">Cached · click to refresh</span>
+            )}
+          </div>
         </div>
       </GlassCard>
 
@@ -320,16 +381,14 @@ function MonteCarloTab() {
         <GlassCard>
           <div className="flex flex-col items-center justify-center py-14 text-center">
             <div className="relative mb-4">
-              <div className="absolute inset-0 blur-2xl rounded-full opacity-20"
-                style={{ background: "radial-gradient(circle, rgba(99,102,241,0.8) 0%, transparent 70%)", width: 80, height: 80 }} />
-              <div className="relative w-14 h-14 rounded-2xl border border-[rgba(99,102,241,0.2)] flex items-center justify-center"
+              <div className="w-14 h-14 rounded-2xl border border-[rgba(99,102,241,0.2)] flex items-center justify-center"
                 style={{ background: "rgba(99,102,241,0.08)" }}>
                 <span className="text-2xl">📈</span>
               </div>
             </div>
-            <p className="text-sm font-semibold text-white/60 mb-1">Run a Simulation</p>
+            <p className="text-sm font-semibold text-white/60 mb-1">Preparing simulation…</p>
             <p className="text-xs text-white/30 max-w-[240px] leading-relaxed">
-              Configure your monthly contribution and horizon above, then click <strong className="text-white/50">Run Simulation</strong> to see 5,000 Monte Carlo paths.
+              Running 5,000 Monte Carlo paths with default parameters.
             </p>
           </div>
         </GlassCard>

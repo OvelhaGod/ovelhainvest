@@ -7,7 +7,7 @@ import { fetcher } from "@/lib/swr-config";
 import {
   LayoutDashboard, Activity, TrendingUp, LineChart,
   Package, Globe, Newspaper, Receipt, BookMarked, FileText, Settings,
-  ChevronLeft, ChevronRight, User,
+  ChevronLeft, ChevronRight, User, Link2,
 } from "lucide-react";
 
 // Endpoints to prefetch when hovering each nav item
@@ -42,10 +42,11 @@ const navItems = [
   {
     group: "Tax & Admin",
     items: [
-      { href: "/tax",     label: "Tax",     icon: Receipt },
-      { href: "/journal", label: "Journal", icon: BookMarked },
-      { href: "/reports", label: "Reports", icon: FileText },
-      { href: "/config",  label: "Config",  icon: Settings },
+      { href: "/tax",         label: "Tax",         icon: Receipt },
+      { href: "/journal",     label: "Journal",     icon: BookMarked },
+      { href: "/reports",     label: "Reports",     icon: FileText },
+      { href: "/connections", label: "Connections", icon: Link2 },
+      { href: "/config",      label: "Config",      icon: Settings },
     ],
   },
 ];
