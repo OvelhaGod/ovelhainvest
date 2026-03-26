@@ -7,8 +7,10 @@
 
 import { useEffect, useState, useCallback } from "react";
 import useSWR from "swr";
-import { fetcher } from "@/lib/swr-config";
+import { fetcher, CACHE_TTL } from "@/lib/swr-config";
 import { AssetLogo } from "@/lib/asset-logos";
+import { MiniChart } from "@/components/charts/MiniChart";
+import { PortfolioChart } from "@/components/charts/PortfolioChart";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 interface IndexTicker {
@@ -173,6 +175,14 @@ export default function MarketsPage() {
   const periods = (pvMarket as any)?.periods as string[] | undefined;
   const pRows = pvMarket as any;
 
+  // Batch sparklines for held assets
+  const heldSymbols = (heldAssets ?? []).map((a) => a.symbol).join(",");
+  const { data: holdingSparklines } = useSWR<Record<string, number[]>>(
+    heldSymbols ? `/price_history/batch?symbols=${heldSymbols}&period=1m` : null,
+    fetcher,
+    { refreshInterval: CACHE_TTL.MEDIUM }
+  );
+
   const PERIOD_LABELS: Record<string, string> = { "1w": "1W", "1m": "1M", "3m": "3M", "ytd": "YTD", "1y": "1Y" };
   const PERIOD_LIST = ["1w", "1m", "3m", "ytd", "1y"];
 
@@ -276,6 +286,13 @@ export default function MarketsPage() {
             )}
           </div>
 
+          {/* PORTFOLIO VS BENCHMARKS CHART */}
+          <div className="rounded-2xl border border-white/[0.08] bg-white/[0.03] p-4">
+            <h2 className="text-sm font-semibold text-white/80 mb-1">Portfolio Evolution</h2>
+            <p className="text-[10px] text-white/30 mb-3">Indexed to 100 at period start · vs SPY, QQQ, ACWI</p>
+            <PortfolioChart height={180} defaultPeriod="3M" />
+          </div>
+
           {/* SECTOR HEATMAP */}
           <div className="rounded-2xl border border-white/[0.08] bg-white/[0.03] p-4">
             <h2 className="text-sm font-semibold text-white/80 mb-3">Sector Performance Today</h2>
@@ -315,6 +332,7 @@ export default function MarketsPage() {
                       <th className="text-left pb-2 text-white/40 font-medium">Asset</th>
                       <th className="text-right pb-2 text-white/40 font-medium px-2">Price</th>
                       <th className="text-right pb-2 text-white/40 font-medium px-2">Today</th>
+                      <th className="text-right pb-2 text-white/40 font-medium px-2">1M</th>
                       <th className="text-right pb-2 text-white/40 font-medium">Qty</th>
                     </tr>
                   </thead>
@@ -333,6 +351,15 @@ export default function MarketsPage() {
                         <td className="py-2 px-2 text-right font-mono text-white/70">{fmtPrice(a.price)}</td>
                         <td className={`py-2 px-2 text-right font-mono font-semibold ${pctColor(a.change_pct)}`}>
                           {fmtPct(a.change_pct)}
+                        </td>
+                        <td className="py-2 px-2 text-right">
+                          {holdingSparklines?.[a.symbol] && holdingSparklines[a.symbol].length >= 2 ? (
+                            <div className="flex justify-end">
+                              <MiniChart data={holdingSparklines[a.symbol]} height={24} width={52} />
+                            </div>
+                          ) : (
+                            <span className="text-white/20 text-[10px]">—</span>
+                          )}
                         </td>
                         <td className="py-2 text-right font-mono text-white/50">
                           {a.quantity < 1 ? a.quantity.toFixed(4) : a.quantity.toFixed(2)}
