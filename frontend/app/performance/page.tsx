@@ -503,11 +503,11 @@ function RollingTab({ data }: { data: RollingReturnsResponse | null }) {
     const result: { date: string; sharpe: number | null }[] = [];
     for (let i = window; i < pts.length; i++) {
       const slice = pts.slice(i - window, i).map((p) => p["1mo"] as number | null).filter((v): v is number => v != null);
-      if (slice.length < 5) { result.push({ date: pts[i].date as string, sharpe: null }); continue; }
+      if (slice.length < 5) { result.push({ date: String(pts[i].date ?? ""), sharpe: null }); continue; }
       const mean = slice.reduce((s, v) => s + v, 0) / slice.length;
       const std = Math.sqrt(slice.reduce((s, v) => s + (v - mean) ** 2, 0) / slice.length);
       const sharpe = std > 0 ? (mean - RF_DAILY * 21) / std : null;
-      result.push({ date: pts[i].date as string, sharpe: sharpe != null ? Math.round(sharpe * 100) / 100 : null });
+      result.push({ date: String(pts[i].date ?? ""), sharpe: sharpe != null ? Math.round(sharpe * 100) / 100 : null });
     }
     return result;
   }, [data.data_points]);
