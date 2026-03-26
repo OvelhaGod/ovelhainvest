@@ -500,8 +500,10 @@ def daily_status(request: Request, response: Response, user_id: str = Depends(_g
         sleeve_values = allocation_engine.compute_sleeve_values(
             holdings, assets_map, prices, fx_rate
         )
-        if not total_value_usd:
-            total_value_usd = sum(sleeve_values.values())
+        # Always use live-computed value — snapshot total_value_usd reflects
+        # historical prices at snapshot time, not today's prices.
+        total_value_usd = sum(sleeve_values.values())
+        usd_brl_rate = fx_rate  # use live FX rate
         sleeve_weights_dict = allocation_engine.compute_current_sleeve_weights(sleeve_values)
         drift_weights = allocation_engine.detect_drift_vs_targets(
             sleeve_weights_dict, sleeve_values

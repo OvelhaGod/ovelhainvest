@@ -429,7 +429,7 @@ export default function SignalsPage() {
   const filteredRuns = runs;
 
   return (
-    <div className="min-h-screen p-6 space-y-5" style={{ background: "#050508" }}>
+    <div className="min-h-screen p-5 space-y-4" style={{ background: "#050508" }}>
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>

@@ -15,6 +15,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { api } from "@/lib/api";
 import { OIErrorState } from "@/components/ui/oi";
+import { AssetLogo } from "@/lib/asset-logos";
 import type { AssetValuation } from "@/lib/types";
 
 // ── Design tokens ─────────────────────────────────────────────────────────────
@@ -66,12 +67,14 @@ function mosColor(mos: number | null | undefined): string {
 type SortKey = "rank_in_universe" | "composite_score" | "margin_of_safety_pct" | "value_score" | "momentum_score" | "quality_score" | "price";
 
 // ── Score bar component ───────────────────────────────────────────────────────
-function ScoreBar({ value, color = "#6366f1" }: { value: number | null; color?: string }) {
+function ScoreBar({ value, label = "" }: { value: number | null; label?: string }) {
   if (value == null) return <span className="text-[#475569] text-xs">—</span>;
   const pct = Math.round(value * 100);
   const displayColor = value >= 0.55 ? "#10b981" : value >= 0.40 ? "#f59e0b" : "#ef4444";
+  const strength = value >= 0.70 ? "Strong" : value >= 0.55 ? "Good" : value >= 0.40 ? "Fair" : "Weak";
+  const tooltip = label ? `${label}: ${value.toFixed(2)} — ${strength}` : `${value.toFixed(2)} — ${strength}`;
   return (
-    <div className="flex items-center gap-1.5">
+    <div className="flex items-center gap-1.5" title={tooltip}>
       <div className="w-14 h-1.5 rounded-full bg-white/[0.06] overflow-hidden">
         <div
           className="h-full rounded-full transition-all"
@@ -525,7 +528,7 @@ export default function AssetsPage() {
 
   return (
     <div
-      className="min-h-screen p-6"
+      className="min-h-screen p-5"
       style={{
         background:
           "radial-gradient(ellipse 80% 50% at 50% -20%, rgba(99,102,241,0.10) 0%, transparent 60%), #050508",
@@ -683,7 +686,7 @@ export default function AssetsPage() {
                   return (
                     <tr
                       key={asset.asset_id || asset.symbol}
-                      className="border-b border-white/[0.04] hover:bg-white/[0.02] cursor-pointer transition-colors"
+                      className="border-b border-white/[0.04] hover:bg-white/[0.02] cursor-pointer transition-all hover:shadow-[inset_3px_0_0_rgba(99,102,241,0.45)]"
                       onClick={() => setSelected(asset)}
                     >
                       {/* Rank */}
@@ -692,14 +695,26 @@ export default function AssetsPage() {
                       </td>
                       {/* Symbol */}
                       <td className="px-3 py-3">
-                        <div className="font-mono font-semibold text-sm text-[#f1f5f9]">
-                          {asset.symbol}
-                        </div>
-                        {asset.name && (
-                          <div className="text-[10px] text-[#475569] truncate max-w-[120px]">
-                            {asset.name}
+                        <div className="flex items-center gap-2">
+                          <AssetLogo symbol={asset.symbol} size={24} />
+                          <div>
+                            <div className="flex items-center gap-1.5">
+                              <span className="font-mono font-semibold text-sm text-[#f1f5f9]">
+                                {asset.symbol}
+                              </span>
+                              {asset.in_portfolio && (
+                                <span className="text-[9px] font-medium text-[#10b981] opacity-80" title="Currently held in portfolio">
+                                  ● Held
+                                </span>
+                              )}
+                            </div>
+                            {asset.name && (
+                              <div className="text-[10px] text-[#475569] truncate max-w-[120px]">
+                                {asset.name}
+                              </div>
+                            )}
                           </div>
-                        )}
+                        </div>
                       </td>
                       {/* Class badge */}
                       <td className="px-3 py-3">
@@ -734,12 +749,12 @@ export default function AssetsPage() {
                         )}
                       </td>
                       {/* Factor score bars */}
-                      <td className="px-3 py-3"><ScoreBar value={asset.value_score} /></td>
-                      <td className="px-3 py-3"><ScoreBar value={asset.momentum_score} /></td>
-                      <td className="px-3 py-3"><ScoreBar value={asset.quality_score} /></td>
+                      <td className="px-3 py-3"><ScoreBar value={asset.value_score} label="Value Score" /></td>
+                      <td className="px-3 py-3"><ScoreBar value={asset.momentum_score} label="Momentum Score" /></td>
+                      <td className="px-3 py-3"><ScoreBar value={asset.quality_score} label="Quality Score" /></td>
                       {/* Composite */}
                       <td className="px-3 py-3">
-                        <ScoreBar value={asset.composite_score} />
+                        <ScoreBar value={asset.composite_score} label="Composite Score" />
                       </td>
                       {/* Moat */}
                       <td className="px-3 py-3">

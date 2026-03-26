@@ -204,7 +204,7 @@ export default function ConfigPage() {
   const model = ALLOCATION_MODELS[allocModel];
 
   return (
-    <div className="min-h-screen p-6 space-y-5" style={{ background: "#050508" }}>
+    <div className="min-h-screen p-5 space-y-4" style={{ background: "#050508" }}>
       {/* Toast */}
       {toastMsg && (
         <div className="fixed bottom-6 right-6 z-50 rounded-xl border border-white/10 bg-white/[0.06] backdrop-blur-md px-4 py-2.5 text-sm text-white/90 shadow-xl">

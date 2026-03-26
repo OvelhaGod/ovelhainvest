@@ -423,19 +423,43 @@ def valuation_summary(
 # ── GET /assets/list ─────────────────────────────────────────────────────────
 
 @router.get("/assets/list", tags=["valuation"])
-def assets_list() -> dict:
+def assets_list(user_id: str = Query(default=None)) -> dict:
     """
     Return ALL active assets with their latest valuation data.
     Unlike /valuation_summary (which caps at 8), this returns the full universe.
     Includes value_score, momentum_score, quality_score for the assets page table.
+    Also includes in_portfolio: bool from current holdings.
+    Cached 5 minutes in Redis.
     """
+    from app.config import get_default_user_id
+    uid = user_id or get_default_user_id()
+    cache_key = f"assets:list:{uid}"
+    try:
+        from app.db.redis_client import get_redis_client as _get_rc
+        _rc = _get_rc()
+        _cached = _rc.get(cache_key)
+        if _cached:
+            import json as _json
+            return _json.loads(_cached)
+    except Exception as _ce:
+        logger.debug("Redis cache miss (assets:list): %s", _ce)
+
     from app.db.repositories.valuations import get_latest_valuations
+    from app.db.repositories.holdings import get_holdings
 
     try:
         rows = get_latest_valuations()
     except Exception as exc:
         logger.error("assets_list failed: %s", exc)
         rows = []
+
+    # Build set of held asset_ids for in_portfolio indicator
+    held_asset_ids: set[str] = set()
+    try:
+        holdings = get_holdings(uid)
+        held_asset_ids = {h["asset_id"] for h in holdings if float(h.get("quantity", 0)) > 0}
+    except Exception as he:
+        logger.debug("Could not load holdings for in_portfolio: %s", he)
 
     as_of_date = rows[0].get("as_of_date") if rows else None
     scored = sum(1 for r in rows if r.get("composite_score") is not None)
@@ -466,9 +490,17 @@ def assets_list() -> dict:
             "as_of_date":               row.get("as_of_date"),
             "vol_30d":                  row.get("vol_30d"),
             "drawdown_from_6_12m_high_pct": row.get("drawdown_from_6_12m_high_pct"),
+            "in_portfolio": row.get("id") in held_asset_ids or row.get("asset_id") in held_asset_ids,
         })
 
-    return {"assets": assets, "total": len(assets), "scored": scored, "as_of_date": as_of_date}
+    result = {"assets": assets, "total": len(assets), "scored": scored, "as_of_date": as_of_date}
+    try:
+        import json as _json2
+        from app.db.redis_client import get_redis_client as _get_rc2
+        _get_rc2().set(cache_key, _json2.dumps(result), ex=300)
+    except Exception as _se:
+        logger.debug("Redis cache store failed (assets:list): %s", _se)
+    return result
 
 
 # ── GET /valuation/{symbol} ───────────────────────────────────────────────────

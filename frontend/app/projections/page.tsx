@@ -316,6 +316,25 @@ function MonteCarloTab() {
         </GlassCard>
       )}
 
+      {!running && !result && !error && (
+        <GlassCard>
+          <div className="flex flex-col items-center justify-center py-14 text-center">
+            <div className="relative mb-4">
+              <div className="absolute inset-0 blur-2xl rounded-full opacity-20"
+                style={{ background: "radial-gradient(circle, rgba(99,102,241,0.8) 0%, transparent 70%)", width: 80, height: 80 }} />
+              <div className="relative w-14 h-14 rounded-2xl border border-[rgba(99,102,241,0.2)] flex items-center justify-center"
+                style={{ background: "rgba(99,102,241,0.08)" }}>
+                <span className="text-2xl">📈</span>
+              </div>
+            </div>
+            <p className="text-sm font-semibold text-white/60 mb-1">Run a Simulation</p>
+            <p className="text-xs text-white/30 max-w-[240px] leading-relaxed">
+              Configure your monthly contribution and horizon above, then click <strong className="text-white/50">Run Simulation</strong> to see 5,000 Monte Carlo paths.
+            </p>
+          </div>
+        </GlassCard>
+      )}
+
       {result && (
         <>
           {/* Stats row */}
@@ -866,7 +885,7 @@ export default function ProjectionsPage() {
   const [tab, setTab] = useState("monte_carlo");
 
   return (
-    <div className="p-6 space-y-6 min-h-screen" style={{ background: "radial-gradient(ellipse 80% 50% at 50% -20%, rgba(99,102,241,0.10) 0%, transparent 60%), #050508" }}>
+    <div className="p-5 space-y-5 min-h-screen" style={{ background: "radial-gradient(ellipse 80% 50% at 50% -20%, rgba(99,102,241,0.10) 0%, transparent 60%), #050508" }}>
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-xl font-semibold" style={{ color: "#f1f5f9" }}>Projections</h1>

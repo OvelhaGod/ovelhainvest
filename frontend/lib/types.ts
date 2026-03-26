@@ -210,6 +210,7 @@ export interface AssetValuation {
   region: string | null;
   currency: string;
   is_dcf_eligible: boolean;
+  in_portfolio?: boolean;
 }
 
 export interface ValuationSummaryResponse {
