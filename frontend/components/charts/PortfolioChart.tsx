@@ -57,14 +57,18 @@ export function PortfolioChart({
   const { data, isLoading, error } = useSWR<PortfolioHistoryData>(
     `/portfolio_history?period=${PERIOD_API[period]}`,
     fetcher,
-    { refreshInterval: CACHE_TTL.MEDIUM }
+    {
+      refreshInterval: CACHE_TTL.MEDIUM,
+      errorRetryCount: 3,
+      errorRetryInterval: 2000,
+      keepPreviousData: true,
+    }
   );
 
-  // Show skeleton only on the initial load when no data has been cached yet.
-  // Using `isLoading && !data` prevents the skeleton from re-appearing during
-  // background revalidations when stale data is already rendered.
-  if (isLoading && !data) return <SkeletonChart height={height + 40} />;
-  if (error) {
+  // Rule: if data exists, ALWAYS render the chart — stale errors are ignored.
+  // Error/skeleton only show when there is no data at all.
+  if (!data && isLoading) return <SkeletonChart height={height + 40} />;
+  if (!data && error) {
     return (
       <div
         className="flex items-center justify-center text-white/20 text-xs rounded-xl border border-white/[0.06]"
@@ -74,7 +78,7 @@ export function PortfolioChart({
       </div>
     );
   }
-  if (!data?.data?.length) {
+  if (!data?.data?.length && !isLoading) {
     return (
       <div
         className="flex items-center justify-center text-white/20 text-xs rounded-xl border border-white/[0.06]"
@@ -84,6 +88,8 @@ export function PortfolioChart({
       </div>
     );
   }
+  // At this point data is guaranteed to be defined with data.length > 0
+  if (!data) return null;
 
   // Merge all series by date
   const allDates = new Set<string>();

@@ -55,23 +55,31 @@ export function PriceChart({
 }: PriceChartProps) {
   const [period, setPeriod] = useState<Period>(defaultPeriod);
 
-  const { data, isLoading } = useSWR<PriceData>(
+  const { data, isLoading, error } = useSWR<PriceData>(
     `/price_history/${symbol}?period=${PERIOD_API[period]}`,
     fetcher,
-    { refreshInterval: period === "1D" ? 60_000 : 300_000 }
+    {
+      refreshInterval: period === "1D" ? 60_000 : 300_000,
+      errorRetryCount: 3,
+      errorRetryInterval: 2000,
+      keepPreviousData: true,
+    }
   );
 
-  if (isLoading) return <SkeletonChart height={height} />;
-  if (!data?.data?.length) {
+  // Rule: if data exists, render the chart regardless of error/loading state.
+  if (!data && isLoading) return <SkeletonChart height={height} />;
+  if (!data?.data?.length && !isLoading) {
     return (
       <div
         className="flex items-center justify-center text-white/20 text-xs rounded-xl border border-white/[0.06]"
         style={{ height, background: "rgba(255,255,255,0.02)" }}
       >
-        No data
+        {error ? "Unable to load chart data" : "No data"}
       </div>
     );
   }
+  // At this point data is guaranteed to be defined with data.length > 0
+  if (!data) return null;
 
   const isPositive = (data.change_pct ?? 0) >= 0;
   const lineColor = isPositive ? "#10b981" : "#ef4444";
