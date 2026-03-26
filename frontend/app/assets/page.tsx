@@ -12,10 +12,14 @@
  *  - Buy/hold/sell zone visualization
  */
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import React, { useCallback, useEffect, useState } from "react";
+import useSWR from "swr";
 import { api } from "@/lib/api";
+import { fetcher } from "@/lib/swr-config";
 import { OIErrorState } from "@/components/ui/oi";
 import { AssetLogo } from "@/lib/asset-logos";
+import { MiniChart } from "@/components/charts/MiniChart";
+import { PriceChart } from "@/components/charts/PriceChart";
 import type { AssetValuation } from "@/lib/types";
 
 // ── Design tokens ─────────────────────────────────────────────────────────────
@@ -459,12 +463,21 @@ function NewsFeed({ symbol }: { symbol: string }) {
 
 // ── Main Page ─────────────────────────────────────────────────────────────────
 export default function AssetsPage() {
-  const [data, setData]         = useState<AssetValuation[]>([]);
-  const [loading, setLoading]   = useState(true);
-  const [error, setError]       = useState<string | null>(null);
-  const [selected, setSelected] = useState<AssetValuation | null>(null);
-  const [valRunning, setValRunning] = useState(false);
-  const [valMsg, setValMsg]     = useState<string | null>(null);
+  const [data, setData]               = useState<AssetValuation[]>([]);
+  const [loading, setLoading]         = useState(true);
+  const [error, setError]             = useState<string | null>(null);
+  const [selected, setSelected]       = useState<AssetValuation | null>(null);
+  const [expandedSymbol, setExpandedSymbol] = useState<string | null>(null);
+  const [valRunning, setValRunning]   = useState(false);
+  const [valMsg, setValMsg]           = useState<string | null>(null);
+
+  // Batch sparklines — fetched once data is loaded
+  const symbolList = data.map((a) => a.symbol).join(",");
+  const { data: sparklines } = useSWR<Record<string, number[]>>(
+    symbolList ? `/price_history/batch?symbols=${symbolList}&period=1m` : null,
+    fetcher,
+    { refreshInterval: 300_000 }
+  );
 
   // Filters
   const [filterClass, setFilterClass]   = useState<string>("");
@@ -683,11 +696,13 @@ export default function AssetsPage() {
                   const tier = TIER_CONFIG[asset.tier ?? ""] ?? null;
                   const mos  = asset.margin_of_safety_pct;
 
+                  const isExpanded = expandedSymbol === asset.symbol;
+
                   return (
+                    <React.Fragment key={asset.asset_id || asset.symbol}>
                     <tr
-                      key={asset.asset_id || asset.symbol}
-                      className="border-b border-white/[0.04] hover:bg-white/[0.02] cursor-pointer transition-all hover:shadow-[inset_3px_0_0_rgba(99,102,241,0.45)]"
-                      onClick={() => setSelected(asset)}
+                      className={`border-b border-white/[0.04] hover:bg-white/[0.02] cursor-pointer transition-all hover:shadow-[inset_3px_0_0_rgba(99,102,241,0.45)] ${isExpanded ? "bg-white/[0.02] shadow-[inset_3px_0_0_rgba(99,102,241,0.45)]" : ""}`}
+                      onClick={() => setExpandedSymbol(isExpanded ? null : asset.symbol)}
                     >
                       {/* Rank */}
                       <td className="px-3 py-3 text-xs font-mono text-[#475569]">
@@ -728,9 +743,18 @@ export default function AssetsPage() {
                           {asset.asset_class?.replace("_", " ") ?? "—"}
                         </span>
                       </td>
-                      {/* Price */}
-                      <td className="px-3 py-3 text-xs font-mono text-[#94a3b8]">
-                        {fmtUSD(asset.price)}
+                      {/* Price + sparkline */}
+                      <td className="px-3 py-3">
+                        <div className="flex items-center gap-2">
+                          <span className="text-xs font-mono text-[#94a3b8]">{fmtUSD(asset.price)}</span>
+                          {sparklines?.[asset.symbol] && sparklines[asset.symbol].length >= 2 && (
+                            <MiniChart
+                              data={sparklines[asset.symbol]}
+                              height={28}
+                              width={56}
+                            />
+                          )}
+                        </div>
                       </td>
                       {/* MoS */}
                       <td className="px-3 py-3">
@@ -773,22 +797,65 @@ export default function AssetsPage() {
                       <td className="px-3 py-3 text-xs font-mono text-[#94a3b8]">
                         {fmtUSD(asset.fair_value_estimate_dcf)}
                       </td>
-                      {/* Tier */}
+                      {/* Tier + detail button */}
                       <td className="px-3 py-3">
-                        {tier ? (
-                          <span
-                            className="text-[10px] px-1.5 py-0.5 rounded-full border font-medium"
-                            style={{
-                              color: tier.color,
-                              borderColor: `${tier.color}40`,
-                              background: `${tier.color}12`,
-                            }}
+                        <div className="flex items-center gap-2">
+                          {tier ? (
+                            <span
+                              className="text-[10px] px-1.5 py-0.5 rounded-full border font-medium"
+                              style={{
+                                color: tier.color,
+                                borderColor: `${tier.color}40`,
+                                background: `${tier.color}12`,
+                              }}
+                            >
+                              {tier.label}
+                            </span>
+                          ) : null}
+                          <button
+                            onClick={(e) => { e.stopPropagation(); setSelected(asset); }}
+                            className="text-[10px] text-[#475569] hover:text-[#94a3b8] transition-colors px-1"
+                            title="Open detail drawer"
                           >
-                            {tier.label}
-                          </span>
-                        ) : null}
+                            →
+                          </button>
+                        </div>
                       </td>
                     </tr>
+                    {/* Inline expanded PriceChart */}
+                    {isExpanded && (
+                      <tr key={`${asset.asset_id || asset.symbol}-expand`} className="border-b border-white/[0.04] bg-white/[0.015]">
+                        <td colSpan={12} className="px-6 py-4">
+                          <div className="flex items-start gap-4">
+                            <div className="flex-1 min-w-0">
+                              <p className="text-[10px] text-[#475569] uppercase tracking-wider mb-3 font-mono">
+                                {asset.symbol} · Price History
+                              </p>
+                              <PriceChart symbol={asset.symbol} height={180} defaultPeriod="3M" />
+                            </div>
+                            <div className="shrink-0 w-[180px] space-y-2 pt-6">
+                              {[
+                                { label: "Value Score",    val: asset.value_score,    color: "#6366f1" },
+                                { label: "Momentum",       val: asset.momentum_score, color: "#8b5cf6" },
+                                { label: "Quality",        val: asset.quality_score,  color: "#10b981" },
+                                { label: "Composite",      val: asset.composite_score,color: "#f59e0b" },
+                              ].map(({ label, val, color }) => (
+                                <div key={label} className="flex items-center justify-between">
+                                  <span className="text-[10px] text-[#475569]">{label}</span>
+                                  <div className="flex items-center gap-1.5">
+                                    <div className="w-16 h-1 rounded-full bg-white/[0.06] overflow-hidden">
+                                      <div className="h-full rounded-full" style={{ width: `${(val ?? 0) * 100}%`, background: color }} />
+                                    </div>
+                                    <span className="text-[10px] font-mono" style={{ color }}>{val?.toFixed(2) ?? "—"}</span>
+                                  </div>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        </td>
+                      </tr>
+                    )}
+                    </React.Fragment>
                   );
                 })
               )}
