@@ -224,7 +224,7 @@ def start_monte_carlo(
     years = int(body.get("years", 20))
     years = max(1, min(years, 50))
     sleeve_weights = body.get("sleeve_weights") or _DEFAULT_WEIGHTS
-    n_simulations = min(int(body.get("n_simulations", 5000)), 10000)
+    n_simulations = min(int(body.get("n_simulations", 2000)), 10000)
     use_bootstrap = bool(body.get("use_historical_bootstrap", True))
     target_value = body.get("target_value")
 

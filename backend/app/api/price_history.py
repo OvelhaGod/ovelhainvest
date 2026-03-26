@@ -164,7 +164,9 @@ def get_price_history_batch(
         data = _fetch_ohlcv(sym, period)
         closes = [r["close"] for r in data if r["close"] is not None]
         result[sym] = closes
-        _cache_set(f"sparkline:{sym}:{period}", closes, _TTL_BY_PERIOD.get(period, 1800))
+        # Only cache if we got actual data — don't cache empty to allow retry on next request
+        if len(closes) >= 2:
+            _cache_set(f"sparkline:{sym}:{period}", closes, _TTL_BY_PERIOD.get(period, 1800))
 
     return result
 
