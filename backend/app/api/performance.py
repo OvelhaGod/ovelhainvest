@@ -460,50 +460,96 @@ async def performance_risk(
 @router.post("/performance/snapshot", response_model=SnapshotTriggerResponse)
 async def trigger_snapshot(
     user_id: str = Query(default=None),
+    force: bool = Query(default=False),
 ) -> SnapshotTriggerResponse:
     """
-    Manually trigger a portfolio snapshot for today.
+    Trigger a portfolio snapshot for today using live holdings × current prices.
 
-    In production this is called by n8n daily. This endpoint allows manual triggering.
-    The snapshot uses the latest known holdings and current market prices.
+    Called by n8n daily and by SnapshotInit on app startup.
+    Always writes today's snapshot with current market prices — never uses
+    stale historical values from previous snapshots.
+
+    Set force=true to overwrite an existing today snapshot.
     """
     user_id = _resolve_user(user_id)
     from app.db.repositories.snapshots import get_latest_snapshot as get_snap
+    from app.services.portfolio_value import compute_live_portfolio_value
+    from app.services import allocation_engine
+    from app.db.repositories import holdings as holdings_repo
     today = date.today()
 
     latest = get_snap(user_id)
-    if latest and latest.get("snapshot_date") == today.isoformat():
-        return SnapshotTriggerResponse(
-            status="exists",
-            snapshot_date=today,
-            total_value_usd=latest.get("total_value_usd"),
-            message="Snapshot for today already exists.",
+    existing_today = latest and latest.get("snapshot_date") == today.isoformat()
+
+    # Skip only if already ran today AND not forced — prevents redundant yfinance calls
+    if existing_today and not force:
+        # But verify the existing value looks reasonable (> $1k); if not, force refresh
+        existing_val = float(latest.get("total_value_usd") or 0)
+        if existing_val > 1000:
+            return SnapshotTriggerResponse(
+                status="exists",
+                snapshot_date=today,
+                total_value_usd=existing_val,
+                message="Snapshot for today already exists with live value.",
+            )
+
+    # Compute live portfolio value — holdings × today's market prices
+    try:
+        total_usd, total_brl, fx_rate = compute_live_portfolio_value(user_id)
+    except Exception as exc:
+        logger.error("compute_live_portfolio_value failed: %s", exc)
+        raise HTTPException(status_code=500, detail=f"Live value computation failed: {exc}")
+
+    if total_usd < 100:
+        raise HTTPException(
+            status_code=422,
+            detail="Computed portfolio value < $100 — check holdings and prices.",
         )
 
-    # Build a minimal snapshot from last known state + interpolation
-    # Full implementation requires holdings + prices; for now write a placeholder
-    # that can be backfilled when holdings data is available.
-    prev_value = float(latest["total_value_usd"]) if latest else 0.0
+    # Build sleeve weights from live computation
+    sleeve_weights_dict: dict = {}
+    try:
+        holdings = holdings_repo.get_holdings(user_id)
+        if holdings:
+            from app.services.market_data import fetch_current_prices
+            symbols = list({h["symbol"] for h in holdings if h.get("symbol")})
+            prices = fetch_current_prices(symbols) if symbols else {}
+            assets_map = {h["symbol"]: h for h in holdings}
+            sleeve_vals = allocation_engine.compute_sleeve_values(
+                holdings, assets_map, prices, fx_rate
+            )
+            sleeve_weights_dict = {
+                k: round(v / total_usd, 6)
+                for k, v in sleeve_vals.items()
+                if total_usd > 0
+            }
+    except Exception as exc:
+        logger.debug("Sleeve weight computation failed (non-critical): %s", exc)
+
     snapshot = {
         "user_id": user_id,
         "snapshot_date": today.isoformat(),
-        "total_value_usd": prev_value,
-        "total_value_brl": None,
-        "usd_brl_rate": None,
-        "sleeve_weights": latest.get("sleeve_weights") if latest else None,
+        "total_value_usd": total_usd,
+        "total_value_brl": total_brl,
+        "usd_brl_rate": fx_rate,
+        "sleeve_weights": sleeve_weights_dict or (latest.get("sleeve_weights") if latest else None),
         "benchmark_symbol": "SPY",
     }
 
     try:
-        saved = upsert_portfolio_snapshot(snapshot)
+        upsert_portfolio_snapshot(snapshot)
+        logger.info(
+            "Snapshot upserted user=%s date=%s value=%.2f",
+            user_id, today.isoformat(), total_usd,
+        )
         return SnapshotTriggerResponse(
-            status="created",
+            status="created" if not existing_today else "updated",
             snapshot_date=today,
-            total_value_usd=prev_value or None,
-            message="Snapshot created. Update with live holdings data via n8n.",
+            total_value_usd=total_usd,
+            message=f"Snapshot {'updated' if existing_today else 'created'} with live value ${total_usd:,.0f}.",
         )
     except Exception as exc:
-        logger.error("Snapshot creation failed: %s", exc)
+        logger.error("Snapshot upsert failed: %s", exc)
         raise HTTPException(status_code=500, detail=str(exc))
 
 
