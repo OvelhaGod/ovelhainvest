@@ -7,6 +7,7 @@ import { useState } from "react";
 import useSWR from "swr";
 import { fetcher, CACHE_TTL } from "@/lib/swr-config";
 import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer } from "recharts";
+import { PluggyConnectWidget } from "@/components/finance/PluggyConnectWidget";
 
 const glass = "glass-card";
 const glassInner = `${glass} p-5`;
@@ -299,20 +300,16 @@ export default function NetWorthPage() {
             <p className="text-xs text-white/50">
               Connect your Brazilian bank or broker via Pluggy Open Finance to automatically sync account balances and transactions.
             </p>
-            <div className="space-y-2">
-              <button
-                className="w-full py-2.5 rounded-lg text-sm font-medium text-white/80 border border-white/10 hover:border-white/20 hover:bg-white/[0.03] transition-colors text-left px-4"
-                onClick={() => setShowConnect(false)}
-              >
-                <span className="text-base mr-2">🇧🇷</span> Brazilian Bank (Pluggy)
-              </button>
-              <button
-                className="w-full py-2.5 rounded-lg text-sm font-medium text-white/80 border border-white/10 hover:border-white/20 hover:bg-white/[0.03] transition-colors text-left px-4"
-                onClick={() => setShowConnect(false)}
-              >
-                <span className="text-base mr-2">📋</span> Manual Entry
-              </button>
-            </div>
+            <PluggyConnectWidget
+              onSuccess={(itemId) => {
+                // After successful connection, trigger sync then close
+                const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? "https://investapi.ovelha.us";
+                fetch(`${API_BASE}/connections/sync/${itemId}`, { method: "POST" })
+                  .then(() => setShowConnect(false))
+                  .catch(() => setShowConnect(false));
+              }}
+              onClose={() => setShowConnect(false)}
+            />
           </div>
         </div>
       )}

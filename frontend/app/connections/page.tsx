@@ -8,6 +8,7 @@
 
 import useSWR from "swr";
 import { fetcher } from "@/lib/swr-config";
+import { PluggyConnectWidget } from "@/components/finance/PluggyConnectWidget";
 
 interface ConnectionStatus {
   connections: Array<{
@@ -75,12 +76,19 @@ export default function ConnectionsPage() {
               <p className="text-xs text-[#475569] leading-relaxed">
                 {data?.message ?? "Connect your Brazilian bank and broker accounts to enable automatic transaction sync."}
               </p>
-              <div className="mt-3 flex gap-2">
+              <div className="mt-4">
+                <PluggyConnectWidget
+                  onSuccess={() => {
+                    window.location.reload();
+                  }}
+                />
+              </div>
+              <div className="mt-2">
                 <a
                   href="https://pluggy.ai"
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="text-xs px-3 py-1.5 rounded-lg bg-violet-500/10 border border-violet-500/20 text-violet-400 hover:bg-violet-500/15 transition-colors"
+                  className="text-xs text-violet-400/60 hover:text-violet-400 transition-colors"
                 >
                   Pluggy Documentation →
                 </a>
