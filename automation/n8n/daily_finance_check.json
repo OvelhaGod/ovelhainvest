@@ -1,0 +1,88 @@
+{
+  "name": "OvelhaInvest — Daily Finance Check",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [{"field": "cronExpression", "expression": "0 8 * * *"}]
+        }
+      },
+      "id": "trigger-daily",
+      "name": "Daily 8am Trigger",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "position": [0, 0]
+    },
+    {
+      "parameters": {
+        "url": "={{$env.API_BASE_URL}}/finance/summary?month={{$now.format('YYYY-MM')}}",
+        "options": {}
+      },
+      "id": "get-finance-summary",
+      "name": "Get Finance Summary",
+      "type": "n8n-nodes-base.httpRequest",
+      "position": [200, 0]
+    },
+    {
+      "parameters": {
+        "url": "={{$env.API_BASE_URL}}/finance/cashflow",
+        "options": {}
+      },
+      "id": "get-cashflow",
+      "name": "Get Cashflow Forecast",
+      "type": "n8n-nodes-base.httpRequest",
+      "position": [200, 150]
+    },
+    {
+      "parameters": {
+        "url": "={{$env.API_BASE_URL}}/finance/net_worth",
+        "options": {}
+      },
+      "id": "get-net-worth",
+      "name": "Get Net Worth",
+      "type": "n8n-nodes-base.httpRequest",
+      "position": [200, 300]
+    },
+    {
+      "parameters": {
+        "jsCode": "const summary = $('Get Finance Summary').first().json;\nconst cashflow = $('Get Cashflow Forecast').first().json;\nconst netWorth = $('Get Net Worth').first().json;\n\nconst income = summary.total_income || 0;\nconst expenses = summary.total_expenses || 0;\nconst savings = summary.savings || 0;\nconst savingsRate = ((summary.savings_rate || 0) * 100).toFixed(1);\nconst netWorthValue = netWorth.net_worth_usd || 0;\nconst currentBalance = cashflow.current_balance || 0;\n\n// Check for danger zones\nconst lowBalance = currentBalance < 500;\nconst negSavings = savings < 0;\nconst savingsRateLow = (summary.savings_rate || 0) < 0.1;\n\nconst fmtUSD = (n) => '$' + Math.abs(n).toLocaleString('en-US', {minimumFractionDigits: 0, maximumFractionDigits: 0});\n\nlet urgency = lowBalance || negSavings ? 'WARNING' : 'OK';\nlet lines = [];\n\nlines.push(`*OvelhaInvest — Daily Finance Check*`);\nlines.push(`${new Date().toLocaleDateString('en-US', {weekday: 'long', month: 'long', day: 'numeric'})}`);\nlines.push('');\nlines.push(`*This Month (${new Date().toLocaleDateString('en-US', {month: 'long', year: 'numeric'})})*`);\nlines.push(`Income: ${fmtUSD(income)}`);\nlines.push(`Expenses: ${fmtUSD(expenses)}`);\nlines.push(`Net Savings: ${savings >= 0 ? '+' : ''}${fmtUSD(savings)}`);\nlines.push(`Savings Rate: ${savingsRate}% ${savingsRateLow ? '(below 10% target)' : ''}`);\nlines.push('');\nlines.push(`*Balance & Net Worth*`);\nlines.push(`Cash Balance: ${fmtUSD(currentBalance)} ${lowBalance ? '(LOW - below $500)' : ''}`);\nlines.push(`Net Worth: ${fmtUSD(netWorthValue)}`);\n\nif (urgency === 'WARNING') {\n  lines.push('');\n  lines.push('*Action Required:*');\n  if (lowBalance) lines.push('- Cash balance is critically low (<$500). Review upcoming bills.');\n  if (negSavings) lines.push('- Spending exceeds income this month. Review expenses.');\n}\n\nlines.push('');\nlines.push('[View Finance Dashboard](https://invest.ovelha.us/finance)');\n\nreturn [{json: {message: lines.join('\\n'), urgency}}];"
+      },
+      "id": "format-message",
+      "name": "Format Telegram Message",
+      "type": "n8n-nodes-base.code",
+      "position": [450, 150]
+    },
+    {
+      "parameters": {
+        "chatId": "={{$env.TELEGRAM_CHAT_ID}}",
+        "text": "={{$json.message}}",
+        "additionalFields": {
+          "parse_mode": "Markdown",
+          "disable_web_page_preview": true
+        }
+      },
+      "id": "send-telegram",
+      "name": "Send Telegram Alert",
+      "type": "n8n-nodes-base.telegram",
+      "position": [650, 150],
+      "credentials": {
+        "telegramApi": {"id": "telegram-bot", "name": "OvelhaInvest Bot"}
+      }
+    }
+  ],
+  "connections": {
+    "Daily 8am Trigger": {
+      "main": [[
+        {"node": "Get Finance Summary", "type": "main", "index": 0},
+        {"node": "Get Cashflow Forecast", "type": "main", "index": 0},
+        {"node": "Get Net Worth", "type": "main", "index": 0}
+      ]]
+    },
+    "Get Finance Summary": {"main": [[{"node": "Format Telegram Message", "type": "main", "index": 0}]]},
+    "Get Cashflow Forecast": {"main": [[{"node": "Format Telegram Message", "type": "main", "index": 0}]]},
+    "Get Net Worth": {"main": [[{"node": "Format Telegram Message", "type": "main", "index": 0}]]},
+    "Format Telegram Message": {"main": [[{"node": "Send Telegram Alert", "type": "main", "index": 0}]]}
+  },
+  "settings": {
+    "executionOrder": "v1"
+  }
+}

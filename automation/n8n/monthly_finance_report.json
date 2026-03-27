@@ -1,0 +1,98 @@
+{
+  "name": "OvelhaInvest — Monthly Finance Report",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [{"field": "cronExpression", "expression": "0 9 1 * *"}]
+        }
+      },
+      "id": "trigger-monthly",
+      "name": "1st of Month 9am",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "position": [0, 0]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Get previous month\nconst now = new Date();\nconst prevMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1);\nconst monthStr = prevMonth.toISOString().slice(0, 7);\nconst monthLabel = prevMonth.toLocaleDateString('en-US', {month: 'long', year: 'numeric'});\nreturn [{json: {month: monthStr, monthLabel, apiBase: $env.API_BASE_URL}}];"
+      },
+      "id": "compute-prev-month",
+      "name": "Compute Previous Month",
+      "type": "n8n-nodes-base.code",
+      "position": [200, 0]
+    },
+    {
+      "parameters": {
+        "url": "={{$json.apiBase}}/finance/summary?month={{$json.month}}",
+        "options": {}
+      },
+      "id": "get-monthly-summary",
+      "name": "Get Monthly Summary",
+      "type": "n8n-nodes-base.httpRequest",
+      "position": [400, 0]
+    },
+    {
+      "parameters": {
+        "url": "={{$('Compute Previous Month').first().json.apiBase}}/finance/net_worth",
+        "options": {}
+      },
+      "id": "get-net-worth",
+      "name": "Get Net Worth",
+      "type": "n8n-nodes-base.httpRequest",
+      "position": [400, 150]
+    },
+    {
+      "parameters": {
+        "url": "={{$('Compute Previous Month').first().json.apiBase}}/budgets?month={{$('Compute Previous Month').first().json.month}}-01",
+        "options": {}
+      },
+      "id": "get-budgets",
+      "name": "Get Budget Performance",
+      "type": "n8n-nodes-base.httpRequest",
+      "position": [400, 300]
+    },
+    {
+      "parameters": {
+        "jsCode": "const summary = $('Get Monthly Summary').first().json;\nconst netWorth = $('Get Net Worth').first().json;\nconst budgetsData = $('Get Budget Performance').first().json;\nconst monthLabel = $('Compute Previous Month').first().json.monthLabel;\n\nconst fmtUSD = (n) => '$' + Math.abs(n || 0).toLocaleString('en-US', {minimumFractionDigits: 0, maximumFractionDigits: 0});\nconst fmtPct = (n) => ((n || 0) * 100).toFixed(1) + '%';\n\nconst income = summary.total_income || 0;\nconst expenses = summary.total_expenses || 0;\nconst savings = summary.savings || 0;\nconst savingsRate = summary.savings_rate || 0;\nconst netWorthValue = netWorth.net_worth_usd || 0;\n\nconst budgets = budgetsData.budgets || [];\nconst overBudget = budgets.filter(b => b.pct_used > 100);\nconst topCategories = Object.entries(summary.by_category || {})\n  .sort((a, b) => b[1] - a[1])\n  .slice(0, 3);\n\nlet lines = [];\nlines.push(`*Monthly Finance Report — ${monthLabel}*`);\nlines.push('');\nlines.push(`*Income & Expenses*`);\nlines.push(`Income: ${fmtUSD(income)}`);\nlines.push(`Expenses: ${fmtUSD(expenses)}`);\nlines.push(`Net Savings: ${savings >= 0 ? '+' : ''}${fmtUSD(savings)}`);\nlines.push(`Savings Rate: ${fmtPct(savingsRate)} ${savingsRate >= 0.2 ? '(target met)' : savingsRate >= 0.1 ? '(below 20% target)' : '(below 10% — review expenses)'}`);\nlines.push('');\nlines.push(`*Net Worth*`);\nlines.push(`Current: ${fmtUSD(netWorthValue)}`);\n\nif (topCategories.length > 0) {\n  lines.push('');\n  lines.push('*Top Expense Categories*');\n  topCategories.forEach(([cat, amt]) => {\n    lines.push(`- ${cat}: ${fmtUSD(amt)}`);\n  });\n}\n\nif (overBudget.length > 0) {\n  lines.push('');\n  lines.push(`*Budget Overruns (${overBudget.length})*`);\n  overBudget.slice(0, 3).forEach(b => {\n    lines.push(`- ${b.categories?.name || 'Unknown'}: ${b.pct_used?.toFixed(0)}% used`);\n  });\n}\n\nlines.push('');\nlines.push('[View Finance Report](https://invest.ovelha.us/finance)');\n\nreturn [{json: {message: lines.join('\\n')}}];"
+      },
+      "id": "format-report",
+      "name": "Format Monthly Report",
+      "type": "n8n-nodes-base.code",
+      "position": [650, 150]
+    },
+    {
+      "parameters": {
+        "chatId": "={{$env.TELEGRAM_CHAT_ID}}",
+        "text": "={{$json.message}}",
+        "additionalFields": {
+          "parse_mode": "Markdown",
+          "disable_web_page_preview": true
+        }
+      },
+      "id": "send-report",
+      "name": "Send Monthly Report",
+      "type": "n8n-nodes-base.telegram",
+      "position": [850, 150],
+      "credentials": {
+        "telegramApi": {"id": "telegram-bot", "name": "OvelhaInvest Bot"}
+      }
+    }
+  ],
+  "connections": {
+    "1st of Month 9am": {"main": [[{"node": "Compute Previous Month", "type": "main", "index": 0}]]},
+    "Compute Previous Month": {
+      "main": [[
+        {"node": "Get Monthly Summary", "type": "main", "index": 0},
+        {"node": "Get Net Worth", "type": "main", "index": 0},
+        {"node": "Get Budget Performance", "type": "main", "index": 0}
+      ]]
+    },
+    "Get Monthly Summary": {"main": [[{"node": "Format Monthly Report", "type": "main", "index": 0}]]},
+    "Get Net Worth": {"main": [[{"node": "Format Monthly Report", "type": "main", "index": 0}]]},
+    "Get Budget Performance": {"main": [[{"node": "Format Monthly Report", "type": "main", "index": 0}]]},
+    "Format Monthly Report": {"main": [[{"node": "Send Monthly Report", "type": "main", "index": 0}]]}
+  },
+  "settings": {
+    "executionOrder": "v1"
+  }
+}
