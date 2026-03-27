@@ -33,8 +33,12 @@ export function SWRProvider({ children }: { children: React.ReactNode }) {
       value={{
         fetcher,
         revalidateOnFocus: false,
-        shouldRetryOnError: false,
-        dedupingInterval: CACHE_TTL.FAST,
+        revalidateOnReconnect: true,
+        dedupingInterval: 5_000,
+        errorRetryCount: 5,
+        errorRetryInterval: 3_000,
+        loadingTimeout: 30_000,
+        keepPreviousData: true,
       }}
     >
       {children}

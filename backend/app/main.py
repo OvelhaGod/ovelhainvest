@@ -39,8 +39,26 @@ async def lifespan(app: FastAPI):  # noqa: ARG001
                 logger.warning("Telegram webhook registration failed on startup")
         except Exception as exc:
             logger.warning("Telegram webhook startup error (non-critical): %s", exc)
+
+    # Pre-warm Redis cache so the first /daily_status request is fast.
+    # Runs as a background task — never blocks startup.
+    asyncio.ensure_future(_warm_cache())
+
     yield
     # Shutdown — nothing to clean up
+
+
+async def _warm_cache() -> None:
+    """Pre-fetch live portfolio value on startup to populate Redis cache."""
+    await asyncio.sleep(5)  # wait for full app initialisation
+    try:
+        from app.config import get_default_user_id
+        from app.services.portfolio_value import compute_live_portfolio_value
+        user_id = get_default_user_id()
+        await asyncio.to_thread(compute_live_portfolio_value, user_id)
+        logger.info("Cache warmed on startup — portfolio value pre-fetched")
+    except Exception as exc:
+        logger.warning("Startup cache warm failed (non-fatal): %s", exc)
 
 
 # ---------------------------------------------------------------------------
