@@ -8,6 +8,7 @@ import {
   LayoutDashboard, Activity, TrendingUp, LineChart,
   Package, Globe, Newspaper, Receipt, BookMarked, FileText, Settings,
   ChevronLeft, ChevronRight, User, Link2,
+  Wallet, CreditCard, BarChart3, RefreshCw, PiggyBank,
 } from "lucide-react";
 
 // Endpoints to prefetch when hovering each nav item
@@ -19,6 +20,11 @@ const PREFETCH_MAP: Record<string, string[]> = {
   "/markets":      ["/markets/overview"],
   "/projections":  ["/simulation/dashboard_preview"],
   "/tax":          ["/tax/estimate"],
+  "/finance":      ["/finance/summary"],
+  "/transactions": ["/transactions?limit=20"],
+  "/budget":       ["/budgets"],
+  "/cashflow":     ["/finance/cashflow"],
+  "/net-worth":    ["/finance/net_worth"],
 };
 
 const navItems = [
@@ -29,6 +35,16 @@ const navItems = [
       { href: "/signals",     label: "Signals",     icon: Activity },
       { href: "/performance", label: "Performance", icon: TrendingUp },
       { href: "/projections", label: "Projections", icon: LineChart },
+    ],
+  },
+  {
+    group: "Finances",
+    items: [
+      { href: "/finance",      label: "Overview",     icon: Wallet },
+      { href: "/transactions", label: "Transactions", icon: CreditCard },
+      { href: "/budget",       label: "Budget",       icon: PiggyBank },
+      { href: "/cashflow",     label: "Cash Flow",    icon: BarChart3 },
+      { href: "/net-worth",    label: "Net Worth",    icon: RefreshCw },
     ],
   },
   {
@@ -159,7 +175,7 @@ export function Sidebar() {
         </div>
 
         {!collapsed && (
-          <p className="text-[10px] text-white/20 px-1 pt-0.5">v1.5.0 · Phase 10</p>
+          <p className="text-[10px] text-white/20 px-1 pt-0.5">v2.0.0 · Phase 11</p>
         )}
       </div>
     </aside>

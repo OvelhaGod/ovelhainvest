@@ -874,6 +874,9 @@ export default function DashboardPage() {
         </a>
       )}
 
+      {/* ── Finance Summary widget ── */}
+      <FinanceSummaryWidget />
+
       {/* ── Error banner ── */}
       {error && (
         <OIErrorState
@@ -998,4 +1001,69 @@ function seasonIcon(s: string) {
     normal:                           "⚖️",
   };
   return icons[s] ?? "📊";
+}
+
+// ── Finance Summary Widget ─────────────────────────────────────────────────────
+function FinanceSummaryWidget() {
+  const today = new Date();
+  const monthStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, "0")}`;
+
+  const { data: summary } = useSWR<{
+    month: string;
+    total_income: number;
+    total_expenses: number;
+    savings: number;
+    savings_rate: number;
+  }>(
+    `/finance/summary?month=${monthStr}`,
+    fetcher,
+    { refreshInterval: CACHE_TTL.MEDIUM, keepPreviousData: true }
+  );
+
+  // Only show widget if there's finance data
+  if (!summary || (summary.total_income === 0 && summary.total_expenses === 0)) return null;
+
+  const savingsRatePct = ((summary.savings_rate ?? 0) * 100).toFixed(1);
+  const savingsColor = (summary.savings_rate ?? 0) >= 0.2 ? "#10b981" : (summary.savings_rate ?? 0) >= 0.1 ? "#f59e0b" : "#ef4444";
+
+  return (
+    <a
+      href="/finance"
+      className={`${glassInner} block hover:border-white/[0.14] transition-colors`}
+      style={{ borderColor: "rgba(6,182,212,0.12)", boxShadow: "0 0 20px rgba(6,182,212,0.04)" }}
+    >
+      <div className="flex items-center justify-between mb-3">
+        <p className="text-xs text-white/40 uppercase tracking-widest">Personal Finance</p>
+        <span className="text-xs text-white/30 hover:text-white/50 transition-colors">
+          {today.toLocaleDateString("en-US", { month: "long", year: "numeric" })} · View details →
+        </span>
+      </div>
+      <div className="grid grid-cols-4 gap-4">
+        <div>
+          <p className="text-xs text-white/30 mb-1">Income</p>
+          <p className="text-lg font-bold font-mono text-[#10b981]">
+            {new Intl.NumberFormat("en-US", { style: "currency", currency: "USD", maximumFractionDigits: 0 }).format(summary.total_income)}
+          </p>
+        </div>
+        <div>
+          <p className="text-xs text-white/30 mb-1">Expenses</p>
+          <p className="text-lg font-bold font-mono text-[#ef4444]">
+            {new Intl.NumberFormat("en-US", { style: "currency", currency: "USD", maximumFractionDigits: 0 }).format(summary.total_expenses)}
+          </p>
+        </div>
+        <div>
+          <p className="text-xs text-white/30 mb-1">Net Savings</p>
+          <p className="text-lg font-bold font-mono" style={{ color: summary.savings >= 0 ? "#10b981" : "#ef4444" }}>
+            {summary.savings >= 0 ? "+" : ""}{new Intl.NumberFormat("en-US", { style: "currency", currency: "USD", maximumFractionDigits: 0 }).format(summary.savings)}
+          </p>
+        </div>
+        <div>
+          <p className="text-xs text-white/30 mb-1">Savings Rate</p>
+          <p className="text-lg font-bold font-mono" style={{ color: savingsColor }}>
+            {savingsRatePct}%
+          </p>
+        </div>
+      </div>
+    </a>
+  );
 }
