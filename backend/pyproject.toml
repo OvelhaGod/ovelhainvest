@@ -24,6 +24,8 @@ dependencies = [
     "python-dateutil>=2.9.0",
     "pg8000>=1.31.5",
     "paramiko>=4.0.0",
+    "psycopg2-binary>=2.9.11",
+    "python-multipart>=0.0.22",
 ]
 
 [build-system]
