@@ -200,13 +200,33 @@ def get_portfolio_history(
     days_map = {"1m": 35, "3m": 95, "6m": 185, "1y": 370}
     days = days_map.get(period, 95)
 
-    snapshots = get_snapshot_history(user_id, days=days)
+    # Exclude today's retroactive snapshot; today's live value is appended below
+    today_iso = date.today().isoformat()
+    snapshots = get_snapshot_history(user_id, days=days, exclude_today=True)
     if not snapshots:
         return {"data": [], "portfolio_indexed": [], "benchmarks": {}, "current_value": None, "change_pct": None}
 
     # Sort ascending
     snapshots = sorted(snapshots, key=lambda s: s["snapshot_date"])
     port_data = [{"date": s["snapshot_date"], "value": float(s["total_value_usd"])} for s in snapshots]
+
+    # Append today's live value from /daily_status snapshot (already stored by force_snapshot)
+    try:
+        from app.db.supabase_client import get_supabase_client as _get_db
+        _db = _get_db()
+        today_snap = (
+            _db.table("portfolio_snapshots")
+            .select("total_value_usd")
+            .eq("user_id", user_id)
+            .eq("snapshot_date", today_iso)
+            .limit(1)
+            .execute()
+        )
+        if today_snap.data:
+            live_val = float(today_snap.data[0]["total_value_usd"])
+            port_data.append({"date": today_iso, "value": live_val})
+    except Exception as exc:
+        logger.warning("Could not append today's live snapshot: %s", exc)
 
     if len(port_data) < 2:
         return {"data": port_data, "portfolio_indexed": [], "benchmarks": {}, "current_value": port_data[-1]["value"] if port_data else None, "change_pct": None}

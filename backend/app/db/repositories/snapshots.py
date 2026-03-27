@@ -35,13 +35,14 @@ def upsert_portfolio_snapshot(snapshot: dict) -> dict:
         raise
 
 
-def get_snapshot_history(user_id: str, days: int = 365) -> list[dict]:
+def get_snapshot_history(user_id: str, days: int = 365, exclude_today: bool = False) -> list[dict]:
     """
     Fetch portfolio snapshot history for a user.
 
     Args:
         user_id: UUID string.
         days: Number of days of history (default 365).
+        exclude_today: If True, exclude today's snapshot (used when appending live value separately).
 
     Returns:
         List of snapshot dicts ordered by date ascending.
@@ -49,14 +50,15 @@ def get_snapshot_history(user_id: str, days: int = 365) -> list[dict]:
     try:
         cutoff = (date.today() - timedelta(days=days)).isoformat()
         client = get_supabase_client()
-        resp = (
+        q = (
             client.table("portfolio_snapshots")
             .select("*")
             .eq("user_id", user_id)
             .gte("snapshot_date", cutoff)
-            .order("snapshot_date")
-            .execute()
         )
+        if exclude_today:
+            q = q.lt("snapshot_date", date.today().isoformat())
+        resp = q.order("snapshot_date").execute()
         return resp.data or []
     except Exception as exc:
         logger.error("get_snapshot_history failed for user %s: %s", user_id, exc)

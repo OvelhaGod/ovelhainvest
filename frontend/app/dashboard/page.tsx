@@ -382,7 +382,7 @@ export default function DashboardPage() {
       <div className={glassInner}>
         <p className="text-xs text-white/40 uppercase tracking-widest mb-4">Portfolio Evolution</p>
         <p className="text-xs text-white/25 mb-3">Indexed to 100 at period start · vs SPY, QQQ, ACWI</p>
-        <PortfolioChart height={200} defaultPeriod="3M" />
+        <PortfolioChart height={200} defaultPeriod="1M" />
       </div>
 
       {/* ── Middle row: Donut + Vaults ── */}

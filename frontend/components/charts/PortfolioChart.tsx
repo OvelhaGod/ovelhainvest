@@ -210,6 +210,9 @@ export function PortfolioChart({
           ))}
         </LineChart>
       </ResponsiveContainer>
+      <p className="text-[10px] text-white/20 mt-2">
+        Historical values estimated using current holdings × past prices. Connect accounts via Pluggy for accurate history.
+      </p>
     </div>
   );
 }
