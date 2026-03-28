@@ -156,7 +156,7 @@ def health_check() -> dict:
         "status": overall,
         "supabase": "connected" if supabase_ok else "unreachable",
         "redis": redis_status,
-        "version": "1.2.0",
+        "version": "2.0.2",
         "env": settings.app_env,
         "timestamp": datetime.now(timezone.utc).isoformat(),
     }
@@ -165,7 +165,7 @@ def health_check() -> dict:
 @app.get("/version", tags=["system"])
 def version() -> dict:
     """Return API version info."""
-    return {"version": "1.2.0", "phase": "6", "env": settings.app_env}
+    return {"version": "2.0.2", "phase": "11", "env": settings.app_env}
 
 
 @app.get("/", tags=["system"])
