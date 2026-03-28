@@ -103,7 +103,7 @@ def rebuild():
         qty = float(h.get("quantity", 0))
         if not symbol or qty <= 0:
             continue
-        symbol_qty[symbol] = qty
+        symbol_qty[symbol] = symbol_qty.get(symbol, 0.0) + qty
         asset_class_map[symbol] = asset_class.lower().replace(" ", "_")
         if currency == "BRL" or "brazil" in asset_class.lower():
             brl_symbols.add(symbol)
