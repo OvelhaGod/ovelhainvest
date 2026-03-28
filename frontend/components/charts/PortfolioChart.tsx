@@ -18,10 +18,12 @@ import {
 } from "recharts";
 import { fetcher, CACHE_TTL } from "@/lib/swr-config";
 import { SkeletonChart } from "@/components/ui/skeleton";
+import { tightDomain, formatIndexTick } from "@/lib/chart-utils";
 
-const PERIODS = ["1M", "3M", "6M", "1Y"] as const;
+const PERIODS = ["1W", "1M", "3M", "6M", "1Y"] as const;
 type Period = (typeof PERIODS)[number];
 const PERIOD_API: Record<Period, string> = {
+  "1W": "1w",
   "1M": "1m",
   "3M": "3m",
   "6M": "6m",
@@ -46,11 +48,13 @@ interface PortfolioHistoryData {
 interface PortfolioChartProps {
   height?: number;
   defaultPeriod?: Period;
+  showPeriodSelector?: boolean;
 }
 
 export function PortfolioChart({
   height = 250,
   defaultPeriod = "3M",
+  showPeriodSelector = true,
 }: PortfolioChartProps) {
   const [period, setPeriod] = useState<Period>(defaultPeriod);
 
@@ -112,6 +116,7 @@ export function PortfolioChart({
   }));
 
   const isPositive = (data.change_pct ?? 0) >= 0;
+  const domain = tightDomain(chartData, ["Portfolio", "SPY", "QQQ", "ACWI"]);
 
   return (
     <div>
@@ -133,21 +138,23 @@ export function PortfolioChart({
             </span>
           )}
         </div>
-        <div className="flex gap-1">
-          {PERIODS.map((p) => (
-            <button
-              key={p}
-              onClick={() => setPeriod(p)}
-              className={`px-2 py-0.5 text-xs rounded font-mono transition-colors ${
-                period === p
-                  ? "bg-white/[0.10] text-white/90"
-                  : "text-white/30 hover:text-white/60"
-              }`}
-            >
-              {p}
-            </button>
-          ))}
-        </div>
+        {showPeriodSelector && (
+          <div className="flex gap-1">
+            {PERIODS.map((p) => (
+              <button
+                key={p}
+                onClick={() => setPeriod(p)}
+                className={`px-2 py-0.5 text-xs rounded font-mono transition-colors ${
+                  period === p
+                    ? "bg-white/[0.10] text-white/90"
+                    : "text-white/30 hover:text-white/60"
+                }`}
+              >
+                {p}
+              </button>
+            ))}
+          </div>
+        )}
       </div>
 
       <ResponsiveContainer width="100%" height={height}>
@@ -163,10 +170,11 @@ export function PortfolioChart({
             }
           />
           <YAxis
+            domain={domain}
+            tickFormatter={formatIndexTick}
             tick={{ fill: "#52525b", fontSize: 10, fontFamily: "var(--font-mono, monospace)" }}
             axisLine={false}
             tickLine={false}
-            tickFormatter={(v: number) => `${v.toFixed(0)}`}
             width={32}
           />
           <ReferenceLine

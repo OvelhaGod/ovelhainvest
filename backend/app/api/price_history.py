@@ -49,7 +49,7 @@ _YF_PERIOD = {
 # Map frontend period → yfinance interval for intraday granularity
 _YF_INTERVAL = {
     "1d": "5m",
-    "1w": "1h",
+    "1w": "30m",
     "1m": "1d",
     "3m": "1d",
     "6m": "1d",
@@ -89,13 +89,23 @@ def _fetch_ohlcv(symbol: str, period: str) -> list[dict]:
         if hist.empty:
             return []
         rows = []
+        intraday = period in ("1d", "1w")
         for ts, row in hist.iterrows():
+            if intraday:
+                date_str = ts.strftime("%Y-%m-%dT%H:%M")
+                # 1D → show clock time only; 1W → show "Mon HH:MM" across 5 days
+                display = ts.strftime("%H:%M") if period == "1d" else ts.strftime("%a %H:%M")
+            else:
+                date_str = ts.strftime("%Y-%m-%d")
+                display = ts.strftime("%b %d") if period != "1y" else ts.strftime("%b '%y")
+            import math as _math
             rows.append({
-                "date": ts.strftime("%Y-%m-%d") if period not in ("1d", "1w") else ts.strftime("%Y-%m-%dT%H:%M"),
-                "close": round(float(row["Close"]), 4) if not __import__("math").isnan(row["Close"]) else None,
-                "open":  round(float(row["Open"]), 4) if not __import__("math").isnan(row["Open"]) else None,
-                "high":  round(float(row["High"]), 4) if not __import__("math").isnan(row["High"]) else None,
-                "low":   round(float(row["Low"]), 4) if not __import__("math").isnan(row["Low"]) else None,
+                "date":    date_str,
+                "display": display,
+                "close": round(float(row["Close"]), 4) if not _math.isnan(row["Close"]) else None,
+                "open":  round(float(row["Open"]), 4) if not _math.isnan(row["Open"]) else None,
+                "high":  round(float(row["High"]), 4) if not _math.isnan(row["High"]) else None,
+                "low":   round(float(row["Low"]), 4) if not _math.isnan(row["Low"]) else None,
                 "volume": int(row.get("Volume", 0) or 0),
             })
         return [r for r in rows if r["close"] is not None]
@@ -178,7 +188,7 @@ def get_price_history(
 
 @router.get("/portfolio_history")
 def get_portfolio_history(
-    period: str = Query(default="3m", pattern="^(1m|3m|6m|1y)$"),
+    period: str = Query(default="3m", pattern="^(1w|1m|3m|6m|1y)$"),
     user_id: str = Query(default=None),
 ):
     """
@@ -197,7 +207,7 @@ def get_portfolio_history(
         return cached
 
     # Determine lookback days
-    days_map = {"1m": 35, "3m": 95, "6m": 185, "1y": 370}
+    days_map = {"1w": 10, "1m": 35, "3m": 95, "6m": 185, "1y": 370}
     days = days_map.get(period, 95)
 
     # Exclude today's retroactive snapshot; today's live value is appended below

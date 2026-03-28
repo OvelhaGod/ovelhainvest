@@ -2,17 +2,20 @@
 
 /**
  * /markets — Live market overview, portfolio vs benchmarks, sector heatmap.
- * Perplexity Finance-inspired layout with glassmorphism design.
+ * Perplexity Finance-inspired layout: clickable tickers, sector sparklines,
+ * expandable holdings rows.
  */
 
-import { useEffect, useState, useCallback } from "react";
+import { useCallback, useState } from "react";
 import useSWR from "swr";
+import { X } from "lucide-react";
 import { fetcher, CACHE_TTL } from "@/lib/swr-config";
 import { AssetLogo } from "@/lib/asset-logos";
 import { MiniChart } from "@/components/charts/MiniChart";
 import { PortfolioChart } from "@/components/charts/PortfolioChart";
+import { PriceChart } from "@/components/charts/PriceChart";
 
-// ── Types ─────────────────────────────────────────────────────────────────────
+// ── Types ──────────────────────────────────────────────────────────────────────
 interface IndexTicker {
   symbol: string;
   name: string;
@@ -41,11 +44,10 @@ interface HeldAsset {
   quantity: number;
 }
 
-// ── Helpers ───────────────────────────────────────────────────────────────────
+// ── Helpers ────────────────────────────────────────────────────────────────────
 function fmtPrice(n: number | null | undefined): string {
   if (n == null) return "—";
   if (n >= 1000) return `$${n.toLocaleString("en-US", { maximumFractionDigits: 0 })}`;
-  if (n >= 100)  return `$${n.toFixed(2)}`;
   return `$${n.toFixed(2)}`;
 }
 
@@ -57,19 +59,19 @@ function fmtPct(n: number | null | undefined, dp = 2): string {
 
 function pctColor(n: number | null | undefined): string {
   if (n == null) return "text-white/40";
-  if (n > 0)  return "text-[#10b981]";
-  if (n < 0)  return "text-[#f43f5e]";
+  if (n > 0) return "text-[#10b981]";
+  if (n < 0) return "text-[#f43f5e]";
   return "text-white/60";
 }
 
 function sectorBg(chg: number | null): string {
   if (chg == null) return "rgba(255,255,255,0.03)";
-  if (chg > 2.0)   return "rgba(6,78,59,0.85)";   // dark emerald — strong green
-  if (chg > 1.0)   return "rgba(6,95,70,0.65)";
-  if (chg > 0)     return "rgba(6,78,59,0.35)";
-  if (chg > -1.0)  return "rgba(76,16,16,0.40)";
-  if (chg > -2.0)  return "rgba(76,16,16,0.65)";
-  return "rgba(91,26,26,0.85)";                     // dark red — strong loss
+  if (chg > 2.0) return "rgba(6,78,59,0.85)";
+  if (chg > 1.0) return "rgba(6,95,70,0.65)";
+  if (chg > 0)   return "rgba(6,78,59,0.35)";
+  if (chg > -1.0) return "rgba(76,16,16,0.40)";
+  if (chg > -2.0) return "rgba(76,16,16,0.65)";
+  return "rgba(91,26,26,0.85)";
 }
 
 function sectorBorder(chg: number | null): string {
@@ -78,9 +80,10 @@ function sectorBorder(chg: number | null): string {
   return "rgba(244,63,94,0.20)";
 }
 
-// Mini SVG sparkline (no lib, lightweight)
+// Mini inline SVG sparkline
 function Sparkline({ data, color }: { data: number[]; color: string }) {
-  if (!data || data.length < 2) return <div className="w-10 h-6 opacity-30 bg-white/5 rounded" />;
+  if (!data || data.length < 2)
+    return <div className="w-10 h-6 opacity-30 bg-white/5 rounded" />;
   const min = Math.min(...data);
   const max = Math.max(...data);
   const range = max - min || 1;
@@ -95,12 +98,10 @@ function Sparkline({ data, color }: { data: number[]; color: string }) {
   );
 }
 
-// Skeleton loader
 function Skeleton({ className = "" }: { className?: string }) {
   return <div className={`animate-pulse rounded bg-white/[0.06] ${className}`} />;
 }
 
-// Fear & Greed gauge
 function FearGreedGauge({ value }: { value: number }) {
   const label =
     value <= 20 ? "Extreme Fear" :
@@ -112,7 +113,6 @@ function FearGreedGauge({ value }: { value: number }) {
     value <= 40 ? "#f59e0b" :
     value <= 60 ? "#94a3b8" :
     value <= 80 ? "#10b981" : "#06b6d4";
-  const pct = `${value}%`;
 
   return (
     <div className="space-y-2">
@@ -122,7 +122,10 @@ function FearGreedGauge({ value }: { value: number }) {
       </div>
       <div className="h-2 rounded-full bg-white/[0.08] overflow-hidden">
         <div className="h-full rounded-full transition-all duration-500"
-          style={{ width: pct, background: `linear-gradient(90deg, #f43f5e 0%, #f59e0b 25%, #94a3b8 50%, #10b981 75%, #06b6d4 100%)` }} />
+          style={{
+            width: `${value}%`,
+            background: "linear-gradient(90deg, #f43f5e 0%, #f59e0b 25%, #94a3b8 50%, #10b981 75%, #06b6d4 100%)"
+          }} />
       </div>
       <div className="flex justify-between text-[10px] text-white/30">
         <span>Fear</span><span>Neutral</span><span>Greed</span>
@@ -131,8 +134,14 @@ function FearGreedGauge({ value }: { value: number }) {
   );
 }
 
+// ── Sector symbols for sparkline batch fetch ───────────────────────────────────
+const SECTOR_SYMBOLS = ["XLK", "XLE", "XLV", "XLF", "XLRE", "XLY", "XLU", "XLB", "XLI", "XLC"];
+
 // ── Main component ─────────────────────────────────────────────────────────────
 export default function MarketsPage() {
+  const [selectedTicker, setSelectedTicker] = useState<string | null>(null);
+  const [expandedHolding, setExpandedHolding] = useState<string | null>(null);
+
   const { data: overview, isLoading: loadingOverview } = useSWR(
     "/markets/overview", fetcher, { refreshInterval: 60_000 }
   );
@@ -143,23 +152,8 @@ export default function MarketsPage() {
     "/markets/movers", fetcher, { refreshInterval: 60_000 }
   );
 
-  // Compute fear/greed from VIX
-  const fearGreed = useCallback(() => {
-    if (!overview) return 50;
-    const indices = (overview as any).indices as IndexTicker[] | undefined;
-    if (!indices) return 50;
-    const vix = indices.find((i) => i.symbol === "VIX" || i.name === "VIX");
-    if (!vix?.price) return 50;
-    // VIX inverse: VIX 10=90 (extreme greed), VIX 40=5 (extreme fear)
-    const raw = Math.max(5, Math.min(95, Math.round(100 - ((vix.price - 10) / 30) * 90)));
-    return raw;
-  }, [overview]);
-
-  const indices = (overview as any)?.indices as IndexTicker[] | undefined;
-  const sectors = (overview as any)?.sectors as SectorData[] | undefined;
-  const fx      = (overview as any)?.fx as FxData[] | undefined;
+  // Batch sparklines for held assets
   const heldAssetsRaw = (movers as any)?.held_assets as HeldAsset[] | undefined;
-  // Deduplicate by symbol, summing quantities
   const heldAssets = heldAssetsRaw
     ? Object.values(
         heldAssetsRaw.reduce<Record<string, HeldAsset>>((acc, a) => {
@@ -172,16 +166,33 @@ export default function MarketsPage() {
         }, {})
       )
     : undefined;
-  const periods = (pvMarket as any)?.periods as string[] | undefined;
-  const pRows = pvMarket as any;
 
-  // Batch sparklines for held assets
   const heldSymbols = (heldAssets ?? []).map((a) => a.symbol).join(",");
   const { data: holdingSparklines } = useSWR<Record<string, number[]>>(
     heldSymbols ? `/price_history/batch?symbols=${heldSymbols}&period=1m` : null,
     fetcher,
     { refreshInterval: CACHE_TTL.MEDIUM }
   );
+
+  // Batch sparklines for sectors (1M period)
+  const { data: sectorSparklines } = useSWR<Record<string, number[]>>(
+    `/price_history/batch?symbols=${SECTOR_SYMBOLS.join(",")}&period=1m`,
+    fetcher,
+    { refreshInterval: CACHE_TTL.SLOW }
+  );
+
+  const fearGreed = useCallback(() => {
+    if (!overview) return 50;
+    const indices = (overview as any).indices as IndexTicker[] | undefined;
+    const vix = indices?.find((i) => i.symbol === "VIX" || i.name === "VIX");
+    if (!vix?.price) return 50;
+    return Math.max(5, Math.min(95, Math.round(100 - ((vix.price - 10) / 30) * 90)));
+  }, [overview]);
+
+  const indices = (overview as any)?.indices as IndexTicker[] | undefined;
+  const sectors = (overview as any)?.sectors as SectorData[] | undefined;
+  const fx = (overview as any)?.fx as FxData[] | undefined;
+  const pRows = pvMarket as any;
 
   const PERIOD_LABELS: Record<string, string> = { "1w": "1W", "1m": "1M", "3m": "3M", "ytd": "YTD", "1y": "1Y" };
   const PERIOD_LIST = ["1w", "1m", "3m", "ytd", "1y"];
@@ -191,6 +202,7 @@ export default function MarketsPage() {
       style={{
         background: "radial-gradient(ellipse 80% 50% at 50% -20%, rgba(99,102,241,0.10) 0%, transparent 60%), #050508"
       }}>
+
       {/* ── Page header ── */}
       <div className="flex items-center justify-between">
         <div>
@@ -204,27 +216,64 @@ export default function MarketsPage() {
         )}
       </div>
 
-      {/* ── TICKER STRIP ── */}
-      <div className="relative overflow-hidden rounded-xl border border-white/[0.07] bg-white/[0.03]">
-        <div className="flex gap-0 ticker-scroll">
-          {[...(indices ?? []), ...(indices ?? [])].map((t, i) => (
-            <div key={i} className="flex items-center gap-2 px-4 py-2.5 border-r border-white/[0.06] shrink-0 min-w-[160px]">
-              <Sparkline
-                data={t.sparkline ?? []}
-                color={(t.change_pct ?? 0) >= 0 ? "#10b981" : "#f43f5e"}
-              />
-              <div>
-                <div className="flex items-center gap-1.5">
-                  <span className="text-xs font-mono font-semibold text-white/90">{t.symbol}</span>
-                  <span className={`text-[10px] font-mono ${pctColor(t.change_pct)}`}>
-                    {fmtPct(t.change_pct)}
-                  </span>
+      {/* ── TICKER STRIP — clickable ── */}
+      <div className="rounded-xl border border-white/[0.07] bg-white/[0.03] overflow-hidden">
+        <div className="flex overflow-x-auto scrollbar-hide">
+          {(indices ?? []).map((t) => {
+            const isSelected = selectedTicker === t.symbol;
+            const chgColor = (t.change_pct ?? 0) >= 0 ? "#10b981" : "#f43f5e";
+            return (
+              <button
+                key={t.symbol}
+                onClick={() => setSelectedTicker(isSelected ? null : t.symbol)}
+                className={`flex items-center gap-2.5 px-4 py-2.5 border-r border-white/[0.06] shrink-0 min-w-[160px]
+                  transition-all duration-150
+                  ${isSelected
+                    ? "bg-white/[0.06] border-b-2 border-b-emerald-500"
+                    : "hover:bg-white/[0.03] border-b-2 border-b-transparent"
+                  }`}
+              >
+                <Sparkline data={t.sparkline ?? []} color={chgColor} />
+                <div className="text-left">
+                  <div className="flex items-center gap-1.5">
+                    <span className="text-xs font-mono font-semibold text-white/90">{t.symbol}</span>
+                    <span className="text-[10px] font-mono" style={{ color: chgColor }}>
+                      {fmtPct(t.change_pct)}
+                    </span>
+                  </div>
+                  <div className="text-[10px] font-mono text-white/40">{fmtPrice(t.price)}</div>
                 </div>
-                <div className="text-[10px] font-mono text-white/40">{fmtPrice(t.price)}</div>
-              </div>
-            </div>
-          ))}
+              </button>
+            );
+          })}
         </div>
+
+        {/* Expanded chart panel for selected ticker */}
+        {selectedTicker && (
+          <div className="border-t border-white/[0.06] p-4 bg-white/[0.02]">
+            <div className="flex items-center justify-between mb-3">
+              <div className="flex items-center gap-2">
+                <span className="text-sm font-semibold font-mono text-white/90">{selectedTicker}</span>
+                <span className="text-xs text-white/40">
+                  {indices?.find((i) => i.symbol === selectedTicker)?.name ?? ""}
+                </span>
+              </div>
+              <button
+                onClick={() => setSelectedTicker(null)}
+                className="text-white/30 hover:text-white/60 transition-colors"
+              >
+                <X size={14} />
+              </button>
+            </div>
+            <PriceChart
+              symbol={selectedTicker}
+              height={160}
+              showPeriodSelector={true}
+              defaultPeriod="1D"
+              variant="minimal"
+            />
+          </div>
+        )}
       </div>
 
       {/* ── MAIN GRID ── */}
@@ -233,7 +282,7 @@ export default function MarketsPage() {
         {/* LEFT COLUMN */}
         <div className="space-y-4">
 
-          {/* PORTFOLIO VS MARKET */}
+          {/* PORTFOLIO VS MARKET TABLE */}
           <div className="rounded-2xl border border-white/[0.08] bg-white/[0.03] p-4">
             <h2 className="text-sm font-semibold text-white/80 mb-3">Portfolio vs Market</h2>
             {loadingPvM ? (
@@ -269,12 +318,7 @@ export default function MarketsPage() {
                           const val = pRows?.[key]?.[p] as number | null;
                           return (
                             <td key={p} className={`py-2 px-2 text-right font-mono ${pctColor(val != null ? val * 100 : null)}`}>
-                              {val != null ? (
-                                <span className="flex items-center justify-end gap-0.5">
-                                  {isAlpha && val > 0 ? "↑" : isAlpha && val < 0 ? "↓" : ""}
-                                  {fmtPct(val * 100, 1)}
-                                </span>
-                              ) : "—"}
+                              {val != null ? fmtPct(val * 100, 1) : "—"}
                             </td>
                           );
                         })}
@@ -286,38 +330,47 @@ export default function MarketsPage() {
             )}
           </div>
 
-          {/* PORTFOLIO VS BENCHMARKS CHART */}
+          {/* PORTFOLIO EVOLUTION CHART */}
           <div className="rounded-2xl border border-white/[0.08] bg-white/[0.03] p-4">
             <h2 className="text-sm font-semibold text-white/80 mb-1">Portfolio Evolution</h2>
             <p className="text-[10px] text-white/30 mb-3">Indexed to 100 at period start · vs SPY, QQQ, ACWI</p>
             <PortfolioChart height={180} defaultPeriod="3M" />
           </div>
 
-          {/* SECTOR HEATMAP */}
+          {/* SECTOR HEATMAP with sparklines */}
           <div className="rounded-2xl border border-white/[0.08] bg-white/[0.03] p-4">
-            <h2 className="text-sm font-semibold text-white/80 mb-3">Sector Performance Today</h2>
+            <h2 className="text-sm font-semibold text-white/80 mb-3">Sector Performance</h2>
             {loadingOverview ? (
               <div className="grid grid-cols-4 gap-2">
-                {[...Array(8)].map((_, i) => <Skeleton key={i} className="h-16" />)}
+                {[...Array(8)].map((_, i) => <Skeleton key={i} className="h-20" />)}
               </div>
             ) : (
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-                {(sectors ?? []).map(s => (
-                  <div key={s.symbol}
-                    className="rounded-xl p-3 border transition-all hover:brightness-110"
-                    style={{ background: sectorBg(s.change_pct), borderColor: sectorBorder(s.change_pct) }}>
-                    <div className="text-[10px] text-white/50 mb-0.5">{s.symbol}</div>
-                    <div className="text-xs font-medium text-white/80 leading-tight">{s.name}</div>
-                    <div className={`text-sm font-mono font-bold mt-1 ${pctColor(s.change_pct)}`}>
-                      {fmtPct(s.change_pct)}
+              <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-5 gap-2">
+                {(sectors ?? []).map(s => {
+                  const spark = sectorSparklines?.[s.symbol] ?? [];
+                  const chgColor = (s.change_pct ?? 0) >= 0 ? "#10b981" : "#f43f5e";
+                  return (
+                    <div key={s.symbol}
+                      className="rounded-xl p-3 border transition-all hover:brightness-110 cursor-default"
+                      style={{ background: sectorBg(s.change_pct), borderColor: sectorBorder(s.change_pct) }}>
+                      <div className="text-[10px] text-white/50 mb-0.5">{s.symbol}</div>
+                      <div className="text-xs font-medium text-white/80 leading-tight truncate">{s.name}</div>
+                      <div className={`text-sm font-mono font-bold mt-1 ${pctColor(s.change_pct)}`}>
+                        {fmtPct(s.change_pct)}
+                      </div>
+                      {spark.length >= 2 && (
+                        <div className="mt-1.5">
+                          <MiniChart data={spark} height={28} color={chgColor} />
+                        </div>
+                      )}
                     </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             )}
           </div>
 
-          {/* YOUR HOLDINGS TODAY */}
+          {/* YOUR HOLDINGS TODAY — expandable rows */}
           <div className="rounded-2xl border border-white/[0.08] bg-white/[0.03] p-4">
             <h2 className="text-sm font-semibold text-white/80 mb-3">Your Holdings Today</h2>
             {loadingMovers ? (
@@ -338,33 +391,54 @@ export default function MarketsPage() {
                   </thead>
                   <tbody>
                     {(heldAssets ?? []).slice(0, 12).map(a => (
-                      <tr key={a.symbol} className="border-b border-white/[0.04] hover:bg-white/[0.02] transition-colors">
-                        <td className="py-2 pr-2">
-                          <div className="flex items-center gap-2">
-                            <AssetLogo symbol={a.symbol} size={20} />
-                            <div>
-                              <div className="font-mono font-semibold text-white/90">{a.symbol}</div>
-                              <div className="text-[10px] text-white/40 truncate max-w-[100px]">{a.name}</div>
+                      <>
+                        <tr
+                          key={`row-${a.symbol}`}
+                          onClick={() =>
+                            setExpandedHolding(expandedHolding === a.symbol ? null : a.symbol)
+                          }
+                          className="border-b border-white/[0.04] hover:bg-white/[0.02] transition-colors cursor-pointer"
+                        >
+                          <td className="py-2 pr-2">
+                            <div className="flex items-center gap-2">
+                              <AssetLogo symbol={a.symbol} size={20} />
+                              <div>
+                                <div className="font-mono font-semibold text-white/90">{a.symbol}</div>
+                                <div className="text-[10px] text-white/40 truncate max-w-[100px]">{a.name}</div>
+                              </div>
                             </div>
-                          </div>
-                        </td>
-                        <td className="py-2 px-2 text-right font-mono text-white/70">{fmtPrice(a.price)}</td>
-                        <td className={`py-2 px-2 text-right font-mono font-semibold ${pctColor(a.change_pct)}`}>
-                          {fmtPct(a.change_pct)}
-                        </td>
-                        <td className="py-2 px-2 text-right">
-                          {holdingSparklines?.[a.symbol] && holdingSparklines[a.symbol].length >= 2 ? (
-                            <div className="flex justify-end">
-                              <MiniChart data={holdingSparklines[a.symbol]} height={24} width={52} />
-                            </div>
-                          ) : (
-                            <span className="text-white/20 text-[10px]">—</span>
-                          )}
-                        </td>
-                        <td className="py-2 text-right font-mono text-white/50">
-                          {a.quantity < 1 ? a.quantity.toFixed(4) : a.quantity.toFixed(2)}
-                        </td>
-                      </tr>
+                          </td>
+                          <td className="py-2 px-2 text-right font-mono text-white/70">{fmtPrice(a.price)}</td>
+                          <td className={`py-2 px-2 text-right font-mono font-semibold ${pctColor(a.change_pct)}`}>
+                            {fmtPct(a.change_pct)}
+                          </td>
+                          <td className="py-2 px-2 text-right">
+                            {holdingSparklines?.[a.symbol] && holdingSparklines[a.symbol].length >= 2 ? (
+                              <div className="flex justify-end">
+                                <MiniChart data={holdingSparklines[a.symbol]} height={24} width={52} />
+                              </div>
+                            ) : (
+                              <span className="text-white/20 text-[10px]">—</span>
+                            )}
+                          </td>
+                          <td className="py-2 text-right font-mono text-white/50">
+                            {a.quantity < 1 ? a.quantity.toFixed(4) : a.quantity.toFixed(2)}
+                          </td>
+                        </tr>
+                        {expandedHolding === a.symbol && (
+                          <tr key={`expand-${a.symbol}`}>
+                            <td colSpan={5} className="px-2 pb-4 pt-1 bg-white/[0.02]">
+                              <PriceChart
+                                symbol={a.symbol}
+                                height={150}
+                                showPeriodSelector={true}
+                                defaultPeriod="1D"
+                                variant="minimal"
+                              />
+                            </td>
+                          </tr>
+                        )}
+                      </>
                     ))}
                   </tbody>
                 </table>
@@ -434,7 +508,7 @@ export default function MarketsPage() {
             <p className="text-[10px] text-white/30 mt-2">Derived from VIX + SPY momentum</p>
           </div>
 
-          {/* MARKET GAINERS/LOSERS */}
+          {/* MARKET MOVERS */}
           <div className="rounded-2xl border border-white/[0.08] bg-white/[0.03] p-4">
             <h2 className="text-sm font-semibold text-white/80 mb-3">Market Movers</h2>
             {loadingMovers ? (

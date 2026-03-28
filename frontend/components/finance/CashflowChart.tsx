@@ -4,6 +4,7 @@
  * Danger zone highlighted when balance < threshold.
  */
 import { AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer, ReferenceLine } from "recharts";
+import { tightDomain } from "@/lib/chart-utils";
 
 interface CashflowChartProps {
   data: { date: string; balance: number; is_today?: boolean }[];
@@ -44,6 +45,7 @@ export function CashflowChart({
   }));
 
   const todayPoint = chartData.find((d) => d.is_today);
+  const domain = tightDomain(chartData as Record<string, unknown>[], ["balance"]);
 
   return (
     <ResponsiveContainer width="100%" height={height}>
@@ -62,11 +64,12 @@ export function CashflowChart({
           interval={Math.floor(chartData.length / 5)}
         />
         <YAxis
+          domain={domain}
           tick={{ fill: "rgba(255,255,255,0.3)", fontSize: 10 }}
           tickLine={false}
           axisLine={false}
-          tickFormatter={(v) => `$${(v / 1000).toFixed(0)}k`}
-          width={40}
+          tickFormatter={(v) => `$${(v / 1000).toFixed(1)}k`}
+          width={44}
         />
         <Tooltip content={<CustomTooltip />} />
         <ReferenceLine
