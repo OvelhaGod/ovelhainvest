@@ -129,12 +129,13 @@ export function PriceChart({
               interval="preserveStartEnd" minTickGap={variant === "minimal" ? 60 : 40}
             />
             {variant === "standard" ? (
-              <YAxis domain={domain} tickFormatter={formatYTick}
+              <YAxis domain={domain} allowDataOverflow={true}
+                tickFormatter={(v: number) => v === 0 ? "" : formatYTick(v)}
                 tick={{ fill: "#52525b", fontSize: 10, fontFamily: "var(--font-mono, monospace)" }}
                 axisLine={false} tickLine={false} width={50}
               />
             ) : (
-              <YAxis hide domain={domain} />
+              <YAxis hide domain={domain} allowDataOverflow={true} />
             )}
             <Tooltip
               contentStyle={{
@@ -151,6 +152,7 @@ export function PriceChart({
             <Area type="monotone" dataKey="value"
               stroke={lineColor} strokeWidth={1.5}
               fill={`url(#${gradientId})`}
+              baseValue={domain[0]}
               dot={false} activeDot={{ r: 3, fill: lineColor, strokeWidth: 0 }}
               connectNulls
             />

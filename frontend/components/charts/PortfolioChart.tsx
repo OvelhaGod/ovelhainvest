@@ -171,7 +171,8 @@ export function PortfolioChart({
           />
           <YAxis
             domain={domain}
-            tickFormatter={formatIndexTick}
+            allowDataOverflow={true}
+            tickFormatter={(v: number) => v === 0 ? "" : formatIndexTick(v)}
             tick={{ fill: "#52525b", fontSize: 10, fontFamily: "var(--font-mono, monospace)" }}
             axisLine={false}
             tickLine={false}

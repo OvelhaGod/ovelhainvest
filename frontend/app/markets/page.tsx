@@ -6,7 +6,7 @@
  * expandable holdings rows.
  */
 
-import { useCallback, useState } from "react";
+import React, { useCallback, useState } from "react";
 import useSWR from "swr";
 import { X } from "lucide-react";
 import { fetcher, CACHE_TTL } from "@/lib/swr-config";
@@ -217,8 +217,8 @@ export default function MarketsPage() {
       </div>
 
       {/* ── TICKER STRIP — clickable ── */}
-      <div className="rounded-xl border border-white/[0.07] bg-white/[0.03] overflow-hidden">
-        <div className="flex overflow-x-auto scrollbar-hide">
+      <div className="rounded-xl border border-white/[0.07] bg-white/[0.03]">
+        <div className="flex overflow-x-auto scrollbar-hide rounded-t-xl overflow-hidden">
           {(indices ?? []).map((t) => {
             const isSelected = selectedTicker === t.symbol;
             const chgColor = (t.change_pct ?? 0) >= 0 ? "#10b981" : "#f43f5e";
@@ -360,7 +360,7 @@ export default function MarketsPage() {
                       </div>
                       {spark.length >= 2 && (
                         <div className="mt-1.5">
-                          <MiniChart data={spark} height={28} color={chgColor} />
+                          <MiniChart data={spark} height={28} width={80} color={chgColor} showGradient={false} />
                         </div>
                       )}
                     </div>
@@ -391,9 +391,8 @@ export default function MarketsPage() {
                   </thead>
                   <tbody>
                     {(heldAssets ?? []).slice(0, 12).map(a => (
-                      <>
+                      <React.Fragment key={a.symbol}>
                         <tr
-                          key={`row-${a.symbol}`}
                           onClick={() =>
                             setExpandedHolding(expandedHolding === a.symbol ? null : a.symbol)
                           }
@@ -426,7 +425,7 @@ export default function MarketsPage() {
                           </td>
                         </tr>
                         {expandedHolding === a.symbol && (
-                          <tr key={`expand-${a.symbol}`}>
+                          <tr>
                             <td colSpan={5} className="px-2 pb-4 pt-1 bg-white/[0.02]">
                               <PriceChart
                                 symbol={a.symbol}
@@ -438,7 +437,7 @@ export default function MarketsPage() {
                             </td>
                           </tr>
                         )}
-                      </>
+                      </React.Fragment>
                     ))}
                   </tbody>
                 </table>
