@@ -74,7 +74,7 @@ jobs:
           echo "Pinging OvelhaInvest API at $APP_BASE_URL"
           STATUS=$(curl -s -o /dev/null -w "%{http_code}" \
             --max-time 30 \
-            "$APP_BASE_URL/health")
+            "$APP_BASE_URL/health" || echo "000")
 
           echo "API health status: $STATUS"
 
